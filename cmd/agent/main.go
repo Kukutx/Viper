@@ -23,8 +23,13 @@ func main() {
 	server := flag.String("server", "localhost:8443", "Viper server address")
 	insecure := flag.Bool("insecure", false, "allow unverified TLS certificate (development only)")
 	name := flag.String("name", "", "device display name")
+	rootFlag := flag.String("root", ".", "root directory exposed to approved sessions")
 	flag.Parse()
 
+	root, err := resolveRoot(*rootFlag)
+	if err != nil {
+		log.Fatalf("invalid -root: %v", err)
+	}
 	hostname, _ := os.Hostname()
 	if *name == "" {
 		*name = hostname
@@ -48,7 +53,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Viper Agent\n\nDevice: %s\nPlatform: %s/%s\nPair code: %s\nStatus: connected\n\n", *name, runtime.GOOS, runtime.GOARCH, pairCode)
+	fmt.Printf("Viper Agent\n\nDevice: %s\nPlatform: %s/%s\nPair code: %s\nShared root: %s\nStatus: connected\n\n", *name, runtime.GOOS, runtime.GOARCH, pairCode, root)
 	fmt.Println("Remote access is disabled until you approve a pairing request.")
 	reader := bufio.NewReader(os.Stdin)
 
@@ -64,7 +69,7 @@ func main() {
 				requester = "remote controller"
 			}
 			fmt.Printf("\n%s requests remote assistance.\n", requester)
-			fmt.Println("Capabilities: device info, directory listing, file read (max 1 MiB)")
+			fmt.Println("Capabilities: device info, directory listing, file read (max 1 MiB within the configured root)")
 			fmt.Print("Allow for up to 1 hour? [y/N]: ")
 			line, _ := reader.ReadString('\n')
 			answer := strings.TrimSpace(line)
@@ -80,14 +85,14 @@ func main() {
 			content := fmt.Sprintf("hostname=%s\nos=%s\narch=%s\ngo=%s\n", host, runtime.GOOS, runtime.GOARCH, runtime.Version())
 			_ = c.Write(protocol.Message{Type: "info_result", RequestID: msg.RequestID, Content: content})
 		case "list_request":
-			content, listErr := listDir(msg.Path)
+			content, listErr := listDir(root, msg.Path)
 			errText := ""
 			if listErr != nil {
 				errText = listErr.Error()
 			}
 			_ = c.Write(protocol.Message{Type: "list_result", RequestID: msg.RequestID, Content: content, Error: errText})
 		case "read_request":
-			content, readErr := readLimited(msg.Path)
+			content, readErr := readLimited(root, msg.Path)
 			errText := ""
 			if readErr != nil {
 				errText = readErr.Error()
@@ -102,11 +107,55 @@ func dialTLS(address string, insecure bool) (net.Conn, error) {
 	return tls.Dial("tcp", address, &tls.Config{MinVersion: tls.VersionTLS13, ServerName: host, InsecureSkipVerify: insecure}) //nolint:gosec -- explicit development-only CLI option
 }
 
-func listDir(path string) (string, error) {
-	if strings.TrimSpace(path) == "" {
-		path = "."
+func resolveRoot(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
 	}
-	entries, err := os.ReadDir(path)
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("%s is not a directory", path)
+	}
+	return resolved, nil
+}
+
+func resolveUnderRoot(root, requested string) (string, string, error) {
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		requested = "."
+	}
+	if filepath.IsAbs(requested) {
+		return "", "", fmt.Errorf("absolute paths are not allowed")
+	}
+	clean := filepath.Clean(requested)
+	candidate := filepath.Join(root, clean)
+	resolved, err := filepath.EvalSymlinks(candidate)
+	if err != nil {
+		return "", "", err
+	}
+	rel, err := filepath.Rel(root, resolved)
+	if err != nil {
+		return "", "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", "", fmt.Errorf("path escapes configured root")
+	}
+	return resolved, clean, nil
+}
+
+func listDir(root, path string) (string, error) {
+	resolved, displayPath, err := resolveUnderRoot(root, path)
+	if err != nil {
+		return "", err
+	}
+	entries, err := os.ReadDir(resolved)
 	if err != nil {
 		return "", err
 	}
@@ -116,13 +165,17 @@ func listDir(path string) (string, error) {
 		if entry.IsDir() {
 			kind = "dir"
 		}
-		fmt.Fprintf(&b, "%s\t%s\n", kind, filepath.Join(path, entry.Name()))
+		fmt.Fprintf(&b, "%s\t%s\n", kind, filepath.Join(displayPath, entry.Name()))
 	}
 	return b.String(), nil
 }
 
-func readLimited(path string) (string, error) {
-	f, err := os.Open(path)
+func readLimited(root, path string) (string, error) {
+	resolved, _, err := resolveUnderRoot(root, path)
+	if err != nil {
+		return "", err
+	}
+	f, err := os.Open(resolved)
 	if err != nil {
 		return "", err
 	}
