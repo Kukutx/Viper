@@ -2,12 +2,17 @@ package protocol
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"sync"
 )
 
-const Version = 1
+const (
+	Version         = 1
+	MaxMessageBytes = 8 << 20
+)
 
 type Message struct {
 	Version      int      `json:"version,omitempty"`
@@ -39,13 +44,33 @@ func NewConn(rw io.ReadWriter) *Conn {
 }
 
 func (c *Conn) Read() (Message, error) {
-	line, err := c.r.ReadBytes('\n')
-	if err != nil {
+	var wire bytes.Buffer
+	for {
+		fragment, err := c.r.ReadSlice('\n')
+		if wire.Len()+len(fragment) > MaxMessageBytes {
+			return Message{}, fmt.Errorf("protocol message exceeds %d bytes", MaxMessageBytes)
+		}
+		_, _ = wire.Write(fragment)
+		if err == nil {
+			break
+		}
+		if err == bufio.ErrBufferFull {
+			continue
+		}
 		return Message{}, err
 	}
+
 	var msg Message
-	err = json.Unmarshal(line, &msg)
-	return msg, err
+	if err := json.Unmarshal(wire.Bytes(), &msg); err != nil {
+		return Message{}, err
+	}
+	if msg.Version != Version {
+		return Message{}, fmt.Errorf("unsupported protocol version %d", msg.Version)
+	}
+	if msg.Type == "" {
+		return Message{}, fmt.Errorf("protocol message type is required")
+	}
+	return msg, nil
 }
 
 func (c *Conn) Write(msg Message) error {
@@ -57,6 +82,9 @@ func (c *Conn) Write(msg Message) error {
 		return err
 	}
 	data = append(data, '\n')
+	if len(data) > MaxMessageBytes {
+		return fmt.Errorf("protocol message exceeds %d bytes", MaxMessageBytes)
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	_, err = c.w.Write(data)
