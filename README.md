@@ -16,7 +16,7 @@ The first public MVP intentionally starts read-only:
 
 - `device.info`
 - `file.list`
-- `file.read` (1 MiB maximum per request)
+- `file.read` (1 MiB maximum per request, restricted to the configured shared root)
 
 Remote command execution is not enabled in this first version. The next execution layer should require explicit per-command approval on the agent side before a command is started.
 
@@ -27,6 +27,10 @@ Remote command execution is not enabled in this first version. The next executio
 - The remote user must explicitly approve the session in the agent terminal.
 - Approved sessions expire after at most one hour.
 - Closing either side invalidates the session.
+- File operations are sandboxed under the agent's configured `-root` directory; absolute paths, `..` traversal, and symlink escapes are rejected.
+- Protocol messages have a bounded wire size and require the current protocol version.
+- The relay binds pairing decisions and request results to the expected peer and expires pending state.
+- Pairing attempts are throttled per controller connection.
 - The MVP installs no persistence and does not hide itself.
 
 ## Requirements
@@ -57,10 +61,10 @@ Start the server. With no certificate arguments it creates an in-memory self-sig
 go run ./cmd/server
 ```
 
-Start an agent:
+Start an agent and explicitly choose the directory that may be inspected during the approved session:
 
 ```bash
-go run ./cmd/agent -server localhost:8443 -insecure
+go run ./cmd/agent -server localhost:8443 -insecure -root .
 ```
 
 The agent prints an 8-digit pairing code.
@@ -82,6 +86,8 @@ read README.md
 quit
 ```
 
+Attempts to read outside the configured root are rejected.
+
 ## Public deployment
 
 Run `viper-server` on a public host and use a trusted TLS certificate:
@@ -90,10 +96,10 @@ Run `viper-server` on a public host and use a trusted TLS certificate:
 viper-server -listen :443 -cert fullchain.pem -key privkey.pem
 ```
 
-Then agents connect outbound:
+Then agents connect outbound and expose only an explicitly chosen directory:
 
 ```bash
-viper-agent -server remote.example.com:443
+viper-agent -server remote.example.com:443 -root /srv/viper-share
 ```
 
 Controllers use:
@@ -111,10 +117,11 @@ Messages are newline-delimited JSON over TLS 1.3. The server routes approved req
 ## Roadmap
 
 1. Durable Ed25519 device identity and encrypted local state.
-2. Fine-grained capability approval and audit log.
-3. Per-command local approval for an execution capability.
-4. PTY interactive terminal and streaming file transfer after the approval model is hardened.
-5. UDP endpoint discovery, authenticated hole punching, P2P transport, relay fallback.
-6. AI tool adapter using the capability protocol.
-7. Screen streaming/input control as separate opt-in capabilities.
-8. Android APK using the same protocol with Android-specific capabilities.
+2. Fine-grained capability approval and structured audit log.
+3. Server-wide/IP-aware abuse controls in addition to per-connection pairing throttling.
+4. Per-command local approval for any future execution capability.
+5. PTY interactive terminal and streaming file transfer only after the approval model is hardened and independently reviewed.
+6. UDP endpoint discovery, authenticated hole punching, P2P transport, relay fallback.
+7. AI tool adapter using the capability protocol.
+8. Screen streaming/input control as separate opt-in capabilities.
+9. Android APK using the same protocol with Android-specific capabilities.
