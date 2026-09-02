@@ -19,10 +19,19 @@ import (
 	"github.com/Kukutx/Viper/internal/protocol"
 )
 
+const (
+	pairAttemptLimit  = 5
+	pairAttemptWindow = time.Minute
+	pendingPairTTL    = 2 * time.Minute
+	requestTTL        = 30 * time.Second
+)
+
 type peer struct {
-	conn *protocol.Conn
-	role string
-	name string
+	conn            *protocol.Conn
+	role            string
+	name            string
+	pairWindowStart time.Time
+	pairAttempts    int
 }
 
 type session struct {
@@ -31,16 +40,29 @@ type session struct {
 	expires    time.Time
 }
 
+type pendingPair struct {
+	agent      *peer
+	controller *peer
+	expires    time.Time
+}
+
+type pendingRequest struct {
+	agent      *peer
+	controller *peer
+	resultType string
+	expires    time.Time
+}
+
 type hub struct {
 	mu       sync.Mutex
 	agents   map[string]*peer
-	pending  map[string]*peer
-	requests map[string]*peer
+	pending  map[string]pendingPair
+	requests map[string]pendingRequest
 	sessions map[string]session
 }
 
 func newHub() *hub {
-	return &hub{agents: make(map[string]*peer), pending: make(map[string]*peer), requests: make(map[string]*peer), sessions: make(map[string]session)}
+	return &hub{agents: make(map[string]*peer), pending: make(map[string]pendingPair), requests: make(map[string]pendingRequest), sessions: make(map[string]session)}
 }
 
 func main() {
@@ -75,20 +97,28 @@ func main() {
 
 func (h *hub) handle(raw net.Conn) {
 	defer raw.Close()
+	_ = raw.SetDeadline(time.Now().Add(15 * time.Second))
 	pc := protocol.NewConn(raw)
 	hello, err := pc.Read()
 	if err != nil || hello.Type != "hello" || hello.Version != protocol.Version {
 		return
 	}
+	_ = raw.SetDeadline(time.Time{})
+
 	p := &peer{conn: pc, role: hello.Role, name: hello.DeviceName}
 	if hello.Role == "agent" {
 		if hello.PairCode == "" {
 			return
 		}
 		h.mu.Lock()
+		if h.agents[hello.PairCode] != nil {
+			h.mu.Unlock()
+			log.Printf("agent registration rejected due to pair-code collision name=%q platform=%s", hello.DeviceName, hello.Platform)
+			return
+		}
 		h.agents[hello.PairCode] = p
 		h.mu.Unlock()
-		log.Printf("agent online name=%q platform=%s pair=%s", hello.DeviceName, hello.Platform, hello.PairCode)
+		log.Printf("agent online name=%q platform=%s", hello.DeviceName, hello.Platform)
 	} else if hello.Role != "controller" {
 		return
 	}
@@ -106,32 +136,44 @@ func (h *hub) handle(raw net.Conn) {
 func (h *hub) route(from *peer, msg protocol.Message) {
 	switch msg.Type {
 	case "pair_request":
-		if from.role != "controller" {
+		if from.role != "controller" || msg.RequestID == "" || msg.PairCode == "" {
 			return
 		}
+		if !allowPairAttempt(from) {
+			_ = from.conn.Write(protocol.Message{Type: "pair_result", RequestID: msg.RequestID, Error: "too many pairing attempts; try again later"})
+			return
+		}
+
+		now := time.Now()
 		h.mu.Lock()
+		h.cleanupExpiredLocked(now)
 		agent := h.agents[msg.PairCode]
-		if agent != nil {
-			h.pending[msg.RequestID] = from
+		_, duplicate := h.pending[msg.RequestID]
+		if agent != nil && !duplicate {
+			h.pending[msg.RequestID] = pendingPair{agent: agent, controller: from, expires: now.Add(pendingPairTTL)}
 		}
 		h.mu.Unlock()
-		if agent == nil {
-			_ = from.conn.Write(protocol.Message{Type: "pair_result", RequestID: msg.RequestID, Error: "pair code not found"})
+		if agent == nil || duplicate {
+			_ = from.conn.Write(protocol.Message{Type: "pair_result", RequestID: msg.RequestID, Error: "pairing unavailable"})
 			return
 		}
 		_ = agent.conn.Write(protocol.Message{Type: "pair_prompt", RequestID: msg.RequestID, DeviceName: from.name})
 
 	case "pair_decision":
-		if from.role != "agent" {
+		if from.role != "agent" || msg.RequestID == "" {
 			return
 		}
+		now := time.Now()
 		h.mu.Lock()
-		controller := h.pending[msg.RequestID]
-		delete(h.pending, msg.RequestID)
+		pending, ok := h.pending[msg.RequestID]
+		if ok && pending.agent == from {
+			delete(h.pending, msg.RequestID)
+		}
 		h.mu.Unlock()
-		if controller == nil {
+		if !ok || pending.agent != from || now.After(pending.expires) {
 			return
 		}
+		controller := pending.controller
 		if !msg.Allow {
 			_ = controller.conn.Write(protocol.Message{Type: "pair_result", RequestID: msg.RequestID, Error: "remote user denied the request"})
 			return
@@ -145,14 +187,14 @@ func (h *hub) route(from *peer, msg protocol.Message) {
 			_ = controller.conn.Write(protocol.Message{Type: "pair_result", RequestID: msg.RequestID, Error: "could not create session"})
 			return
 		}
-		exp := time.Now().Add(time.Duration(ttl) * time.Second)
+		exp := now.Add(time.Duration(ttl) * time.Second)
 		h.mu.Lock()
 		h.sessions[token] = session{agent: from, controller: controller, expires: exp}
 		h.mu.Unlock()
 		_ = controller.conn.Write(protocol.Message{Type: "pair_result", RequestID: msg.RequestID, SessionToken: token, ExpiresAt: exp.UTC().Format(time.RFC3339), Capabilities: []string{"device.info", "file.list", "file.read"}})
 
 	case "info_request", "list_request", "read_request":
-		if from.role != "controller" {
+		if from.role != "controller" || msg.RequestID == "" {
 			return
 		}
 		s, ok := h.authorized(from, msg.SessionToken)
@@ -160,36 +202,92 @@ func (h *hub) route(from *peer, msg protocol.Message) {
 			_ = from.conn.Write(protocol.Message{Type: resultType(msg.Type), RequestID: msg.RequestID, Error: "invalid or expired session"})
 			return
 		}
+		now := time.Now()
 		h.mu.Lock()
-		h.requests[msg.RequestID] = from
+		h.cleanupExpiredLocked(now)
+		_, duplicate := h.requests[msg.RequestID]
+		if !duplicate {
+			h.requests[msg.RequestID] = pendingRequest{agent: s.agent, controller: from, resultType: resultType(msg.Type), expires: now.Add(requestTTL)}
+		}
 		h.mu.Unlock()
-		_ = s.agent.conn.Write(msg)
-
-	case "info_result", "list_result", "read_result":
-		if from.role != "agent" {
+		if duplicate {
+			_ = from.conn.Write(protocol.Message{Type: resultType(msg.Type), RequestID: msg.RequestID, Error: "duplicate request id"})
 			return
 		}
+		if err := s.agent.conn.Write(msg); err != nil {
+			h.mu.Lock()
+			delete(h.requests, msg.RequestID)
+			h.mu.Unlock()
+			_ = from.conn.Write(protocol.Message{Type: resultType(msg.Type), RequestID: msg.RequestID, Error: "agent unavailable"})
+		}
+
+	case "info_result", "list_result", "read_result":
+		if from.role != "agent" || msg.RequestID == "" {
+			return
+		}
+		now := time.Now()
 		h.mu.Lock()
-		controller := h.requests[msg.RequestID]
-		delete(h.requests, msg.RequestID)
+		request, ok := h.requests[msg.RequestID]
+		if ok && now.After(request.expires) {
+			delete(h.requests, msg.RequestID)
+			ok = false
+		}
+		if ok && request.agent == from && request.resultType == msg.Type {
+			delete(h.requests, msg.RequestID)
+		} else {
+			ok = false
+		}
 		h.mu.Unlock()
-		if controller != nil {
-			_ = controller.conn.Write(msg)
+		if ok {
+			_ = request.controller.conn.Write(msg)
 		}
 	}
+}
+
+func allowPairAttempt(p *peer) bool {
+	now := time.Now()
+	if p.pairWindowStart.IsZero() || now.Sub(p.pairWindowStart) >= pairAttemptWindow {
+		p.pairWindowStart = now
+		p.pairAttempts = 0
+	}
+	if p.pairAttempts >= pairAttemptLimit {
+		return false
+	}
+	p.pairAttempts++
+	return true
 }
 
 func (h *hub) authorized(controller *peer, token string) (session, bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	now := time.Now()
+	h.cleanupExpiredLocked(now)
 	s, ok := h.sessions[token]
-	if !ok || s.controller != controller || time.Now().After(s.expires) {
+	if !ok || s.controller != controller || now.After(s.expires) {
 		if ok {
 			delete(h.sessions, token)
 		}
 		return session{}, false
 	}
 	return s, true
+}
+
+func (h *hub) cleanupExpiredLocked(now time.Time) {
+	for id, pending := range h.pending {
+		if now.After(pending.expires) {
+			delete(h.pending, id)
+		}
+	}
+	for id, request := range h.requests {
+		if now.After(request.expires) {
+			delete(h.requests, id)
+		}
+	}
+	for token, s := range h.sessions {
+		if now.After(s.expires) {
+			delete(h.sessions, token)
+		}
+	}
 }
 
 func (h *hub) removePeer(p *peer) {
@@ -205,13 +303,13 @@ func (h *hub) removePeer(p *peer) {
 			delete(h.sessions, token)
 		}
 	}
-	for id, c := range h.pending {
-		if c == p {
+	for id, pending := range h.pending {
+		if pending.agent == p || pending.controller == p {
 			delete(h.pending, id)
 		}
 	}
-	for id, c := range h.requests {
-		if c == p {
+	for id, request := range h.requests {
+		if request.agent == p || request.controller == p {
 			delete(h.requests, id)
 		}
 	}
