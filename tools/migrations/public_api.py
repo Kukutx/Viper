@@ -1,6 +1,7 @@
 """将客户端切换到 FRB 2 公开函数，修复新版 UI API 与分析诊断。"""
 from pathlib import Path
 import re
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -81,9 +82,8 @@ def main():
     change(path, 'valueListenable: gFFI.abModel.currentName,', 'valueListenable: _selectedAddressBook,')
     change(path, 'final TextEditingController textEditingController = TextEditingController();', 'final textEditingController = _addressBookSearch;')
 
-    # Rust 继续拥有截图缓存及原子成功/失败语义；使用只选择路径的官方插件。
+    # Rust 继续拥有截图缓存及成功/失败语义；使用只选择路径的官方插件。
     change('flutter/pubspec.yaml', 'dependencies:\n', 'dependencies:\n  file_selector: 1.1.0\n', count=2)
-    # 第二次匹配是 dev_dependencies 后缀；避免重复声明。
     change('flutter/pubspec.yaml', 'dev_dependencies:\n  file_selector: 1.1.0\n', 'dev_dependencies:\n')
     path = 'flutter/lib/models/model.dart'
     change(path, "import 'dart:convert';", "import 'dart:convert';\nimport 'package:file_selector/file_selector.dart' as file_selector;\nimport '../utils/screenshot_save.dart';")
@@ -119,7 +119,6 @@ def main():
         text = re.sub(r"^import 'package:file_picker/file_picker.dart';\n", '', text, flags=re.M)
     file.write_text(text)
 
-    # 新 SDK 的无效代码诊断：删除未被调用的私有成员，不隐藏警告。
     change('flutter/lib/common.dart', "import 'dart:math';\n", '')
     path = ROOT / 'flutter/lib/desktop/pages/desktop_setting_page.dart'
     text = path.read_text().replace('const _Printer({super.key});', 'const _Printer();')
@@ -140,9 +139,9 @@ def main():
         raise ValueError('Unused popup constant anchor drift')
     path.write_text(text)
     path = ROOT / 'flutter/lib/desktop/widgets/tabbar_widget.dart'
-    text, count = re.subn(r'\n  static RxString tablabelGetter\([^\n]*\) \{[\s\S]*?\n  \}\n', '\n', path.read_text())
+    text, count = re.subn(r'(  _DesktopTabState\(\) : super\(\);\n)\n  static RxString tablabelGetter\([^\n]*\) \{[\s\S]*?\n  \}\n', r'\1', path.read_text())
     if count != 1:
-        raise ValueError('Unused tab label anchor drift')
+        raise ValueError('Unused private-state tab label anchor drift')
     path.write_text(text)
     path = 'flutter/lib/mobile/pages/file_manager_page.dart'
     change(path, 'selectedItems!.items.single.isFile', 'selectedItems.items.single.isFile')
@@ -155,15 +154,17 @@ def main():
     change('flutter/packages/dash_chat_2/lib/src/widgets/message_list/message_list.dart', '      default:\n        return false;\n', '')
     path = ROOT / 'flutter/packages/dash_chat_2/VIPER.md'
     path.write_text(path.read_text() + '\nDart 3.13: removed an unreachable default in the exhaustive separator-frequency switch.\n')
-    # FRB 2 的发送返回 Result；接收方已关闭时记录诊断，不静默丢弃错误。
     path = ROOT / 'src/flutter.rs'
     text = path.read_text()
-    pattern = re.compile(r'^(\s*)((?:stream|s)\.add\([^\n]+\));$', re.M)
+    pattern = re.compile(r'^([ \t]*)((?:stream|s)\.add\([^\n]+\));$', re.M)
     text, count = pattern.subn(lambda m: m[1] + 'if let Err(error) = ' + m[2] + ' {\n' + m[1] + '    log::debug!("Flutter event receiver closed: {error}");\n' + m[1] + '}', text)
     if count < 5:
         raise ValueError(f'Expected at least five Result-returning event sends, got {count}')
     path.write_text(text)
-    print(f'Public FRB API migrated: {len(mapping)} functions. Event send Results handled: {count}.')
+    print(f'Public FRB API migrated: {len(mapping)} functions. Event send Results handled: {count}.', flush=True)
+    subprocess.run(['flutter', 'pub', 'get'], cwd=ROOT / 'flutter', check=True)
+    # 仅移除本次 API/私有成员迁移后不再使用的导入；不修改分析器规则。
+    subprocess.run(['dart', 'fix', '--apply', '--code=unused_import'], cwd=ROOT / 'flutter', check=True)
 
 
 if __name__ == '__main__':
