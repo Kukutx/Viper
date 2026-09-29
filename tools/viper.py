@@ -139,12 +139,12 @@ def files_in(directory: Path) -> list[Path]:
     if directory.is_symlink() or not directory.is_dir():
         raise ValueError("Artifact directory must be a real directory")
     result = []
-    for path in sorted(directory.rglob("*")):
+    for path in sorted(directory.rglob("*"), key=lambda p: p.relative_to(directory).as_posix()):
         if path.is_symlink():
             raise ValueError(f"Symlink not allowed: {path}")
-        if path.is_file() and path.name != "release-manifest.json":
+        if path.is_file() and path != directory / "release-manifest.json":
             result.append(path)
-        elif not path.is_dir() and path.name != "release-manifest.json":
+        elif not path.is_dir() and path != directory / "release-manifest.json":
             raise ValueError(f"Unsupported artifact: {path}")
     if not result:
         raise ValueError("Empty release")

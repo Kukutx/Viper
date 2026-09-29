@@ -69,6 +69,16 @@ class ReleaseTests(unittest.TestCase):
     def write(self, data):
         (self.root / "release-manifest.json").write_text(json.dumps(data), encoding="utf-8")
 
+    def test_nested_manifest_is_not_excluded(self):
+        nested = self.root / "nested"
+        nested.mkdir()
+        (nested / "release-manifest.json").write_text("tracked artifact")
+        data = self.save()
+        self.assertEqual(len(data["artifacts"]), 2)
+        (nested / "release-manifest.json").write_text("tampered")
+        with self.assertRaises(ValueError):
+            viper.verify_manifest(self.root)
+
     def test_roundtrip(self):
         self.save()
         viper.verify_manifest(self.root)

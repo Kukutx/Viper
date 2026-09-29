@@ -1,10 +1,13 @@
 # syntax=docker/dockerfile:1
 ARG RUST_VERSION=1.98.1
 FROM rust:${RUST_VERSION}-trixie AS rust
+RUN rustup component add rustfmt clippy
 
 FROM python:3.14.7-slim-trixie
 ARG CMAKE_VERSION=4.4.3
 ARG VCPKG_COMMIT_ID=9e593bb18ea69cc5095e012465dcd675a822ed0d
+ARG BUILDER_UID=10001
+ARG BUILDER_GID=10001
 ARG DEBIAN_FRONTEND=noninteractive
 ENV VCPKG_FORCE_SYSTEM_BINARIES=1 \
     VCPKG_ROOT=/opt/vcpkg \
@@ -29,11 +32,13 @@ RUN git init /opt/vcpkg && \
     git -C /opt/vcpkg checkout --detach FETCH_HEAD && \
     test "$(git -C /opt/vcpkg rev-parse HEAD)" = "${VCPKG_COMMIT_ID}" && \
     /opt/vcpkg/bootstrap-vcpkg.sh -disableMetrics
-RUN groupadd --gid 10001 builder && \
-    useradd --uid 10001 --gid builder --create-home builder && \
+RUN test "${BUILDER_UID}" -ne 0 && \
+    groupadd --gid "${BUILDER_GID}" builder && \
+    useradd --uid "${BUILDER_UID}" --gid builder --create-home builder && \
     mkdir -p /workspace /home/builder/.cargo && \
     chown -R builder:builder /workspace /home/builder /opt/vcpkg /opt/rustup
 COPY --chmod=755 entrypoint.sh /usr/local/bin/viper-build
-USER 10001:10001
+USER ${BUILDER_UID}:${BUILDER_GID}
 WORKDIR /workspace
 ENTRYPOINT ["/usr/local/bin/viper-build"]
+CMD ["build", "--locked", "--features", "flutter", "--lib"]
