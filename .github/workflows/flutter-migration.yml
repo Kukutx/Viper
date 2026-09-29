@@ -1,0 +1,84 @@
+name: Flutter migration candidate
+
+on:
+  push:
+    branches: [codex/viper-foundation-modernization]
+    paths: ['tools/migrations/**', '.github/workflows/flutter-migration.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-migration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  candidate:
+    if: github.ref == 'refs/heads/codex/viper-foundation-modernization'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - run: python tools/viper.py env >> "$GITHUB_ENV"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Native development libraries
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y clang libclang-dev cmake ninja-build pkg-config nasm libgtk-3-dev libasound2-dev libpulse-dev libdbus-1-dev libxdo-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxfixes-dev libxtst-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libvpx-dev libyuv-dev libaom-dev libopus-dev libsodium-dev
+      - run: rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: flutter-v2-migration
+      - name: Install checksum-verified bridge generator
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=flutter_rust_bridge_codegen-x86_64-unknown-linux-musl-v2.13.0.tgz
+          url="https://github.com/fzyzcjy/flutter_rust_bridge/releases/download/v2.13.0/$archive"
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 3 "$url" -o "$archive"
+          curl -fsSL --retry 3 "$url.sha256" -o digest.txt
+          digest=$(cut -d ' ' -f1 digest.txt)
+          [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
+          printf '%s  %s\n' "$digest" "$archive" | sha256sum -c -
+          tar -xzf "$archive"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+          find . -maxdepth 3 -name flutter_rust_bridge_codegen -type f -print
+      - name: Prepare API migration
+        run: python tools/migrations/flutter_v2.py prepare
+      - name: Resolve Flutter dependencies
+        working-directory: flutter
+        run: flutter pub get
+      - name: Generate bindings
+        run: flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml
+      - name: Inspect generated API
+        if: always()
+        run: python tools/migrations/flutter_v2.py diagnose
+      - name: Capture migration diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p tools/.reports
+          git diff --stat
+          git diff --binary > tools/.reports/flutter-migration.patch
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: flutter-migration-${{ github.sha }}
+          path: |
+            tools/.reports/
+            flutter/lib/generated/
+            src/bridge_generated*.rs
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error
