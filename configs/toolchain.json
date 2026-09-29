@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "verified_at": "2026-09-29",
+  "rust": "1.98.1",
+  "flutter": "3.47.5",
+  "dart": "3.13.4",
+  "python": "3.14.7",
+  "uv": "0.12.20",
+  "cmake": "4.4.3",
+  "actionlint": "1.7.12",
+  "vcpkg": {
+    "version": "2026.07.29",
+    "revision": "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+  },
+  "hbb_common": {
+    "revision": "229b904508364c8997aad0fb5af57effac859f60",
+    "source": "https://github.com/rustdesk/rustdesk/tree/master/libs/hbb_common"
+  },
+  "migrations": {
+    "flutter_rust_bridge": {
+      "current": "1.80.1",
+      "target": "2.13.0",
+      "status": "pending-api-and-codegen-migration"
+    },
+    "flutter_platform_builds": "pending-unified-sdk-validation",
+    "android_gradle_kotlin": "pending-plugin-api-migration",
+    "sciter_and_legacy_platforms": "pending-feature-migration",
+    "native_dependency_majors": "pending-api-and-platform-validation"
+  },
+  "sources": {
+    "rust": "https://blog.rust-lang.org/releases/latest/",
+    "flutter": "https://github.com/flutter/flutter/tree/3.47.5",
+    "python": "https://www.python.org/downloads/release/python-3147/",
+    "uv": "https://github.com/astral-sh/uv/releases/tag/0.12.20",
+    "cmake": "https://github.com/Kitware/CMake/releases/tag/v4.4.3",
+    "actionlint": "https://github.com/rhysd/actionlint/releases/tag/v1.7.12",
+    "vcpkg": "https://github.com/microsoft/vcpkg/releases/tag/2026.07.29",
+    "flutter_rust_bridge": "https://pub.dev/packages/flutter_rust_bridge/versions/2.13.0"
+  }
+}

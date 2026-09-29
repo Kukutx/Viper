@@ -1,63 +1,39 @@
-FROM debian:trixie-slim
+# syntax=docker/dockerfile:1
+ARG RUST_VERSION=1.98.1
+FROM rust:${RUST_VERSION}-trixie AS rust
 
-WORKDIR /
+FROM python:3.14.7-slim-trixie
+ARG CMAKE_VERSION=4.4.3
+ARG VCPKG_COMMIT_ID=9e593bb18ea69cc5095e012465dcd675a822ed0d
 ARG DEBIAN_FRONTEND=noninteractive
-ENV VCPKG_FORCE_SYSTEM_BINARIES=1
-RUN apt update -y && \
-    apt install --yes --no-install-recommends \
-        g++ \
-        gcc \
-        git \
-        curl \
-        nasm \
-        yasm \
-        libgtk-3-dev \
-        clang \
-        libxcb-randr0-dev \
-        libxdo-dev \
-        libxfixes-dev \
-        libxcb-shape0-dev \
-        libxcb-xfixes0-dev \
-        libasound2-dev \
-        libpulse-dev \
-        make \
-        wget \
-        libssl-dev \
-        unzip \
-        zip \
-        sudo \
-        libgstreamer1.0-dev \
-        libgstreamer-plugins-base1.0-dev \
-        ca-certificates \
-        ninja-build && \
-        rm -rf /var/lib/apt/lists/*
+ENV VCPKG_FORCE_SYSTEM_BINARIES=1 \
+    VCPKG_ROOT=/opt/vcpkg \
+    RUSTUP_HOME=/opt/rustup \
+    CARGO_HOME=/home/builder/.cargo \
+    CARGO_NET_GIT_FETCH_WITH_CLI=true
 
-RUN wget https://github.com/Kitware/CMake/releases/download/v3.30.6/cmake-3.30.6.tar.gz --no-check-certificate && \
-    tar xzf cmake-3.30.6.tar.gz && \
-    cd cmake-3.30.6 && \
-    ./configure  --prefix=/usr/local && \
-    make && \
-    make install
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential ca-certificates clang curl git libclang-dev llvm-dev \
+    libasound2-dev libgtk-3-dev libpulse-dev libssl-dev libunwind-dev \
+    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+    libva-dev libvdpau-dev libxcb-randr0-dev libxcb-shape0-dev \
+    libxcb-xfixes0-dev libxdo-dev libxfixes-dev nasm ninja-build \
+    pkg-config unzip zip && rm -rf /var/lib/apt/lists/*
+RUN python -m pip install --no-cache-dir "cmake==${CMAKE_VERSION}"
+COPY --from=rust /usr/local/cargo/bin/ /usr/local/bin/
+COPY --from=rust /usr/local/rustup/ /opt/rustup/
 
-RUN git clone --branch 2023.04.15 --depth=1 https://github.com/microsoft/vcpkg && \
-    /vcpkg/bootstrap-vcpkg.sh -disableMetrics && \
-    /vcpkg/vcpkg --disable-metrics install libvpx libyuv opus aom
-
-RUN groupadd -r user && \
-    useradd -r -g user user --home /home/user && \
-    mkdir -p /home/user/rustdesk && \
-    chown -R user: /home/user && \
-    echo "user ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/user
-
-WORKDIR /home/user
-RUN curl -LO https://raw.githubusercontent.com/c-smile/sciter-sdk/master/bin.lnx/x64/libsciter-gtk.so
-
-USER user
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup.sh && \
-    chmod +x rustup.sh && \
-    ./rustup.sh -y
-
-USER root
-ENV HOME=/home/user
-COPY ./entrypoint.sh /
-ENTRYPOINT ["/entrypoint.sh"]
+RUN git init /opt/vcpkg && \
+    git -C /opt/vcpkg remote add origin https://github.com/microsoft/vcpkg.git && \
+    git -C /opt/vcpkg fetch --depth 1 origin "${VCPKG_COMMIT_ID}" && \
+    git -C /opt/vcpkg checkout --detach FETCH_HEAD && \
+    test "$(git -C /opt/vcpkg rev-parse HEAD)" = "${VCPKG_COMMIT_ID}" && \
+    /opt/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+RUN groupadd --gid 10001 builder && \
+    useradd --uid 10001 --gid builder --create-home builder && \
+    mkdir -p /workspace /home/builder/.cargo && \
+    chown -R builder:builder /workspace /home/builder /opt/vcpkg /opt/rustup
+COPY --chmod=755 entrypoint.sh /usr/local/bin/viper-build
+USER 10001:10001
+WORKDIR /workspace
+ENTRYPOINT ["/usr/local/bin/viper-build"]
