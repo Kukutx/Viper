@@ -18,6 +18,8 @@ jobs:
     if: github.ref == 'refs/heads/codex/viper-foundation-modernization'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,10 +29,15 @@ jobs:
         with:
           python-version-file: .python-version
       - run: python tools/viper.py env >> "$GITHUB_ENV"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /opt/hostedtoolcache/flutter
+          key: viper-flutter-${{ runner.os }}-${{ env.FLUTTER_VERSION }}
+          save-always: true
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          cache: false
       - name: Install development libraries and tools
         run: |
           mkdir -p tools/.reports
@@ -57,14 +64,32 @@ jobs:
           tar -xzf "$archive"
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Prepare API migration
-        run: python tools/migrations/flutter_v2.py prepare
+        run: |
+          python tools/migrations/flutter_v2.py prepare
+          python tools/migrations/platform_packages.py
       - name: Resolve Flutter dependencies
         working-directory: flutter
         run: flutter pub get
       - name: Generate bindings
+        id: generate
         run: |
           flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml > tools/.reports/codegen.log 2>&1 || { tail -150 tools/.reports/codegen.log; exit 1; }
           tail -40 tools/.reports/codegen.log
+      - name: Migrate Dart callsites
+        id: finish
+        run: python tools/migrations/finish_flutter_v2.py
+      - name: Analyze migrated Flutter
+        if: ${{ !cancelled() && steps.finish.outcome == 'success' }}
+        run: python tools/migrations/analyze.py
+      - name: Check Rust Flutter library
+        if: ${{ !cancelled() && steps.finish.outcome == 'success' }}
+        run: |
+          cargo check --lib --features flutter,linux-pkg-config > tools/.reports/cargo-check.log 2>&1 || { tail -140 tools/.reports/cargo-check.log; exit 1; }
+      - name: Preserve candidate objects for review
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/migrations/snapshot.py
       - name: Inspect generated API
         if: always()
         run: python tools/migrations/flutter_v2.py diagnose
