@@ -1109,7 +1109,7 @@ List<TToggleMenu> toolbarPrivacyMode(
     return [
       getDefaultMenu((sid, opt) async {
         bind.crateFlutterFfiSessionTogglePrivacyMode(
-            sessionId: sid, implKey: implKey, on: privacyModeState.isEmpty);
+            sessionId: sid, implKey: implKey, on_: privacyModeState.isEmpty);
         togglePrivacyModeTime = DateTime.now();
       }, implKey)
     ];
@@ -1137,7 +1137,7 @@ List<TToggleMenu> toolbarPrivacyMode(
                   }
                   togglePrivacyModeTime = DateTime.now();
                   bind.crateFlutterFfiSessionTogglePrivacyMode(
-                      sessionId: sessionId, implKey: implKey, on: value);
+                      sessionId: sessionId, implKey: implKey, on_: value);
                 }
               : null);
     }).toList();
@@ -1268,7 +1268,7 @@ List<Widget> getVirtualDisplayMenuChildren(
                 : (bool? value) async {
                     if (value != null) {
                       bind.crateFlutterFfiSessionToggleVirtualDisplay(
-                          sessionId: ffi.sessionId, index: i + 1, on: value);
+                          sessionId: ffi.sessionId, index: i + 1, on_: value);
                       clickCallBack?.call();
                     }
                   },
@@ -1284,7 +1284,7 @@ List<Widget> getVirtualDisplayMenuChildren(
                   bind.crateFlutterFfiSessionToggleVirtualDisplay(
                       sessionId: ffi.sessionId,
                       index: kAllVirtualDisplay,
-                      on: false);
+                      on_: false);
                   clickCallBack?.call();
                 },
           ffi: ffi,
@@ -1302,7 +1302,7 @@ List<Widget> getVirtualDisplayMenuChildren(
                     ? null
                     : () {
                         bind.crateFlutterFfiSessionToggleVirtualDisplay(
-                            sessionId: ffi.sessionId, index: 0, on: false);
+                            sessionId: ffi.sessionId, index: 0, on_: false);
                         clickCallBack?.call();
                       },
                 child: Icon(Icons.remove),
@@ -1313,7 +1313,7 @@ List<Widget> getVirtualDisplayMenuChildren(
                     ? null
                     : () {
                         bind.crateFlutterFfiSessionToggleVirtualDisplay(
-                            sessionId: ffi.sessionId, index: 0, on: true);
+                            sessionId: ffi.sessionId, index: 0, on_: true);
                         clickCallBack?.call();
                       },
                 child: Icon(Icons.add),
@@ -1328,7 +1328,7 @@ List<Widget> getVirtualDisplayMenuChildren(
                     bind.crateFlutterFfiSessionToggleVirtualDisplay(
                         sessionId: ffi.sessionId,
                         index: kAllVirtualDisplay,
-                        on: false);
+                        on_: false);
                     clickCallBack?.call();
                   },
             ffi: ffi,

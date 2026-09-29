@@ -1753,9 +1753,6 @@ Future<String?> sessionGetCommon({
   param: param,
 );
 
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ResultType < () >>>
-abstract class ResultType implements RustOpaqueInterface {}
-
 @freezed
 sealed class EventToUI with _$EventToUI {
   const EventToUI._();

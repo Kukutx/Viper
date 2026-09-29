@@ -220,20 +220,16 @@ class _AddressBookState extends State<AddressBook> {
     }
 
     final items = names
-        .map((e) => DropdownMenuItem(value: e, child: buildItem(e)))
+        .map((e) => DropdownItem<String>(value: e, height: 36, child: buildItem(e)))
         .toList();
-    var menuItemStyleData = MenuItemStyleData(height: 36);
     if (contains && items.length > 1) {
-      items.insert(1, DropdownMenuItem(enabled: false, child: Divider()));
-      List<double> customHeights = List.filled(items.length, 36);
-      customHeights[1] = 4;
-      menuItemStyleData = MenuItemStyleData(customHeights: customHeights);
+      items.insert(1, DropdownItem<String>(enabled: false, height: 4, child: Divider()));
     }
     final TextEditingController textEditingController = TextEditingController();
 
     final isOptFixed = isOptionFixed(kOptionCurrentAbName);
     return DropdownButton2<String>(
-      value: gFFI.abModel.currentName.value,
+      valueListenable: gFFI.abModel.currentName,
       onChanged: isOptFixed
           ? null
           : (value) {
@@ -255,14 +251,13 @@ class _AddressBookState extends State<AddressBook> {
         height: 0.7,
         color: Theme.of(context).dividerColor.withOpacity(0.1),
       ),
-      menuItemStyleData: menuItemStyleData,
       items: items,
       isExpanded: true,
       isDense: true,
       dropdownSearchData: DropdownSearchData(
         searchController: textEditingController,
-        searchInnerWidgetHeight: 50,
-        searchInnerWidget: Container(
+        searchBarWidgetHeight: 50,
+        searchBarWidget: Container(
           height: 50,
           padding: const EdgeInsets.only(
             top: 8,

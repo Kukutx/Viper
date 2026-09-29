@@ -16,7 +16,7 @@ use hbb_common::{
     config::{self, LocalConfig, PeerConfig, PeerInfoSerde},
     lazy_static, log,
     rendezvous_proto::ConnType,
-    ResultType,
+    anyhow,
 };
 use base::{
     config::keys,
@@ -85,7 +85,7 @@ fn initialize(app_dir: &str, custom_client_config: &str) {
 }
 
 #[inline]
-pub fn start_global_event_stream(s: StreamSink<String>, app_type: String) -> ResultType<()> {
+pub fn start_global_event_stream(s: StreamSink<String>, app_type: String) -> anyhow::Result<()> {
     super::flutter::start_global_event_stream(s, app_type)
 }
 
@@ -184,7 +184,7 @@ pub fn session_start(
     events2ui: StreamSink<EventToUI>,
     session_id: SessionID,
     id: String,
-) -> ResultType<()> {
+) -> anyhow::Result<()> {
     session_start_(&session_id, &id, events2ui)
 }
 
@@ -193,7 +193,7 @@ pub fn session_start_with_displays(
     session_id: SessionID,
     id: String,
     displays: Vec<i32>,
-) -> ResultType<()> {
+) -> anyhow::Result<()> {
     session_start_(&session_id, &id, events2ui)?;
 
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
@@ -2635,10 +2635,7 @@ pub fn main_default_privacy_mode_impl() -> String {
 
 #[flutter_rust_bridge::frb(sync)]
 pub fn main_supported_privacy_mode_impls() -> String {
-    (
-        serde_json::to_string(&crate::privacy_mode::get_supported_privacy_mode_impl())
-            .unwrap_or_default(),
-    )
+    serde_json::to_string(&crate::privacy_mode::get_supported_privacy_mode_impl()).unwrap_or_default()
 }
 
 #[flutter_rust_bridge::frb(sync)]
@@ -2649,10 +2646,7 @@ pub fn main_supported_input_source() -> String {
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        (
-            serde_json::to_string(&crate::keyboard::input_source::get_supported_input_source())
-                .unwrap_or_default(),
-        )
+        serde_json::to_string(&crate::keyboard::input_source::get_supported_input_source()).unwrap_or_default()
     }
 }
 

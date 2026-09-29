@@ -45,7 +45,8 @@ import 'platform_model.dart';
 import 'package:flutter_hbb/utils/scale.dart';
 
 import 'package:flutter_hbb/generated/flutter_ffi.dart'
-    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart';
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart'
+    show EventToUI, EventToUI_Event, EventToUI_Rgba, EventToUI_Texture;
 import 'package:flutter_hbb/native/custom_cursor.dart'
     if (dart.library.html) 'package:flutter_hbb/web/custom_cursor.dart';
 
@@ -506,7 +507,7 @@ class FfiModel with ChangeNotifier {
         close();
         Future.delayed(Duration.zero, () async {
           final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          String? outputFile = await FilePicker.platform.saveFile(
+          String? outputFile = await FilePicker.saveFile(
             dialogTitle: '${translate('Save as')}...',
             fileName: 'screenshot_$ts.png',
             allowedExtensions: ['png'],

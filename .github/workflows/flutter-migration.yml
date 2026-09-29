@@ -30,8 +30,9 @@ jobs:
       - run: |
           python tools/viper.py env >> "$GITHUB_ENV"
           python -m pip install -r tools/requirements-dev.txt
+          mkdir -p tools/.reports
+          python -m unittest discover -s tools/tests -v
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        id: sdk-cache
         with:
           path: /opt/hostedtoolcache/flutter
           key: viper-flutter-${{ runner.os }}-${{ env.FLUTTER_VERSION }}
@@ -39,11 +40,11 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: false
-      - name: Repair migration API differences
-        run: python tools/migrations/repair_v2.py
-      - name: Verify locked Flutter resolution
+      - name: Migrate remaining public APIs
+        run: python tools/migrations/public_api.py
+      - name: Resolve added native file-selection dependency
         working-directory: flutter
-        run: flutter pub get --enforce-lockfile
+        run: flutter pub get
       - name: Install native development tools
         run: |
           sudo apt-get update -qq > tools/.reports/apt.log 2>&1
@@ -60,49 +61,39 @@ jobs:
           key: viper-yuv-${{ runner.os }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**') }}
       - name: Build repository-pinned libyuv
         run: bash tools/migrations/native_setup.sh
-      - name: Install pinned bridge generator
-        shell: bash
-        run: |
-          set -euo pipefail
-          archive=flutter_rust_bridge_codegen-x86_64-unknown-linux-musl-v2.13.0.tgz
-          cd "$RUNNER_TEMP"
-          curl -fsSL --retry 3 "https://github.com/fzyzcjy/flutter_rust_bridge/releases/download/v2.13.0/$archive" -o "$archive"
-          echo "58de00e9a9cc60fce98a052917f68ac61889825f90ce25eb185cc9d32dc1ff48  $archive" | sha256sum -c -
-          tar -xzf "$archive"
-          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-      - name: Generate bindings
+      - name: Generate version-checked bindings
         id: generate
         run: |
-          flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml > tools/.reports/codegen.log 2>&1 || { tail -100 tools/.reports/codegen.log; exit 1; }
-          tail -30 tools/.reports/codegen.log
+          python tools/bridge.py generate > tools/.reports/codegen.log 2>&1 || { tail -100 tools/.reports/codegen.log; exit 1; }
+          tail -20 tools/.reports/codegen.log
       - name: Analyze Flutter
         if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         run: python tools/migrations/analyze.py
       - name: Check Rust Flutter library
         if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
-        id: native
         run: |
           cargo check --locked --lib --features flutter,linux-pkg-config > tools/.reports/cargo-check.log 2>&1 || { tail -100 tools/.reports/cargo-check.log; exit 1; }
           tail -10 tools/.reports/cargo-check.log
-      - name: Run Flutter regression tests
+      - name: Run all Flutter regression tests
         if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         working-directory: flutter
-        run: flutter test test/cursor_size_test.dart test/utils_test.dart > ../tools/.reports/flutter-tests.log 2>&1 || { tail -120 ../tools/.reports/flutter-tests.log; exit 1; }
+        run: |
+          flutter test --no-pub test > ../tools/.reports/flutter-tests.log 2>&1 || { tail -140 ../tools/.reports/flutter-tests.log; exit 1; }
+          tail -15 ../tools/.reports/flutter-tests.log
       - name: Preserve candidate objects
         if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python tools/migrations/snapshot.py
-      - name: Capture candidate and diagnostics
+      - name: Capture candidate source and diagnostics
         if: always()
         run: |
           mkdir -p tools/.reports
           git diff --stat
           git diff --binary > tools/.reports/flutter-migration.patch
           python - <<'PY'
-          import json, pathlib, subprocess, zipfile
+          import pathlib, subprocess, zipfile
           paths = set(subprocess.check_output(['git', 'ls-files'], text=True).splitlines())
-          paths |= {str(p) for p in pathlib.Path('flutter/lib/generated').rglob('*') if p.is_file()}
           with zipfile.ZipFile('tools/.reports/source.zip', 'w', zipfile.ZIP_DEFLATED) as z:
               for path in sorted(paths):
                   p = pathlib.Path(path)

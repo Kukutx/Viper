@@ -8,13 +8,6 @@ import 'dart:html' as html;
 
 import 'package:flutter_hbb/consts.dart';
 
-final _privateConstructorUsedError = UnsupportedError(
-    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
-
-mixin _$EventToUI {
-  Object get field0 => throw _privateConstructorUsedError;
-}
-
 sealed class EventToUI {
   const factory EventToUI.event(
     String field0,
@@ -29,19 +22,19 @@ sealed class EventToUI {
 }
 
 class EventToUI_Event implements EventToUI {
-  const EventToUI_Event(final String field0) : this.field = field0;
+  const EventToUI_Event(String field0) : this.field = field0;
   final String field;
   String get field0 => field;
 }
 
 class EventToUI_Rgba implements EventToUI {
-  const EventToUI_Rgba(final int field0) : field = field0;
+  const EventToUI_Rgba(int field0) : field = field0;
   final int field;
   int get field0 => field;
 }
 
 class EventToUI_Texture implements EventToUI {
-  const EventToUI_Texture(final int field0, final bool field1)
+  const EventToUI_Texture(int field0, bool field1)
       : f0 = field0,
         f1 = field1;
   final int f0;
@@ -127,7 +120,7 @@ class RustLibApi {
   Future<bool?> crateFlutterFfiSessionGetToggleOption(
       {required UuidValue sessionId, required String arg, dynamic hint}) {
     return Future(
-        () => sessionGetToggleOptionSync(sessionId: sessionId, arg: arg));
+        () => crateFlutterFfiSessionGetToggleOptionSync(sessionId: sessionId, arg: arg));
   }
 
   bool crateFlutterFfiSessionGetToggleOptionSync(
@@ -369,7 +362,7 @@ class RustLibApi {
 
   bool crateFlutterFfiSessionIsKeyboardModeSupported(
       {required UuidValue sessionId, required String mode, dynamic hint}) {
-    if (mainGetInputSource(hint: hint) == 'Input source 1') {
+    if (crateFlutterFfiMainGetInputSource(hint: hint) == 'Input source 1') {
       return [kKeyMapMode, kKeyTranslateMode].contains(mode);
     } else {
       return [kKeyLegacyMode, kKeyMapMode].contains(mode);
@@ -751,7 +744,7 @@ class RustLibApi {
   }
 
   Future<String> crateFlutterFfiMainGetOption({required String key, dynamic hint}) {
-    return Future.value(mainGetOptionSync(key: key));
+    return Future.value(crateFlutterFfiMainGetOptionSync(key: key));
   }
 
   String crateFlutterFfiMainGetOptionSync({required String key, dynamic hint}) {
@@ -773,7 +766,7 @@ class RustLibApi {
 
   // get server settings
   Future<String> crateFlutterFfiMainGetOptions({dynamic hint}) {
-    return Future(() => mainGetOptionsSync());
+    return Future(() => crateFlutterFfiMainGetOptionsSync());
   }
 
   // get server settings
@@ -804,7 +797,7 @@ class RustLibApi {
   }
 
   Future<String> crateFlutterFfiMainGetAppName({dynamic hint}) {
-    return Future.value(mainGetAppNameSync(hint: hint));
+    return Future.value(crateFlutterFfiMainGetAppNameSync(hint: hint));
   }
 
   String crateFlutterFfiMainGetAppNameSync({dynamic hint}) {
@@ -958,7 +951,7 @@ class RustLibApi {
 
   Future<String> crateFlutterFfiMainGetPeerOption(
       {required String id, required String key, dynamic hint}) {
-    return Future(() => mainGetPeerOptionSync(id: id, key: key, hint: hint));
+    return Future(() => crateFlutterFfiMainGetPeerOptionSync(id: id, key: key, hint: hint));
   }
 
   String crateFlutterFfiMainGetPeerOptionSync(
@@ -990,7 +983,7 @@ class RustLibApi {
       required String key,
       required String value,
       dynamic hint}) {
-    mainSetPeerOptionSync(id: id, key: key, value: value, hint: hint);
+    crateFlutterFfiMainSetPeerOptionSync(id: id, key: key, value: value, hint: hint);
     return Future.value();
   }
 
@@ -1008,7 +1001,7 @@ class RustLibApi {
 
   Future<void> crateFlutterFfiMainSetPeerAlias(
       {required String id, required String alias, dynamic hint}) {
-    mainSetPeerOptionSync(id: id, key: 'alias', value: alias, hint: hint);
+    crateFlutterFfiMainSetPeerOptionSync(id: id, key: 'alias', value: alias, hint: hint);
     return Future.value();
   }
 
@@ -1017,7 +1010,7 @@ class RustLibApi {
   }
 
   Future<void> crateFlutterFfiMainForgetPassword({required String id, dynamic hint}) {
-    return mainSetPeerOption(id: id, key: 'password', value: '');
+    return crateFlutterFfiMainSetPeerOption(id: id, key: 'password', value: '');
   }
 
   Future<bool> crateFlutterFfiMainPeerHasPassword({required String id, dynamic hint}) {
@@ -1140,7 +1133,7 @@ class RustLibApi {
   }
 
   Future<String> crateFlutterFfiMainGetLastRemoteId({dynamic hint}) {
-    return Future(() => mainGetLocalOption(key: 'last_remote_id'));
+    return Future(() => crateFlutterFfiMainGetLocalOption(key: 'last_remote_id'));
   }
 
   Future<void> crateFlutterFfiMainGetSoftwareUpdateUrl({dynamic hint}) {
@@ -1613,27 +1606,27 @@ class RustLibApi {
 
   bool crateFlutterFfiIsCustomClient({dynamic hint}) {
     // is_custom_client() checks if app name is not "RustDesk"
-    return mainGetAppNameSync(hint: hint) != "RustDesk";
+    return crateFlutterFfiMainGetAppNameSync(hint: hint) != "RustDesk";
   }
 
   bool crateFlutterFfiIsDisableSettings({dynamic hint}) {
     // Checks HARD_SETTINGS["disable-settings"] == "Y"
-    return mainGetHardOption(key: "disable-settings", hint: hint) == "Y";
+    return crateFlutterFfiMainGetHardOption(key: "disable-settings", hint: hint) == "Y";
   }
 
   bool crateFlutterFfiIsDisableAb({dynamic hint}) {
     // Checks HARD_SETTINGS["disable-ab"] == "Y"
-    return mainGetHardOption(key: "disable-ab", hint: hint) == "Y";
+    return crateFlutterFfiMainGetHardOption(key: "disable-ab", hint: hint) == "Y";
   }
 
   bool crateFlutterFfiIsDisableGroupPanel({dynamic hint}) {
     // Checks LocalConfig::get_option("disable-group-panel") == "Y"
-    return mainGetLocalOption(key: "disable-group-panel", hint: hint) == "Y";
+    return crateFlutterFfiMainGetLocalOption(key: "disable-group-panel", hint: hint) == "Y";
   }
 
   bool crateFlutterFfiIsDisableAccount({dynamic hint}) {
     // Checks HARD_SETTINGS["disable-account"] == "Y"
-    return mainGetHardOption(key: "disable-account", hint: hint) == "Y";
+    return crateFlutterFfiMainGetHardOption(key: "disable-account", hint: hint) == "Y";
   }
 
   bool crateFlutterFfiIsDisableInstallation({dynamic hint}) {
@@ -1649,7 +1642,7 @@ class RustLibApi {
   }
 
   bool crateFlutterFfiIsSupportMultiUiSession({required String version, dynamic hint}) {
-    return versionToNumber(v: version) > versionToNumber(v: '1.2.4');
+    return crateFlutterFfiVersionToNumber(v: version) > crateFlutterFfiVersionToNumber(v: '1.2.4');
   }
 
   bool crateFlutterFfiIsSelinuxEnforcing({dynamic hint}) {
@@ -1684,7 +1677,7 @@ class RustLibApi {
   }
 
   String crateFlutterFfiMainGetHardOption({required String key, dynamic hint}) {
-    return mainGetLocalOption(key: key, hint: hint);
+    return crateFlutterFfiMainGetLocalOption(key: key, hint: hint);
   }
 
   Future<void> crateFlutterFfiMainCheckHwcodec({dynamic hint}) {
@@ -1757,7 +1750,7 @@ class RustLibApi {
   }
 
   String crateFlutterFfiMainGetBuildinOption({required String key, dynamic hint}) {
-    return mainGetLocalOption(key: key, hint: hint);
+    return crateFlutterFfiMainGetLocalOption(key: key, hint: hint);
   }
 
   String crateFlutterFfiInstallInstallOptions({dynamic hint}) {
