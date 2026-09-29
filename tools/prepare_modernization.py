@@ -1,5 +1,6 @@
-"""One-shot migration: create a candidate commit, never move a ref or publish a release."""
+"""One-shot migration: prepare tested blobs, never move a ref or publish a release."""
 from __future__ import annotations
+import hashlib
 import json
 import os
 import re
@@ -72,7 +73,6 @@ def main():
     text = guard_release_steps(text)
     build.write_text(text.rstrip() + "\n")
 
-    # This imported scratch workflow contains disabled experiments, not a supported release path.
     (ROOT / ".github/workflows/playground.yml").unlink()
     helper = ROOT / ".github/workflows/third-party-RustDeskTempTopMostWindow.yml"
     helper.write_text(replace(helper.read_text(), "required: true", "required: false", count=4))
@@ -106,8 +106,6 @@ def main():
     viper.actions(write=True)
     subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tools/tests", "-v"], check=True)
     subprocess.run(["actionlint", "-shellcheck=", "-pyflakes="], check=True)
-
-    # The candidate removes this privileged, branch-specific one-shot workflow and script.
     (ROOT / ".github/workflows/prepare-modernization.yml").unlink()
     Path(__file__).unlink()
     subprocess.run(["git", "add", "--", ".github/workflows", "tools/viper.py", "tools/tests/test_viper.py", "tools/prepare_modernization.py"], check=True)
@@ -119,15 +117,20 @@ def main():
         if not (path.startswith(".github/workflows/") or path in ("tools/viper.py", "tools/tests/test_viper.py", "tools/prepare_modernization.py")):
             raise ValueError("Unexpected candidate file: " + path)
         file = ROOT / path
-        entry = {"path": path, "mode": "100644", "type": "blob"}
-        entry.update({"content": file.read_text()} if file.exists() else {"sha": None})
+        entry = {"path": path, "mode": "100644", "type": "blob", "sha": None}
+        if file.exists():
+            raw = file.read_bytes()
+            blob = api("POST", "git/blobs", {"content": raw.decode("utf-8"), "encoding": "utf-8"})
+            expected = hashlib.sha1(f"blob {len(raw)}\0".encode() + raw).hexdigest()
+            if blob["sha"] != expected:
+                raise ValueError("Uploaded blob does not match validated content")
+            entry["sha"] = blob["sha"]
         entries.append(entry)
     parent = api("GET", "git/commits/" + head)
-    tree = api("POST", "git/trees", {"base_tree": parent["tree"]["sha"], "tree": entries})
-    commit = api("POST", "git/commits", {"message": "chore(ci): pin current actions and validate modernization foundation", "tree": tree["sha"], "parents": [head]})
-    print("CANDIDATE_COMMIT=" + commit["sha"], flush=True)
-    print("Candidate files: " + str(len(entries)), flush=True)
-    print("No branch was moved; no release or deployment was executed.", flush=True)
+    print("CANDIDATE_PARENT=" + head, flush=True)
+    print("CANDIDATE_BASE_TREE=" + parent["tree"]["sha"], flush=True)
+    print("CANDIDATE_TREE_ELEMENTS=" + json.dumps(entries, separators=(",", ":")), flush=True)
+    print("Validated blobs only: no tree, commit, branch, release or deployment was written.", flush=True)
 
 
 if __name__ == "__main__":
