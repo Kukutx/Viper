@@ -33,7 +33,7 @@ class FlutterWorkflowTests(unittest.TestCase):
             self.assertNotIn(obsolete, text)
 
     def test_validation_remains_read_only_and_fail_closed(self):
-        for name in ('bridge.yml', 'flutter-validate.yml'):
+        for name in ('bridge.yml', 'flutter-validate.yml', 'flutter-platform-tests.yml'):
             workflow = self.workflow(name)
             self.assertEqual(workflow['permissions'], {'contents': 'read'})
             for job in workflow['jobs'].values():
@@ -58,6 +58,18 @@ class FlutterWorkflowTests(unittest.TestCase):
                       'Build and validate the Linux desktop bundle')
         self.assertEqual(bundle['run'], 'bash tools/native/build-linux-bundle.sh')
         self.assertNotIn('if', bundle)
+
+
+    def test_desktop_dart_checks_use_the_shared_sdk_and_lockfile(self):
+        job = self.workflow('flutter-platform-tests.yml')['jobs']['dart']
+        self.assertEqual(set(job['strategy']['matrix']['os']), {'windows-2022', 'macos-14'})
+        sdk = next(step for step in job['steps'] if step.get('uses', '').startswith('subosito/'))
+        self.assertEqual(sdk['with']['flutter-version'], '${{ env.FLUTTER_VERSION }}')
+        commands = '\n'.join(step.get('run', '') for step in job['steps'])
+        self.assertIn('flutter pub get --enforce-lockfile', commands)
+        self.assertIn('flutter test --no-pub test ', commands)
+        self.assertNotIn('test_native/', commands)
+        self.assertNotIn('pub upgrade', commands)
 
 
 if __name__ == '__main__':

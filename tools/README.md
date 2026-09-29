@@ -37,17 +37,22 @@ cargo check --locked --lib --features flutter,linux-pkg-config
 cargo build --locked --lib --features flutter,linux-pkg-config
 (cd flutter && VIPER_NATIVE_LIBRARY="$PWD/../target/debug/liblibrustdesk.so" \
   flutter test --no-pub test_native/bridge_ffi_test.dart)
+bash tools/native/build-linux-bundle.sh
 ```
+
+`build-linux-bundle.sh` 在原生库和锁文件依赖已准备好后编译 Linux Debug 桌面包，检查可执行文件、资源、包内 Rust 库与 Cargo 输出的一致性及动态链接依赖，再从包内库执行真实 FFI 测试。任何一步失败都返回非零；日志写入 `tools/.reports/bundle-*.log`。它不启动桌面会话、不验证远程连接，也不生成生产安装包。
 
 原生 setup 会安装开发系统包，因此需要 sudo；它只支持 Linux x86_64。生成器下载支持已登记的 Linux、macOS、Windows 主机，但这不表示相应应用构建已验证。其他目标的系统依赖、静态链接和打包继续使用其平台工程并完成迁移。
 
-`generate` 验证 Flutter/Dart 版本和锁文件，禁止生成器静默升级依赖。绑定位于 `src/bridge_generated.rs`、`flutter/lib/generated/`。`analyze_flutter.py` 保留全部诊断；错误与警告使检查失败，信息级弃用提示仍在报告内。
+`generate` 验证 Flutter/Dart 版本和锁文件，禁止生成器静默升级依赖。绑定位于 `src/bridge_generated.rs`、`flutter/lib/generated/`。`analyze_flutter.py` 解析平台上的 Dart 可执行路径并保留 UTF-8 完整诊断；错误与警告使检查失败，信息级弃用提示仍在报告内。
 
 ## CI 层次
 
 - `foundation.yml`：配置、工具测试、工作流检查及 Rust `base` / `hbb_common` 核心测试。
-- `flutter-validate.yml`：Draft PR 也执行，检查可复现绑定、Flutter 分析和测试、Linux Rust 库编译及真实动态库 FFI 调用；没有仓库写入或发布权限。
-- `ci.yml` / `flutter-ci.yml` / `flutter-build.yml`：历史完整平台矩阵仍需继续统一 SDK 和移除旧兼容补丁。Draft 阶段跳过的任务不能算作验证通过，当前 PR 不应转为可发布基线。
+- `flutter-validate.yml`：Draft PR 也执行，检查可复现绑定（包括未跟踪的新增生成文件）、Flutter 分析和测试、Linux Rust 库、真实 FFI 和 Debug 桌面包；没有仓库写入或发布权限。
+- `bridge.yml`：复用上述唯一验证链，成功后从同一提交导出已跟踪的 FRB 2 绑定。不再安装 FRB 1、降级依赖或补丁修改源码。为保持现有下载接口，两个历史 artifact 标签暂时保留，但内容完全相同，均不代表旧 SDK 兼容性；不导出旧 C header。
+- `flutter-platform-tests.yml`：Windows x64 和 macOS runner 使用相同中央 SDK、同一 pub 锁文件和全部 `flutter/test` 测试；没有 Rust 原生库构建或签名步骤，不能当作平台安装包验证。
+- `ci.yml` / `flutter-ci.yml` / `flutter-build.yml`：历史完整平台矩阵的 SDK、Apple 旧 C header 引用和兼容补丁仍需继续迁移。共用桥接流程更新不等于整个发布矩阵已可用；Draft 阶段跳过的任务不能算作通过。
 - `dependency-review.yml`：需要启用 GitHub Dependency graph。设置缺失时保留失败，不降低审查级别。
 
 核心库可单独验证：
@@ -57,7 +62,7 @@ cargo metadata --locked --format-version 1
 cargo test --locked -p base -p hbb_common --lib
 ```
 
-Linux 库和 FFI smoke test 不是完整客户端、硬件编码、Windows/macOS/Android/iOS 构建或真机测试。具体剩余范围见 `docs/engineering/foundation.md`。
+Linux Debug 包和 FFI smoke test 不验证 GUI 启动、硬件编码、跨设备连接、Windows/macOS/Android/iOS 原生构建或真机。新增配置中的步骤必须有对应提交的实际 CI 结果，才能标为通过。具体剩余范围见 `docs/engineering/foundation.md`。
 
 ## 构建镜像与发布
 
