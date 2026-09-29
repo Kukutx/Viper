@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-
 concurrency:
   group: flutter-migration-${{ github.ref }}
   cancel-in-progress: true
@@ -28,48 +27,50 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version-file: .python-version
-      - run: python tools/viper.py env >> "$GITHUB_ENV"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - run: |
+          python tools/viper.py env >> "$GITHUB_ENV"
+          python -m pip install -r tools/requirements-dev.txt
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: sdk-cache
         with:
           path: /opt/hostedtoolcache/flutter
           key: viper-flutter-${{ runner.os }}-${{ env.FLUTTER_VERSION }}
-          save-always: true
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: false
-      - name: Install development libraries and tools
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        with:
+          path: /opt/hostedtoolcache/flutter
+          key: viper-flutter-${{ runner.os }}-${{ env.FLUTTER_VERSION }}
+      - name: Prepare API migration
         run: |
-          mkdir -p tools/.reports
+          python tools/migrations/flutter_v2.py prepare
+          python tools/migrations/platform_packages.py
+      - name: Resolve Flutter dependencies before native setup
+        working-directory: flutter
+        run: flutter pub get
+      - name: Install native development tools
+        run: |
           sudo apt-get update -qq > tools/.reports/apt.log 2>&1
           sudo apt-get install -y -qq clang libclang-dev ninja-build pkg-config nasm libgtk-3-dev libasound2-dev libpulse-dev libdbus-1-dev libxdo-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxfixes-dev libxtst-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libvpx-dev libyuv-dev libaom-dev libopus-dev libsodium-dev >> tools/.reports/apt.log 2>&1 || { tail -80 tools/.reports/apt.log; exit 1; }
-          python -m pip install -r tools/requirements-dev.txt "cmake==$CMAKE_VERSION"
+          python -m pip install "cmake==$CMAKE_VERSION"
           rustup toolchain install "$RUST_VERSION" --profile minimal --component rustfmt,clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           prefix-key: flutter-v2-migration
           cache-on-failure: true
-      - name: Install checksum-verified bridge generator
+      - name: Install pinned bridge generator
         shell: bash
         run: |
           set -euo pipefail
           archive=flutter_rust_bridge_codegen-x86_64-unknown-linux-musl-v2.13.0.tgz
-          url="https://github.com/fzyzcjy/flutter_rust_bridge/releases/download/v2.13.0/$archive"
           cd "$RUNNER_TEMP"
-          curl -fsSL --retry 3 "$url" -o "$archive"
-          curl -fsSL --retry 3 "$url.sha256" -o digest.txt
-          digest=$(cut -d ' ' -f1 digest.txt)
-          [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
-          printf '%s  %s\n' "$digest" "$archive" | sha256sum -c -
+          curl -fsSL --retry 3 "https://github.com/fzyzcjy/flutter_rust_bridge/releases/download/v2.13.0/$archive" -o "$archive"
+          echo "58de00e9a9cc60fce98a052917f68ac61889825f90ce25eb185cc9d32dc1ff48  $archive" | sha256sum -c -
           tar -xzf "$archive"
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-      - name: Prepare API migration
-        run: |
-          python tools/migrations/flutter_v2.py prepare
-          python tools/migrations/platform_packages.py
-      - name: Resolve Flutter dependencies
-        working-directory: flutter
-        run: flutter pub get
       - name: Generate bindings
         id: generate
         run: |

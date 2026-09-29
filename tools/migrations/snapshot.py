@@ -5,11 +5,13 @@ import concurrent.futures
 import json
 import os
 import subprocess
+import urllib.error
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 REPO = 'Kukutx/Viper'
 BRANCH = 'refs/heads/codex/viper-foundation-modernization'
+EXACT = {'Cargo.toml', 'Cargo.lock', 'flutter_rust_bridge.yaml', 'src/flutter.rs', 'src/flutter_ffi.rs', 'src/bridge_generated.rs', 'src/bridge_generated.io.rs', 'src/bridge_generated.web.rs', 'flutter/pubspec.yaml', 'flutter/pubspec.lock', 'flutter/macos/Runner/bridge_generated.h', 'flutter/ios/Runner/bridge_generated.h', 'flutter/windows/runner/main.cpp', 'flutter/android/build.gradle', 'flutter/android/app/src/main/AndroidManifest.xml', 'flutter/ios/Runner/Info.plist'}
 
 
 def git(*args):
@@ -23,7 +25,7 @@ def api(path, data):
 
 
 def allowed(path):
-    return path in ('Cargo.toml', 'Cargo.lock', 'flutter_rust_bridge.yaml', 'src/flutter.rs', 'src/flutter_ffi.rs', 'src/bridge_generated.rs', 'src/bridge_generated.io.rs', 'src/bridge_generated.web.rs', 'flutter/pubspec.yaml', 'flutter/pubspec.lock', 'flutter/macos/Runner/bridge_generated.h', 'flutter/ios/Runner/bridge_generated.h') or path.startswith(('flutter/lib/', 'flutter/packages/dash_chat_2/', 'flutter/test/'))
+    return path in EXACT or path.startswith(('flutter/lib/', 'flutter/packages/dash_chat_2/', 'flutter/test/'))
 
 
 def main():
@@ -36,8 +38,6 @@ def main():
     for pattern in ('flutter/lib/generated/**/*', 'flutter/packages/dash_chat_2/**/*', 'src/bridge_generated*.rs'):
         names.update(str(p.relative_to(ROOT)) for p in ROOT.glob(pattern) if p.is_file())
     names.add('flutter_rust_bridge.yaml')
-    names.discard('')
-    # Flutter SDK may add analyzer exclusions; never publish those incidental changes.
     names = {name for name in names if allowed(name)}
     def blob(name):
         path = ROOT / name
@@ -52,13 +52,25 @@ def main():
         return {'path': name, 'mode': '100644', 'type': 'blob', 'sha': sha}
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         entries = list(pool.map(blob, sorted(names)))
-    tree = api('trees', {'base_tree': git('rev-parse', 'HEAD^{tree}'), 'tree': entries})['sha']
-    commit = api('commits', {'message': 'snapshot: unmerged Flutter 2.x migration candidate for review', 'tree': tree, 'parents': [parent]})['sha']
+    base = git('rev-parse', 'HEAD^{tree}')
+    record = {'parent': parent, 'base_tree': base, 'entries': entries}
+    report = ROOT / 'tools/.reports/snapshot.json'
+    report.write_text(json.dumps(record, indent=2) + '\n')
+    print('CANDIDATE_PARENT=' + parent, flush=True)
+    print('CANDIDATE_TREE_ELEMENTS=' + json.dumps(entries, separators=(',', ':')), flush=True)
+    try:
+        tree = api('trees', {'base_tree': base, 'tree': entries})['sha']
+        commit = api('commits', {'message': 'snapshot: unmerged Flutter 2.x migration candidate for review', 'tree': tree, 'parents': [parent]})['sha']
+    except urllib.error.HTTPError as error:
+        if error.code != 403:
+            raise
+        print('Tree creation was denied; blob references remain available for authorized connector review.')
+        return
+    record.update(tree=tree, commit=commit)
+    report.write_text(json.dumps(record, indent=2) + '\n')
     print('CANDIDATE_SNAPSHOT=' + commit)
     print('CANDIDATE_TREE=' + tree)
-    print('CANDIDATE_PARENT=' + parent)
     print('No branch or release was updated. Test results must be checked separately.')
-    (ROOT / 'tools/.reports/snapshot.json').write_text(json.dumps({'commit': commit, 'tree': tree, 'parent': parent, 'entries': entries}, indent=2) + '\n')
 
 
 if __name__ == '__main__':
