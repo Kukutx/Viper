@@ -72,5 +72,17 @@ class FlutterWorkflowTests(unittest.TestCase):
         self.assertNotIn('pub upgrade', commands)
 
 
+    def test_sdk_bootstrap_does_not_pollute_the_strict_version_report(self):
+        steps = self.workflow('flutter-platform-tests.yml')['jobs']['dart']['steps']
+        command = next(step['run'] for step in steps if step.get('name') ==
+                       'Verify SDK and locked dependencies')
+        self.assertLess(command.index('flutter --version >'),
+                        command.index('flutter --version --machine >'))
+        self.assertIn('cat tools/.reports/flutter-bootstrap.log; exit 1;', command)
+        self.assertIn("json.loads(Path('tools/.reports/flutter-version.json').read_text(encoding='utf-8'))", command)
+        self.assertIn("assert actual['frameworkVersion'] == expected['flutter']", command)
+        self.assertIn("assert actual['dartSdkVersion'].split()[0] == expected['dart']", command)
+
+
 if __name__ == '__main__':
     unittest.main()
