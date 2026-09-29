@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:convert';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
@@ -11,7 +13,6 @@ import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:get/get.dart';
 
-import '../../models/platform_model.dart';
 
 /// File Transfer for multi tabs
 class FileManagerTabPage extends StatefulWidget {
@@ -163,7 +164,7 @@ class _FileManagerTabPageState extends State<FileManagerTabPage> {
     } else {
       final bool res;
       if (!option2bool(kOptionEnableConfirmClosingTabs,
-          bind.crateFlutterFfiMainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
+          bind.mainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
         res = true;
       } else {
         res = await closeConfirmDialog();

@@ -15,7 +15,7 @@ import 'package:flutter_hbb/common/widgets/login.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/models/web_video_frame_queue.dart';
 
-import 'package:flutter_hbb/web/bridge.dart';
+import 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:flutter_hbb/common.dart';
 import 'package:uuid/uuid.dart';
 
@@ -42,7 +42,6 @@ typedef HandleEvent = Future<void> Function(Map<String, dynamic> evt);
 
 class PlatformFFI {
   final _eventHandlers = <String, Map<String, HandleEvent>>{};
-  final RustLibApi _ffiBind = RustLibApi();
 
   static String getByName(String name, [String arg = '']) {
     return context.callMethod('getByName', [name, arg]);
@@ -71,7 +70,6 @@ class PlatformFFI {
   static final PlatformFFI instance = PlatformFFI._();
 
   static get localeName => window.navigator.language;
-  RustLibApi get ffiBind => _ffiBind;
 
   static Future<String> getVersion() async {
     throw UnimplementedError();
@@ -120,21 +118,21 @@ class PlatformFFI {
   }
 
   String translate(String name, String locale) =>
-      _ffiBind.crateFlutterFfiTranslate(name: name, locale: locale);
+      bind.translate(name: name, locale: locale);
 
   Uint8List? getRgba(SessionID sessionId, int display, int bufSize) {
     throw UnimplementedError();
   }
 
   int getRgbaSize(SessionID sessionId, int display) =>
-      _ffiBind.crateFlutterFfiSessionGetRgbaSize(sessionId: sessionId, display: display);
+      bind.sessionGetRgbaSize(sessionId: sessionId, display: display);
   void nextRgba(SessionID sessionId, int display) =>
-      _ffiBind.crateFlutterFfiSessionNextRgba(sessionId: sessionId, display: display);
+      bind.sessionNextRgba(sessionId: sessionId, display: display);
   void registerPixelbufferTexture(SessionID sessionId, int display, int ptr) =>
-      _ffiBind.crateFlutterFfiSessionRegisterPixelbufferTexture(
+      bind.sessionRegisterPixelbufferTexture(
           sessionId: sessionId, display: display, ptr: ptr);
   void registerGpuTexture(SessionID sessionId, int display, int ptr) =>
-      _ffiBind.crateFlutterFfiSessionRegisterGpuTexture(
+      bind.sessionRegisterGpuTexture(
           sessionId: sessionId, display: display, ptr: ptr);
 
   Future<void> init(String appType) async {

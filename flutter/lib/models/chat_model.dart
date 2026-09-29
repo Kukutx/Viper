@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 
 import 'package:dash_chat_2/dash_chat_2.dart';
@@ -8,7 +10,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/shared_state.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/mobile/pages/home_page.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
@@ -449,9 +450,9 @@ class ChatModel with ChangeNotifier {
     message.text = trimmedText;
     insertMessage(_currentKey, message);
     if (_currentKey.connId == clientModeID && parent.target != null) {
-      bind.crateFlutterFfiSessionSendChat(sessionId: sessionId, text: message.text);
+      bind.sessionSendChat(sessionId: sessionId, text: message.text);
     } else {
-      bind.crateFlutterFfiCmSendChat(connId: _currentKey.connId, msg: message.text);
+      bind.cmSendChat(connId: _currentKey.connId, msg: message.text);
     }
 
     notifyListeners();
@@ -549,7 +550,7 @@ class ChatModel with ChangeNotifier {
   }
 
   void closeVoiceCall() {
-    bind.crateFlutterFfiSessionCloseVoiceCall(sessionId: sessionId);
+    bind.sessionCloseVoiceCall(sessionId: sessionId);
   }
 }
 

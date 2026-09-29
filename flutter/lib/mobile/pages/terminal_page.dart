@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
@@ -8,7 +10,6 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
 import 'package:flutter_hbb/models/input_modifier_utils.dart';
 import 'package:flutter_hbb/models/model.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/terminal_copy_shortcut.dart';
 import 'package:flutter_hbb/models/terminal_model.dart';
 import 'package:flutter_hbb/models/terminal_mouse_handler.dart';
@@ -87,12 +88,12 @@ class _TerminalPageState extends State<TerminalPage>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   bool get _canConfigureTerminalClipboardPermission =>
       canConfigureTerminalClipboardPermission(
-        settingsDisabled: bind.crateFlutterFfiIsDisableSettings(),
+        settingsDisabled: bind.isDisableSettings(),
         optionFixed: isOptionFixed(kOptionAllowTerminalClipboardWrite),
       );
   bool get _canHandleTerminalClipboardWriteRequest =>
       canHandleTerminalClipboardWriteRequest(
-        localOption: bind.crateFlutterFfiMainGetLocalOption(
+        localOption: bind.mainGetLocalOption(
           key: kOptionAllowTerminalClipboardWrite,
         ),
         canConfigurePermission: _canConfigureTerminalClipboardPermission,
@@ -187,7 +188,7 @@ class _TerminalPageState extends State<TerminalPage>
     // Load Row3 expand/collapse state from persistent storage. The raw option
     // read keeps Row3 collapsed when no value has been saved yet.
     _row3Expanded =
-        bind.crateFlutterFfiMainGetLocalOption(key: kOptionShowTerminalCtrlKeys) == 'Y';
+        bind.mainGetLocalOption(key: kOptionShowTerminalCtrlKeys) == 'Y';
     // Initialize terminal connection
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ffi.dialogManager
@@ -202,7 +203,7 @@ class _TerminalPageState extends State<TerminalPage>
 
   void _handleTerminalClipboardWriteBlocked(String clipboardText) {
     if (!mounted) return;
-    final option = bind.crateFlutterFfiMainGetLocalOption(
+    final option = bind.mainGetLocalOption(
       key: kOptionAllowTerminalClipboardWrite,
     );
     final request = _terminalClipboardNotice.recordBlocked(
@@ -279,7 +280,7 @@ class _TerminalPageState extends State<TerminalPage>
 
   Future<void> _declineTerminalClipboardWrite() async {
     try {
-      await bind.crateFlutterFfiMainSetLocalOption(
+      await bind.mainSetLocalOption(
         key: kOptionAllowTerminalClipboardWrite,
         value: kTerminalClipboardWriteDenied,
       );
@@ -303,7 +304,7 @@ class _TerminalPageState extends State<TerminalPage>
         canWrite: () => _canWriteTerminalClipboard,
         writeClipboard: writeTerminalClipboard,
         persistAllowed: request.persistAllowed
-            ? () => bind.crateFlutterFfiMainSetLocalOption(
+            ? () => bind.mainSetLocalOption(
                   key: kOptionAllowTerminalClipboardWrite,
                   value: kTerminalClipboardWriteAllowed,
                 )

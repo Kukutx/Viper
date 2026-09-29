@@ -1,6 +1,7 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 
 class PrinterOptions {
   String action;
@@ -13,7 +14,7 @@ class PrinterOptions {
       required this.printerName});
 
   static PrinterOptions load() {
-    var action = bind.crateFlutterFfiMainGetLocalOption(key: kKeyPrinterIncomingJobAction);
+    var action = bind.mainGetLocalOption(key: kKeyPrinterIncomingJobAction);
     if (![
       kValuePrinterIncomingJobDismiss,
       kValuePrinterIncomingJobDefault,
@@ -23,11 +24,11 @@ class PrinterOptions {
     }
 
     final printerNames = getPrinterNames();
-    var selectedPrinterName = bind.crateFlutterFfiMainGetLocalOption(key: kKeyPrinterSelected);
+    var selectedPrinterName = bind.mainGetLocalOption(key: kKeyPrinterSelected);
     if (!printerNames.contains(selectedPrinterName)) {
       if (action == kValuePrinterIncomingJobSelected) {
         action = kValuePrinterIncomingJobDefault;
-        bind.crateFlutterFfiMainSetLocalOption(
+        bind.mainSetLocalOption(
             key: kKeyPrinterIncomingJobAction,
             value: kValuePrinterIncomingJobDefault);
         if (printerNames.isEmpty) {
@@ -35,7 +36,7 @@ class PrinterOptions {
         } else {
           selectedPrinterName = printerNames.first;
         }
-        bind.crateFlutterFfiMainSetLocalOption(
+        bind.mainSetLocalOption(
             key: kKeyPrinterSelected, value: selectedPrinterName);
       }
     }

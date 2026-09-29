@@ -207,8 +207,6 @@ class MessageListState extends State<MessageList> {
           message.createdAt.hour,
         );
         return previousDate.difference(messageDate).inHours.abs() > 0;
-      default:
-        return false;
     }
   }
 

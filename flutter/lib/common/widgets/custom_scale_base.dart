@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -5,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:debounce_throttle/debounce_throttle.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/model.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/utils/scale.dart';
 import 'package:flutter_hbb/common.dart';
 
@@ -105,13 +106,13 @@ abstract class CustomScaleControls<T extends StatefulWidget> extends State<T> {
       _scaleValue = v;
     });
     try {
-      await bind.crateFlutterFfiSessionSetFlutterOption(
+      await bind.sessionSetFlutterOption(
           sessionId: ffi.sessionId,
           k: kCustomScalePercentKey,
           v: v.toString());
-      final curStyle = await bind.crateFlutterFfiSessionGetViewStyle(sessionId: ffi.sessionId);
+      final curStyle = await bind.sessionGetViewStyle(sessionId: ffi.sessionId);
       if (curStyle != kRemoteViewStyleCustom) {
-        await bind.crateFlutterFfiSessionSetViewStyle(
+        await bind.sessionSetViewStyle(
             sessionId: ffi.sessionId, value: kRemoteViewStyleCustom);
       }
       await ffi.canvasModel.updateViewStyle();

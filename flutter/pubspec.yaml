@@ -23,6 +23,7 @@ environment:
   flutter: '>=3.47.5'
 
 dependencies:
+  file_selector: 1.1.0
   app_links: 7.2.1
   flutter:
     sdk: flutter
@@ -110,6 +111,7 @@ dependencies:
   google_fonts: 9.0.0
   vector_math: 2.4.3
 
+  collection: any
 dev_dependencies:
   icons_launcher: 3.1.0
   flutter_test:

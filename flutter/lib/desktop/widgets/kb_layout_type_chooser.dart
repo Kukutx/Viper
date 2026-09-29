@@ -1,8 +1,9 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 
 import '../../common.dart';
 
@@ -192,7 +193,7 @@ showKBLayoutTypeChooserIfNeeded(
   if (localPlatform == '') {
     return;
   }
-  KBLayoutType.value = bind.crateFlutterFfiGetLocalKbLayoutType();
+  KBLayoutType.value = bind.getLocalKbLayoutType();
   if (KBLayoutType.value == _kKBLayoutTypeISO ||
       KBLayoutType.value == _kKBLayoutTypeNotISO) {
     return;
@@ -214,8 +215,8 @@ showKBLayoutTypeChooser(
           height: 200,
           dividerWidth: 4.0,
           cb: (String v) async {
-            await bind.crateFlutterFfiSetLocalKbLayoutType(kbLayoutType: v);
-            KBLayoutType.value = bind.crateFlutterFfiGetLocalKbLayoutType();
+            await bind.setLocalKbLayoutType(kbLayoutType: v);
+            KBLayoutType.value = bind.getLocalKbLayoutType();
             return v == KBLayoutType.value;
           }),
       actions: [dialogButton('Close', onPressed: close)],

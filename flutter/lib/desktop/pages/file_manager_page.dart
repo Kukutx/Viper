@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -24,7 +26,6 @@ import '../../consts.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 import '../../common.dart';
 import '../../models/model.dart';
-import '../../models/platform_model.dart';
 import '../widgets/popup_menu.dart';
 
 /// status of location bar
@@ -444,7 +445,7 @@ class _FileManagerViewState extends State<FileManagerView> {
 
   /// [_lastClickTime], [_lastClickEntry] help to handle double click
   var _lastClickTime =
-      DateTime.now().millisecondsSinceEpoch - bind.crateFlutterFfiGetDoubleClickTime() - 1000;
+      DateTime.now().millisecondsSinceEpoch - bind.getDoubleClickTime() - 1000;
   Entry? _lastClickEntry;
 
   double? _windowWidthPrev;
@@ -543,7 +544,7 @@ class _FileManagerViewState extends State<FileManagerView> {
   Widget headTools() {
     var uploadButtonTapPosition = RelativeRect.fill;
     RxBool isUploadFolder =
-        (bind.crateFlutterFfiMainGetLocalOption(key: 'upload-folder-button') == 'Y').obs;
+        (bind.mainGetLocalOption(key: 'upload-folder-button') == 'Y').obs;
     return Container(
       child: Column(
         children: [
@@ -561,7 +562,7 @@ class _FileManagerViewState extends State<FileManagerView> {
                           ),
                           padding: EdgeInsets.all(8.0),
                           child: FutureBuilder<String>(
-                              future: bind.crateFlutterFfiSessionGetPlatform(
+                              future: bind.sessionGetPlatform(
                                   sessionId: _ffi.sessionId,
                                   isRemote: !isLocal),
                               builder: (context, snapshot) {
@@ -908,7 +909,7 @@ class _FileManagerViewState extends State<FileManagerView> {
                               ]);
                           if (value != null) {
                             isUploadFolder.value = value;
-                            bind.crateFlutterFfiMainSetLocalOption(
+                            bind.mainSetLocalOption(
                                 key: 'upload-folder-button',
                                 value: value ? 'Y' : '');
                             webselectFiles(is_folder: value);
@@ -1404,7 +1405,7 @@ class _FileManagerViewState extends State<FileManagerView> {
     final elapsed = current - _lastClickTime;
     _lastClickTime = current;
     if (_lastClickEntry == entry) {
-      if (elapsed < bind.crateFlutterFfiGetDoubleClickTime()) {
+      if (elapsed < bind.getDoubleClickTime()) {
         return true;
       }
     } else {

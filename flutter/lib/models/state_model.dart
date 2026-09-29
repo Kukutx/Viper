@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:get/get.dart';
@@ -122,14 +124,14 @@ class StateGlobal {
 
   String getInputSource({bool force = false}) {
     if (force || _inputSource.isEmpty) {
-      _inputSource = bind.crateFlutterFfiMainGetInputSource();
+      _inputSource = bind.mainGetInputSource();
     }
     return _inputSource;
   }
 
   setInputSource(SessionID sessionId, String v) async {
-    await bind.crateFlutterFfiMainSetInputSource(sessionId: sessionId, value: v);
-    _inputSource = bind.crateFlutterFfiMainGetInputSource();
+    await bind.mainSetInputSource(sessionId: sessionId, value: v);
+    _inputSource = bind.mainGetInputSource();
   }
 
   StateGlobal._() {

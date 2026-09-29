@@ -40,17 +40,11 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: false
-      - name: Migrate remaining public APIs
-        run: python tools/migrations/public_api.py
-      - name: Resolve added native file-selection dependency
+      - name: Finalize event-stream diagnostics
+        run: python tools/migrations/finalize.py
+      - name: Verify locked Flutter dependency graph
         working-directory: flutter
-        run: flutter pub get
-      - name: Install native development tools
-        run: |
-          sudo apt-get update -qq > tools/.reports/apt.log 2>&1
-          sudo apt-get install -y -qq clang libclang-dev ninja-build pkg-config nasm libgtk-3-dev libasound2-dev libpulse-dev libdbus-1-dev libxdo-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxfixes-dev libxtst-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libvpx-dev libaom-dev libopus-dev libsodium-dev >> tools/.reports/apt.log 2>&1 || { tail -80 tools/.reports/apt.log; exit 1; }
-          python -m pip install "cmake==$CMAKE_VERSION"
-          rustup toolchain install "$RUST_VERSION" --profile minimal --component rustfmt,clippy
+        run: flutter pub get --enforce-lockfile
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           prefix-key: flutter-v2-migration
@@ -59,8 +53,8 @@ jobs:
         with:
           path: ~/.cache/viper-vcpkg
           key: viper-yuv-${{ runner.os }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**') }}
-      - name: Build repository-pinned libyuv
-        run: bash tools/migrations/native_setup.sh
+      - name: Set up native development libraries
+        run: bash tools/native/setup-linux.sh
       - name: Generate version-checked bindings
         id: generate
         run: |
@@ -78,8 +72,22 @@ jobs:
         if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         working-directory: flutter
         run: |
-          flutter test --no-pub test > ../tools/.reports/flutter-tests.log 2>&1 || { tail -140 ../tools/.reports/flutter-tests.log; exit 1; }
-          tail -15 ../tools/.reports/flutter-tests.log
+          flutter test --no-pub test > ../tools/.reports/flutter-tests.log 2>&1 || { tail -100 ../tools/.reports/flutter-tests.log; exit 1; }
+          tail -10 ../tools/.reports/flutter-tests.log
+      - name: Build real native library
+        id: build
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        run: |
+          cargo build --locked --lib --features flutter,linux-pkg-config > tools/.reports/cargo-build.log 2>&1 || { tail -100 tools/.reports/cargo-build.log; exit 1; }
+          test -f target/debug/liblibrustdesk.so
+      - name: Exercise real Rust-Dart bridge
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        working-directory: flutter
+        env:
+          VIPER_NATIVE_LIBRARY: ${{ github.workspace }}/target/debug/liblibrustdesk.so
+        run: |
+          flutter test --no-pub test_native/bridge_ffi_test.dart > ../tools/.reports/ffi-tests.log 2>&1 || { tail -100 ../tools/.reports/ffi-tests.log; exit 1; }
+          tail -10 ../tools/.reports/ffi-tests.log
       - name: Preserve candidate objects
         if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         env:

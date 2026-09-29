@@ -1,5 +1,9 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
+import 'package:file_selector/file_selector.dart' as file_selector;
+import '../utils/screenshot_save.dart';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -34,7 +38,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:vector_math/vector_math.dart' show Vector2;
 
 import '../common.dart';
@@ -416,7 +419,7 @@ class FfiModel with ChangeNotifier {
         cancelMsgBox(evt, sessionId);
       } else if (name == 'switch_back') {
         final peer_id = evt['peer_id'].toString();
-        await bind.crateFlutterFfiSessionSwitchSides(sessionId: sessionId);
+        await bind.sessionSwitchSides(sessionId: sessionId);
         closeConnection(id: peer_id);
       } else if (name == 'portable_service_running') {
         _handlePortableServiceRunning(peerId, evt);
@@ -507,32 +510,40 @@ class FfiModel with ChangeNotifier {
         close();
         Future.delayed(Duration.zero, () async {
           final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          String? outputFile = await FilePicker.saveFile(
-            dialogTitle: '${translate('Save as')}...',
-            fileName: 'screenshot_$ts.png',
-            allowedExtensions: ['png'],
-            type: FileType.custom,
-          );
-          if (outputFile == null) {
-            bind.crateFlutterFfiSessionHandleScreenshot(sessionId: sessionId, action: '2');
-          } else {
-            final res = await bind.crateFlutterFfiSessionHandleScreenshot(
-                sessionId: sessionId, action: '0:$outputFile');
+          try {
+            final res = await saveScreenshotToSelectedPath(
+              selectPath: () async => (await file_selector.getSaveLocation(
+                suggestedName: 'screenshot_$ts.png',
+                confirmButtonText: translate('Save as'),
+                acceptedTypeGroups: const [
+                  file_selector.XTypeGroup(
+                    label: 'PNG', extensions: ['png'],
+                    uniformTypeIdentifiers: ['public.png'],
+                  ),
+                ],
+              ))?.path,
+              handleAction: (action) => bind.sessionHandleScreenshot(
+                sessionId: sessionId, action: action,
+              ),
+            );
             if (res.isNotEmpty) {
               msgBox(sessionId, 'custom-nook-nocancel-hasclose-error',
                   'Take screenshot', res, '', dialogManager);
             }
+          } catch (error) {
+            msgBox(sessionId, 'custom-nook-nocancel-hasclose-error',
+                'Take screenshot', error.toString(), '', dialogManager);
           }
         });
       }
 
       copyToClipboard() {
-        bind.crateFlutterFfiSessionHandleScreenshot(sessionId: sessionId, action: '1');
+        bind.sessionHandleScreenshot(sessionId: sessionId, action: '1');
         close();
       }
 
       cancel() {
-        bind.crateFlutterFfiSessionHandleScreenshot(sessionId: sessionId, action: '2');
+        bind.sessionHandleScreenshot(sessionId: sessionId, action: '2');
         close();
       }
 
@@ -580,11 +591,11 @@ class FfiModel with ChangeNotifier {
         final printerName = defaultOrSelectedGroupValue.isEmpty
             ? ''
             : selectedPrinterName.value;
-        bind.crateFlutterFfiSessionPrinterResponse(
+        bind.sessionPrinterResponse(
             sessionId: sessionId, id: id, path: path, printerName: printerName);
         if (saveSettings.value || dontShowAgain.value) {
-          bind.crateFlutterFfiMainSetLocalOption(key: kKeyPrinterSelected, value: printerName);
-          bind.crateFlutterFfiMainSetLocalOption(
+          bind.mainSetLocalOption(key: kKeyPrinterSelected, value: printerName);
+          bind.mainSetLocalOption(
               key: kKeyPrinterIncomingJobAction,
               value: defaultOrSelectedGroupValue.value);
         }
@@ -596,7 +607,7 @@ class FfiModel with ChangeNotifier {
 
       onCancel() {
         if (dontShowAgain.value) {
-          bind.crateFlutterFfiMainSetLocalOption(
+          bind.mainSetLocalOption(
               key: kKeyPrinterIncomingJobAction,
               value: kValuePrinterIncomingJobDismiss);
         }
@@ -749,7 +760,7 @@ class FfiModel with ChangeNotifier {
 
   onUrlSchemeReceived(Map<String, dynamic> evt) {
     final url = evt['url'].toString().trim();
-    if (url.startsWith(bind.crateFlutterFfiMainUriPrefixSync()) &&
+    if (url.startsWith(bind.mainUriPrefixSync()) &&
         handleUriLink(uriString: url)) {
       return;
     }
@@ -822,7 +833,7 @@ class FfiModel with ChangeNotifier {
     final display = int.parse(evt['display']);
 
     if (_pi.currentDisplay != kAllDisplayValue) {
-      if (bind.crateFlutterFfiPeerGetSessionsCount(
+      if (bind.peerGetSessionsCount(
               id: peerId, connType: parent.target!.connType.index) >
           1) {
         if (display != _pi.currentDisplay) {
@@ -938,7 +949,7 @@ class FfiModel with ChangeNotifier {
       if (_restartReconnectDelayTimer == null) {
         parent.target?.inputModel.setRelativeMouseMode(false);
         _cancelPendingMonitorRestore();
-        bind.crateFlutterFfiSessionReconnect(sessionId: sessionId, forceRelay: false);
+        bind.sessionReconnect(sessionId: sessionId, forceRelay: false);
         clearPermissions();
         // Retry once more after the silent window so restart reconnect attempts
         // are spaced by the empirical short cadence instead of only updating UI.
@@ -1123,7 +1134,7 @@ class FfiModel with ChangeNotifier {
     // Disable relative mouse mode before reconnecting to ensure cursor is released.
     parent.target?.inputModel.setRelativeMouseMode(false);
     _cancelPendingMonitorRestore();
-    bind.crateFlutterFfiSessionReconnect(sessionId: sessionId, forceRelay: forceRelay);
+    bind.sessionReconnect(sessionId: sessionId, forceRelay: forceRelay);
     clearPermissions();
     dialogManager.dismissAll();
     dialogManager.showLoading(translate('Connecting...'),
@@ -1205,10 +1216,10 @@ class FfiModel with ChangeNotifier {
     waitForImageDialogShow.value = true;
     waitForImageTimer = Timer(Duration(milliseconds: 1500), () {
       if (waitForFirstImage.isTrue && !isRefreshing) {
-        bind.crateFlutterFfiSessionInputOsPassword(sessionId: sessionId, value: '');
+        bind.sessionInputOsPassword(sessionId: sessionId, value: '');
       }
     });
-    bind.crateFlutterFfiSessionOnWaitingForImageDialogShow(sessionId: sessionId);
+    bind.sessionOnWaitingForImageDialogShow(sessionId: sessionId);
   }
 
   void showPrivacyFailedDialog(
@@ -1235,7 +1246,7 @@ class FfiModel with ChangeNotifier {
     } else {
       final displays = _pi.getCurDisplays();
       if (displays.length == 1) {
-        bind.crateFlutterFfiSessionSetSize(
+        bind.sessionSetSize(
           sessionId: sessionId,
           display:
               pi.currentDisplay == kAllDisplayValue ? 0 : pi.currentDisplay,
@@ -1244,7 +1255,7 @@ class FfiModel with ChangeNotifier {
         );
       } else {
         for (int i = 0; i < displays.length; ++i) {
-          bind.crateFlutterFfiSessionSetSize(
+          bind.sessionSetSize(
             sessionId: sessionId,
             display: i,
             width: displays[i].width,
@@ -1257,11 +1268,10 @@ class FfiModel with ChangeNotifier {
 
   void _queryAuditGuid(String peerId) async {
     try {
-      if (bind.crateFlutterFfiIsDisableAccount()) {
+      if (bind.isDisableAccount()) {
         return;
       }
-      if (bind
-          .crateFlutterFfiSessionGetAuditServerSync(sessionId: sessionId, typ: "conn/active")
+      if (bind.sessionGetAuditServerSync(sessionId: sessionId, typ: "conn/active")
           .isEmpty) {
         return;
       }
@@ -1269,17 +1279,17 @@ class FfiModel with ChangeNotifier {
           kOptionAllowAskForNoteAtEndOfConnection)) {
         return;
       }
-      if (bind.crateFlutterFfiSessionGetAuditGuid(sessionId: sessionId).isNotEmpty) {
+      if (bind.sessionGetAuditGuid(sessionId: sessionId).isNotEmpty) {
         debugPrint('Get cached audit GUID');
         return;
       }
-      final url = bind.crateFlutterFfiSessionGetAuditServerSync(
+      final url = bind.sessionGetAuditServerSync(
           sessionId: sessionId, typ: "conn/active");
       if (url.isEmpty) {
         return;
       }
       final initialConnSessionId =
-          bind.crateFlutterFfiSessionGetConnSessionId(sessionId: sessionId);
+          bind.sessionGetConnSessionId(sessionId: sessionId);
       final connType = switch (parent.target?.connType) {
         ConnType.defaultConn => 0,
         ConnType.fileTransfer => 1,
@@ -1294,7 +1304,7 @@ class FfiModel with ChangeNotifier {
 
       for (int attempt = 1; attempt <= retryIntervals.length; attempt++) {
         final currentConnSessionId =
-            bind.crateFlutterFfiSessionGetConnSessionId(sessionId: sessionId);
+            bind.sessionGetConnSessionId(sessionId: sessionId);
         if (currentConnSessionId != initialConnSessionId) {
           debugPrint('connSessionId changed, stopping audit GUID query');
           return;
@@ -1317,7 +1327,7 @@ class FfiModel with ChangeNotifier {
           if (response.statusCode == 200) {
             final guid = jsonDecode(response.body) as String?;
             if (guid != null && guid.isNotEmpty) {
-              bind.crateFlutterFfiSessionSetAuditGuid(sessionId: sessionId, guid: guid);
+              bind.sessionSetAuditGuid(sessionId: sessionId, guid: guid);
               debugPrint('Successfully retrieved audit GUID');
               return;
             }
@@ -1355,7 +1365,7 @@ class FfiModel with ChangeNotifier {
     cachedPeerData.peerInfo.remove('resolutions');
 
     // Recent peer is updated by handle_peer_info(ui_session_interface.rs) --> handle_peer_info(client.rs) --> save_config(client.rs)
-    bind.crateFlutterFfiMainLoadRecentPeers();
+    bind.mainLoadRecentPeers();
 
     parent.target?.dialogManager.dismissAll();
     _pi.version = evt['version'];
@@ -1371,7 +1381,7 @@ class FfiModel with ChangeNotifier {
       parent.target?.inputModel.updateKeyboardMode();
     }
     _pi.isSupportMultiUiSession =
-        bind.crateFlutterFfiIsSupportMultiUiSession(version: _pi.version);
+        bind.isSupportMultiUiSession(version: _pi.version);
     _pi.username = evt['username'];
     _pi.hostname = evt['hostname'];
     _pi.platform = evt['platform'];
@@ -1381,7 +1391,7 @@ class FfiModel with ChangeNotifier {
       _pi.primaryDisplay = currentDisplay;
     }
 
-    if (bind.crateFlutterFfiPeerGetSessionsCount(
+    if (bind.peerGetSessionsCount(
             id: peerId, connType: parent.target!.connType.index) <=
         1) {
       _pi.currentDisplay = currentDisplay;
@@ -1403,11 +1413,11 @@ class FfiModel with ChangeNotifier {
       // 1. User has set the touch mode explicitly.
       // 2. The advanced option (custom client) is set.
       //    Then we choose to use the local option.
-      final optLocal = bind.crateFlutterFfiMainGetLocalOption(key: kOptionTouchMode);
+      final optLocal = bind.mainGetLocalOption(key: kOptionTouchMode);
       if (optLocal != '') {
         _touchMode = optLocal == 'Y';
       } else {
-        final optSession = await bind.crateFlutterFfiSessionGetOption(
+        final optSession = await bind.sessionGetOption(
             sessionId: sessionId, arg: kOptionTouchMode);
         _touchMode = optSession != '';
       }
@@ -1442,7 +1452,7 @@ class FfiModel with ChangeNotifier {
       pendingMonitorRestore = (!isCache &&
               last != null &&
               last != currentDisplay &&
-              bind.crateFlutterFfiSessionGetUseAllMyDisplaysForTheRemoteSession(
+              bind.sessionGetUseAllMyDisplaysForTheRemoteSession(
                       sessionId: sessionId) !=
                   'Y' &&
               ((last == kAllDisplayValue && _pi.displays.isNotEmpty) ||
@@ -1472,9 +1482,9 @@ class FfiModel with ChangeNotifier {
     if (connType == ConnType.defaultConn) {
       setViewOnly(
           peerId,
-          bind.crateFlutterFfiSessionGetToggleOptionSync(
+          bind.sessionGetToggleOptionSync(
               sessionId: sessionId, arg: kOptionToggleViewOnly));
-      setShowMyCursor(bind.crateFlutterFfiSessionGetToggleOptionSync(
+      setShowMyCursor(bind.sessionGetToggleOptionSync(
           sessionId: sessionId, arg: kOptionToggleShowMyCursor));
     }
     if (connType == ConnType.defaultConn || connType == ConnType.viewCamera) {
@@ -1511,16 +1521,16 @@ class FfiModel with ChangeNotifier {
       // Local side, flutter keyboard input source
       // Currently only map mode is supported, legacy mode is used for compatibility.
       for (final mode in [kKeyMapMode, kKeyLegacyMode]) {
-        if (bind.crateFlutterFfiSessionIsKeyboardModeSupported(
+        if (bind.sessionIsKeyboardModeSupported(
             sessionId: sessionId, mode: mode)) {
-          await bind.crateFlutterFfiSessionSetKeyboardMode(sessionId: sessionId, value: mode);
+          await bind.sessionSetKeyboardMode(sessionId: sessionId, value: mode);
           break;
         }
       }
     } else {
-      final curMode = await bind.crateFlutterFfiSessionGetKeyboardMode(sessionId: sessionId);
+      final curMode = await bind.sessionGetKeyboardMode(sessionId: sessionId);
       if (curMode != null) {
-        if (bind.crateFlutterFfiSessionIsKeyboardModeSupported(
+        if (bind.sessionIsKeyboardModeSupported(
             sessionId: sessionId, mode: curMode)) {
           return;
         }
@@ -1528,9 +1538,9 @@ class FfiModel with ChangeNotifier {
 
       // If current keyboard mode is not supported, change to another one.
       for (final mode in [kKeyMapMode, kKeyTranslateMode, kKeyLegacyMode]) {
-        if (bind.crateFlutterFfiSessionIsKeyboardModeSupported(
+        if (bind.sessionIsKeyboardModeSupported(
             sessionId: sessionId, mode: mode)) {
-          bind.crateFlutterFfiSessionSetKeyboardMode(sessionId: sessionId, value: mode);
+          bind.sessionSetKeyboardMode(sessionId: sessionId, value: mode);
           break;
         }
       }
@@ -1538,7 +1548,7 @@ class FfiModel with ChangeNotifier {
   }
 
   tryUseAllMyDisplaysForTheRemoteSession(String peerId) async {
-    if (bind.crateFlutterFfiSessionGetUseAllMyDisplaysForTheRemoteSession(
+    if (bind.sessionGetUseAllMyDisplaysForTheRemoteSession(
             sessionId: sessionId) !=
         'Y') {
       return;
@@ -1559,7 +1569,7 @@ class FfiModel with ChangeNotifier {
     // 0 is assumed to be the primary display here, for now.
 
     // move to the first display and set fullscreen
-    bind.crateFlutterFfiSessionSwitchDisplay(
+    bind.sessionSwitchDisplay(
       isDesktop: isDesktop,
       sessionId: sessionId,
       value: Int32List.fromList([0]),
@@ -1698,7 +1708,7 @@ class FfiModel with ChangeNotifier {
                     pi.primaryDisplay >= pi.displays.length;
             final newDisplay =
                 isPeerPrimaryDisplayValid ? 0 : pi.primaryDisplay;
-            bind.crateFlutterFfiSessionSwitchDisplay(
+            bind.sessionSwitchDisplay(
               isDesktop: isDesktop,
               sessionId: sessionId,
               value: Int32List.fromList([newDisplay]),
@@ -1766,7 +1776,7 @@ class FfiModel with ChangeNotifier {
       } catch (e) {
         //
       }
-      bind.crateFlutterFfiSessionSwitchDisplay(
+      bind.sessionSwitchDisplay(
         isDesktop: isDesktop,
         sessionId: sessionId,
         value: Int32List.fromList([_pi.currentDisplay]),
@@ -1802,10 +1812,10 @@ class FfiModel with ChangeNotifier {
       Map<String, dynamic> evt, SessionID sessionId, String peerId) async {
     notifyListeners();
     try {
-      final isOn = bind.crateFlutterFfiSessionGetToggleOptionSync(
+      final isOn = bind.sessionGetToggleOptionSync(
           sessionId: sessionId, arg: 'privacy-mode');
       if (isOn) {
-        var privacyModeImpl = await bind.crateFlutterFfiSessionGetOption(
+        var privacyModeImpl = await bind.sessionGetOption(
             sessionId: sessionId, arg: 'privacy-mode-impl-key');
         // For compatibility, version < 1.2.4, the default value is 'privacy_mode_impl_mag'.
         final initDefaultPrivacyMode = 'privacy_mode_impl_mag';
@@ -1828,7 +1838,7 @@ class FfiModel with ChangeNotifier {
       if (value) {
         ShowRemoteCursorState.find(id).value = value;
       } else {
-        ShowRemoteCursorState.find(id).value = bind.crateFlutterFfiSessionGetToggleOptionSync(
+        ShowRemoteCursorState.find(id).value = bind.sessionGetToggleOptionSync(
             sessionId: sessionId, arg: 'show-remote-cursor');
       }
     } catch (e) {
@@ -1875,7 +1885,7 @@ class VirtualMouseMode with ChangeNotifier {
     if (s <= 0) return;
     if (s == _virtualMouseScale) return;
     _virtualMouseScale = s;
-    bind.crateFlutterFfiMainSetLocalOption(key: kOptionVirtualMouseScale, value: s.toString());
+    bind.mainSetLocalOption(key: kOptionVirtualMouseScale, value: s.toString());
     notifyListeners();
   }
 
@@ -1889,28 +1899,28 @@ class VirtualMouseMode with ChangeNotifier {
 
   void loadOptions() {
     _showVirtualMouse =
-        bind.crateFlutterFfiMainGetLocalOption(key: kOptionShowVirtualMouse) == 'Y';
+        bind.mainGetLocalOption(key: kOptionShowVirtualMouse) == 'Y';
     _virtualMouseScale = double.tryParse(
-            bind.crateFlutterFfiMainGetLocalOption(key: kOptionVirtualMouseScale)) ??
+            bind.mainGetLocalOption(key: kOptionVirtualMouseScale)) ??
         1.0;
     _showVirtualJoystick =
-        bind.crateFlutterFfiMainGetLocalOption(key: kOptionShowVirtualJoystick) == 'Y';
+        bind.mainGetLocalOption(key: kOptionShowVirtualJoystick) == 'Y';
     notifyListeners();
   }
 
   Future<void> toggleVirtualMouse() async {
-    await bind.crateFlutterFfiMainSetLocalOption(
+    await bind.mainSetLocalOption(
         key: kOptionShowVirtualMouse, value: showVirtualMouse ? 'N' : 'Y');
     setShowVirtualMouse(
-        bind.crateFlutterFfiMainGetLocalOption(key: kOptionShowVirtualMouse) == 'Y');
+        bind.mainGetLocalOption(key: kOptionShowVirtualMouse) == 'Y');
   }
 
   Future<void> toggleVirtualJoystick() async {
-    await bind.crateFlutterFfiMainSetLocalOption(
+    await bind.mainSetLocalOption(
         key: kOptionShowVirtualJoystick,
         value: showVirtualJoystick ? 'N' : 'Y');
     setShowVirtualJoystick(
-        bind.crateFlutterFfiMainGetLocalOption(key: kOptionShowVirtualJoystick) == 'Y');
+        bind.mainGetLocalOption(key: kOptionShowVirtualJoystick) == 'Y');
   }
 }
 
@@ -2039,7 +2049,7 @@ class ImageModel with ChangeNotifier {
 
   updateUserTextureRender() {
     final preValue = _useTextureRender;
-    _useTextureRender = isDesktop && bind.crateFlutterFfiMainGetUseTextureRender();
+    _useTextureRender = isDesktop && bind.mainGetUseTextureRender();
     if (preValue != _useTextureRender) {
       notifyListeners();
     }
@@ -2382,7 +2392,7 @@ class CanvasModel with ChangeNotifier {
   updateSize() => _size = getSize();
 
   updateViewStyle({refreshMousePos = true, notify = true}) async {
-    final style = await bind.crateFlutterFfiSessionGetViewStyle(sessionId: sessionId);
+    final style = await bind.sessionGetViewStyle(sessionId: sessionId);
     if (style == null) {
       return;
     }
@@ -2457,7 +2467,7 @@ class CanvasModel with ChangeNotifier {
 
   tryUpdateScrollStyle(Duration duration, String? style) async {
     if (_scrollStyle == ScrollStyle.scrollauto) return;
-    style ??= await bind.crateFlutterFfiSessionGetViewStyle(sessionId: sessionId);
+    style ??= await bind.sessionGetViewStyle(sessionId: sessionId);
     if (style != kRemoteViewStyleOriginal && style != kRemoteViewStyleCustom) {
       return;
     }
@@ -2472,7 +2482,7 @@ class CanvasModel with ChangeNotifier {
   }
 
   Future<void> updateScrollStyle() async {
-    final style = await bind.crateFlutterFfiSessionGetScrollStyle(sessionId: sessionId);
+    final style = await bind.sessionGetScrollStyle(sessionId: sessionId);
 
     _scrollStyle =
         style != null ? ScrollStyle.fromString(style) : ScrollStyle.scrollauto;
@@ -2487,7 +2497,7 @@ class CanvasModel with ChangeNotifier {
 
   Future<void> initializeEdgeScrollEdgeThickness() async {
     final savedValue =
-        await bind.crateFlutterFfiSessionGetEdgeScrollEdgeThickness(sessionId: sessionId);
+        await bind.sessionGetEdgeScrollEdgeThickness(sessionId: sessionId);
 
     if (savedValue != null) {
       _edgeScrollEdgeThickness = savedValue;
@@ -2762,7 +2772,7 @@ class CanvasModel with ChangeNotifier {
       _scale = 1.0 / _devicePixelRatio;
     }
     _resetCanvasOffset(getDisplayWidth(), getDisplayHeight());
-    bind.crateFlutterFfiSessionSetViewStyle(sessionId: sessionId, value: _lastViewStyle.style);
+    bind.sessionSetViewStyle(sessionId: sessionId, value: _lastViewStyle.style);
     notifyListeners();
   }
 
@@ -3693,7 +3703,7 @@ class QualityMonitorModel with ChangeNotifier {
   }
 
   checkShowQualityMonitor(SessionID sessionId) async {
-    final show = await bind.crateFlutterFfiSessionGetToggleOption(
+    final show = await bind.sessionGetToggleOption(
             sessionId: sessionId, arg: 'show-quality-monitor') ==
         true;
     if (_show != show) {
@@ -3765,7 +3775,7 @@ class RecordingModel with ChangeNotifier {
     if (value) {
       await sessionRefreshVideo(sessionId, pi);
     }
-    await bind.crateFlutterFfiSessionRecordScreen(sessionId: sessionId, start: value);
+    await bind.sessionRecordScreen(sessionId: sessionId, start: value);
   }
 
   updateStatus(bool status) {
@@ -3925,7 +3935,7 @@ class FFI {
     // Else this session is a new one.
     if (isNewPeer) {
       // ignore: unused_local_variable
-      final addRes = bind.crateFlutterFfiSessionAddSync(
+      final addRes = bind.sessionAddSync(
         sessionId: sessionId,
         id: id,
         isFileTransfer: isFileTransfer,
@@ -3945,7 +3955,7 @@ class FFI {
             'Unreachable, failed to add existed session to $id, the displays is null while display is $display');
         return;
       }
-      final addRes = bind.crateFlutterFfiSessionAddExistedSync(
+      final addRes = bind.sessionAddExistedSync(
           id: id,
           sessionId: sessionId,
           displays: Int32List.fromList(displays),
@@ -3975,11 +3985,11 @@ class FFI {
     // Any operations that depend on the stream should be carefully handled.
     late final Stream<EventToUI> stream;
     if (isNewPeer || display == null || displays == null) {
-      stream = bind.crateFlutterFfiSessionStart(sessionId: sessionId, id: id);
+      stream = bind.sessionStart(sessionId: sessionId, id: id);
     } else {
       // We have to put displays in `sessionStart()` to make sure the stream is ready
       // and then the displays' capturing requests can be sent.
-      stream = bind.crateFlutterFfiSessionStartWithDisplays(
+      stream = bind.sessionStartWithDisplays(
           sessionId: sessionId, id: id, displays: Int32List.fromList(displays));
     }
 
@@ -4004,7 +4014,7 @@ class FFI {
     final cb = ffiModel.startEventListener(sessionId, id);
 
     imageModel.updateUserTextureRender();
-    final hasGpuTextureRender = bind.crateFlutterFfiMainHasGpuTextureRender();
+    final hasGpuTextureRender = bind.mainHasGpuTextureRender();
     final SimpleWrapper<bool> isToNewWindowNotified = SimpleWrapper(false);
     // Preserved for the rgba data.
     stream.listen((message) {
@@ -4029,7 +4039,7 @@ class FFI {
           ffiModel.setPermissions(data.permissions);
           await ffiModel.handleCachedPeerData(data, id);
           await sessionRefreshVideo(sessionId, ffiModel.pi);
-          await bind.crateFlutterFfiSessionRequestNewDisplayInitMsgs(
+          await bind.sessionRequestNewDisplayInitMsgs(
               sessionId: sessionId, display: ffiModel.pi.currentDisplay);
         });
         isToNewWindowNotified.value = true;
@@ -4124,7 +4134,7 @@ class FFI {
   /// Login with [password], choose if the client should [remember] it.
   void login(String osUsername, String osPassword, SessionID sessionId,
       String password, bool remember) {
-    bind.crateFlutterFfiSessionLogin(
+    bind.sessionLogin(
         sessionId: sessionId,
         osUsername: osUsername,
         osPassword: osPassword,
@@ -4133,7 +4143,7 @@ class FFI {
   }
 
   void send2FA(SessionID sessionId, String code, bool trustThisDevice) {
-    bind.crateFlutterFfiSessionSend2Fa(
+    bind.sessionSend2Fa(
         sessionId: sessionId, code: code, trustThisDevice: trustThisDevice);
   }
 
@@ -4169,7 +4179,7 @@ class FFI {
     inputModel.disposeRelativeMouseMode();
     inputModel.disposeSideButtonTracking();
     if (closeSession) {
-      await bind.crateFlutterFfiSessionClose(sessionId: sessionId);
+      await bind.sessionClose(sessionId: sessionId);
     }
     debugPrint('model $id closed');
     id = '';
@@ -4385,14 +4395,14 @@ Future<void> setCanvasConfig(
   p['yCanvas'] = yCanvas;
   p['scale'] = scale;
   p['currentDisplay'] = currentDisplay;
-  await bind.crateFlutterFfiSessionSetFlutterOption(
+  await bind.sessionSetFlutterOption(
       sessionId: sessionId, k: canvasKey, v: jsonEncode(p));
 }
 
 Future<Map<String, dynamic>?> getCanvasConfig(SessionID sessionId) async {
   if (!isWebDesktop) return null;
   var p =
-      await bind.crateFlutterFfiSessionGetFlutterOption(sessionId: sessionId, k: canvasKey);
+      await bind.sessionGetFlutterOption(sessionId: sessionId, k: canvasKey);
   if (p == null || p.isEmpty) return null;
   try {
     Map<String, dynamic> m = json.decode(p);

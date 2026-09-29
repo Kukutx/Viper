@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:convert';
 import 'dart:math';
 
@@ -5,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/model.dart';
@@ -480,7 +481,7 @@ class _RawTouchGestureDetectorRegionState
 
       if (scale != 0) {
         if (widget.isCamera) return;
-        await bind.crateFlutterFfiSessionSendPointer(
+        await bind.sessionSendPointer(
             sessionId: sessionId,
             msg: json.encode(
                 PointerEventToRust(kPointerEventKindTouch, 'scale', scale)
@@ -501,7 +502,7 @@ class _RawTouchGestureDetectorRegionState
     }
     if ((isDesktop || isWebDesktop)) {
       if (widget.isCamera) return;
-      await bind.crateFlutterFfiSessionSendPointer(
+      await bind.sessionSendPointer(
           sessionId: sessionId,
           msg: json.encode(
               PointerEventToRust(kPointerEventKindTouch, 'scale', 0).toJson()));
@@ -509,7 +510,7 @@ class _RawTouchGestureDetectorRegionState
       // mobile
       _scale = 1;
       // No idea why we need to set the view style to "" here.
-      // bind.crateFlutterFfiSessionSetViewStyle(sessionId: sessionId, value: "");
+      // bind.sessionSetViewStyle(sessionId: sessionId, value: "");
     }
     if (!isSpecialHoldDragActive) {
       await inputModel.sendMouse('up', MouseButtons.left);

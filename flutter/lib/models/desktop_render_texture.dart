@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:flutter/material.dart';
 import 'package:flutter_gpu_texture_renderer/flutter_gpu_texture_renderer.dart';
 import 'package:flutter_hbb/common/shared_state.dart';
@@ -24,7 +26,7 @@ class _PixelbufferTexture {
 
   create(int d, SessionID sessionId, FFI ffi) {
     _display = d;
-    _textureKey = bind.crateFlutterFfiGetNextTextureKey();
+    _textureKey = bind.getNextTextureKey();
     _sessionId = sessionId;
 
     textureRenderer.createTexture(_textureKey).then((id) async {
@@ -59,7 +61,7 @@ class _PixelbufferTexture {
 class _GpuTexture {
   int _textureId = -1;
   SessionID? _sessionId;
-  final support = bind.crateFlutterFfiMainHasGpuTextureRender();
+  final support = bind.mainHasGpuTextureRender();
   bool _destroying = false;
   int _display = 0;
   int? _id;

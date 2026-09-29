@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
@@ -14,15 +16,12 @@ import '../../common.dart';
 import '../../common/widgets/dialog.dart';
 import '../../common/widgets/toolbar.dart';
 import '../../models/model.dart';
-import '../../models/platform_model.dart';
 import '../../common/shared_state.dart';
 import '../../utils/image.dart';
 import '../widgets/remote_toolbar.dart';
 import '../widgets/kb_layout_type_chooser.dart';
 import '../widgets/tabbar_widget.dart';
 
-import 'package:flutter_hbb/native/custom_cursor.dart'
-    if (dart.library.html) 'package:flutter_hbb/web/custom_cursor.dart';
 
 final SimpleWrapper<bool> _firstEnterImage = SimpleWrapper(false);
 
@@ -106,7 +105,7 @@ class _ViewCameraPageState extends State<ViewCameraPage>
       showKBLayoutTypeChooserIfNeeded(
           _ffi.ffiModel.pi.platform, _ffi.dialogManager);
       _ffi.recordingModel
-          .updateStatus(bind.crateFlutterFfiSessionGetIsRecording(sessionId: _ffi.sessionId));
+          .updateStatus(bind.sessionGetIsRecording(sessionId: _ffi.sessionId));
     });
     _ffi.start(
       widget.id,
@@ -443,9 +442,9 @@ class _ViewCameraPageState extends State<ViewCameraPage>
   Widget getBodyForDesktop(BuildContext context) {
     var paints = <Widget>[
       MouseRegion(onEnter: (evt) {
-        if (!isWeb) bind.crateFlutterFfiHostStopSystemKeyPropagate(stopped: false);
+        if (!isWeb) bind.hostStopSystemKeyPropagate(stopped: false);
       }, onExit: (evt) {
-        if (!isWeb) bind.crateFlutterFfiHostStopSystemKeyPropagate(stopped: true);
+        if (!isWeb) bind.hostStopSystemKeyPropagate(stopped: true);
       }, child: LayoutBuilder(builder: (context, constraints) {
         final c = Provider.of<CanvasModel>(context, listen: false);
         Future.delayed(Duration.zero, () => c.updateViewStyle());
@@ -611,17 +610,7 @@ class _ImagePaintState extends State<ImagePaint> {
     );
   }
 
-  MouseCursor _buildCustomCursor(BuildContext context, double scale) {
-    final cursor = Provider.of<CursorModel>(context);
-    final cache = cursor.cache ?? preDefaultCursor.cache;
-    return buildCursorOfCache(cursor, scale, cache);
-  }
 
-  MouseCursor _buildDisabledCursor(BuildContext context, double scale) {
-    final cursor = Provider.of<CursorModel>(context);
-    final cache = preForbiddenCursor.cache;
-    return buildCursorOfCache(cursor, scale, cache);
-  }
 
   Widget _buildCrossScrollbarFromLayout(
     BuildContext context,

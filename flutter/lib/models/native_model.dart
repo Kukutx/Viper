@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
@@ -50,7 +52,6 @@ class PlatformFFI {
   // _homeDir is only needed for Android and IOS.
   String _homeDir = '';
   final _eventHandlers = <String, Map<String, HandleEvent>>{};
-  late RustLibApi _ffiBind;
   late String _appType;
   StreamEventHandler? _eventCallback;
 
@@ -59,7 +60,6 @@ class PlatformFFI {
   static final PlatformFFI instance = PlatformFFI._();
   final _toAndroidChannel = const MethodChannel('mChannel');
 
-  RustLibApi get ffiBind => _ffiBind;
   F3? _session_get_rgba;
 
   static get localeName => Platform.localeName;
@@ -103,7 +103,7 @@ class PlatformFFI {
   }
 
   String translate(String name, String locale) =>
-      _ffiBind.crateFlutterFfiTranslate(name: name, locale: locale);
+      bind.translate(name: name, locale: locale);
 
   Uint8List? getRgba(SessionID sessionId, int display, int bufSize) {
     if (_session_get_rgba == null) return null;
@@ -122,14 +122,14 @@ class PlatformFFI {
   }
 
   int getRgbaSize(SessionID sessionId, int display) =>
-      _ffiBind.crateFlutterFfiSessionGetRgbaSize(sessionId: sessionId, display: display);
+      bind.sessionGetRgbaSize(sessionId: sessionId, display: display);
   void nextRgba(SessionID sessionId, int display) =>
-      _ffiBind.crateFlutterFfiSessionNextRgba(sessionId: sessionId, display: display);
+      bind.sessionNextRgba(sessionId: sessionId, display: display);
   void registerPixelbufferTexture(SessionID sessionId, int display, int ptr) =>
-      _ffiBind.crateFlutterFfiSessionRegisterPixelbufferTexture(
+      bind.sessionRegisterPixelbufferTexture(
           sessionId: sessionId, display: display, ptr: ptr);
   void registerGpuTexture(SessionID sessionId, int display, int ptr) =>
-      _ffiBind.crateFlutterFfiSessionRegisterGpuTexture(
+      bind.sessionRegisterGpuTexture(
           sessionId: sessionId, display: display, ptr: ptr);
 
   /// Init the FFI class, loads the native Rust core library.
@@ -158,18 +158,17 @@ class PlatformFFI {
         debugPrint('Failed to get documents directory: $e');
       }
       await RustLib.init(externalLibrary: dylib);
-      _ffiBind = RustLib.instance.api;
 
       if (isLinux) {
         if (isMain) {
           // Start a dbus service for uri links, no need to await
-          _ffiBind.crateFlutterFfiMainStartDbusServer();
+          bind.mainStartDbusServer();
         }
       } else if (isMacOS && isMain) {
         // Start ipc service for uri links.
-        _ffiBind.crateFlutterFfiMainStartIpcUrlServer();
+        bind.mainStartIpcUrlServer();
       }
-      _startListenEvent(_ffiBind); // global event
+      _startListenEvent(); // global event
       try {
         if (isAndroid) {
           // Android file transfer uses app-specific storage. User-selected
@@ -180,7 +179,7 @@ class PlatformFFI {
           // The previous code was `_homeDir = (await getDownloadsDirectory())?.path ?? '';`,
           // which provided the `downloads` path in the sandbox.
           // It is unclear why we now use the `data` directory in the sandbox instead.
-          _homeDir = _ffiBind.crateFlutterFfiMainGetDataDirIos(appDir: _dir);
+          _homeDir = bind.mainGetDataDirIos(appDir: _dir);
         } else {
           // no need to set home dir
         }
@@ -228,12 +227,12 @@ class PlatformFFI {
             '_appType:$_appType,info1-id:$id,info2-name:$name,dir:$_dir');
       }
       if (desktopType == DesktopType.cm) {
-        await _ffiBind.crateFlutterFfiCmInit();
+        await bind.cmInit();
       }
-      await _ffiBind.crateFlutterFfiMainDeviceId(id: id);
-      await _ffiBind.crateFlutterFfiMainDeviceName(name: name);
-      await _ffiBind.crateFlutterFfiMainSetHomeDir(home: _homeDir);
-      await _ffiBind.crateFlutterFfiMainInit(
+      await bind.mainDeviceId(id: id);
+      await bind.mainDeviceName(name: name);
+      await bind.mainSetHomeDir(home: _homeDir);
+      await bind.mainInit(
         appDir: _dir,
         customClientConfig: '',
       );
@@ -260,10 +259,10 @@ class PlatformFFI {
   }
 
   /// Start listening to the Rust core's events and frames.
-  void _startListenEvent(RustLibApi rustdeskImpl) {
+  void _startListenEvent() {
     final appType =
         _appType == kAppTypeDesktopRemote ? '$_appType,$kWindowId' : _appType;
-    var sink = rustdeskImpl.crateFlutterFfiStartGlobalEventStream(appType: appType);
+    var sink = bind.startGlobalEventStream(appType: appType);
     sink.listen((message) {
       () async {
         try {

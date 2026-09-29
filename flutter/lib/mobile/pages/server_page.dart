@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -11,7 +13,6 @@ import 'package:provider/provider.dart';
 import '../../common.dart';
 import '../../common/widgets/dialog.dart';
 import '../../consts.dart';
-import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
 import 'home_page.dart';
 
@@ -23,8 +24,8 @@ class ServerPage extends StatefulWidget implements PageShape {
   final icon = const Icon(Icons.mobile_screen_share);
 
   @override
-  final appBarActions = (!bind.crateFlutterFfiIsDisableSettings() &&
-          bind.crateFlutterFfiMainGetBuildinOption(key: kOptionHideSecuritySetting) != 'Y')
+  final appBarActions = (!bind.isDisableSettings() &&
+          bind.mainGetBuildinOption(key: kOptionHideSecuritySetting) != 'Y')
       ? [_DropDownAction()]
       : [];
 
@@ -145,12 +146,12 @@ class _DropDownAction extends StatelessWidget {
               value == kUseTemporaryPassword ||
               value == kUseBothPasswords) {
             callback() {
-              bind.crateFlutterFfiMainSetOption(key: kOptionVerificationMethod, value: value);
+              bind.mainSetOption(key: kOptionVerificationMethod, value: value);
               gFFI.serverModel.updatePasswordModel();
             }
 
             if (value == kUsePermanentPassword &&
-                (await bind.crateFlutterFfiMainGetCommon(key: "permanent-password-set")) !=
+                (await bind.mainGetCommon(key: "permanent-password-set")) !=
                     "true") {
               if (isChangePermanentPasswordDisabled()) {
                 callback();
@@ -249,7 +250,7 @@ class ServiceNotRunningNotification extends StatelessWidget {
                 icon: const Icon(Icons.play_arrow),
                 onPressed: () {
                   if (gFFI.userModel.userName.value.isEmpty &&
-                      bind.crateFlutterFfiMainGetLocalOption(key: "show-scam-warning") !=
+                      bind.mainGetLocalOption(key: "show-scam-warning") !=
                           "N") {
                     showScamWarning(context, serverModel);
                   } else {
@@ -272,7 +273,7 @@ class ScamWarningDialog extends StatefulWidget {
 }
 
 class ScamWarningDialogState extends State<ScamWarningDialog> {
-  int _countdown = bind.crateFlutterFfiIsCustomClient() ? 0 : 12;
+  int _countdown = bind.isCustomClient() ? 0 : 12;
   bool show_warning = false;
   late Timer _timer;
   late ServerModel _serverModel;
@@ -401,7 +402,7 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
                                 Navigator.of(context).pop();
                                 _serverModel.toggleService();
                                 if (show_warning) {
-                                  bind.crateFlutterFfiMainSetLocalOption(
+                                  bind.mainSetLocalOption(
                                       key: "show-scam-warning", value: "N");
                                 }
                               },
@@ -549,7 +550,7 @@ class ServerInfo extends StatelessWidget {
                       IconButton(
                           visualDensity: VisualDensity.compact,
                           icon: const Icon(Icons.refresh),
-                          onPressed: () => bind.crateFlutterFfiMainUpdateTemporaryPassword()),
+                          onPressed: () => bind.mainUpdateTemporaryPassword()),
                       IconButton(
                           visualDensity: VisualDensity.compact,
                           icon: Icon(Icons.copy_outlined),
@@ -578,10 +579,10 @@ class _PermissionCheckerState extends State<PermissionChecker> {
     final serverModel = Provider.of<ServerModel>(context);
     final hasAudioPermission = androidVersion >= 30;
     final hideStopService = isAndroid &&
-        bind.crateFlutterFfiMainGetBuildinOption(key: kOptionHideStopService) == 'Y';
+        bind.mainGetBuildinOption(key: kOptionHideStopService) == 'Y';
     final allowPermChangeInAcceptWindow = option2bool(
         kOptionEnablePermChangeInAcceptWindow,
-        bind.crateFlutterFfiMainGetBuildinOption(
+        bind.mainGetBuildinOption(
           key: kOptionEnablePermChangeInAcceptWindow,
         ));
     final permissionChangeLocked = isAndroid &&
@@ -606,7 +607,7 @@ class _PermissionCheckerState extends State<PermissionChecker> {
                 serverModel.mediaOk,
                 !serverModel.mediaOk &&
                         gFFI.userModel.userName.value.isEmpty &&
-                        bind.crateFlutterFfiMainGetLocalOption(key: "show-scam-warning") != "N"
+                        bind.mainGetLocalOption(key: "show-scam-warning") != "N"
                     ? () => showScamWarning(context, serverModel)
                     : serverModel.toggleService),
           PermissionRow(
@@ -724,7 +725,7 @@ class ConnectionManager extends StatelessWidget {
       style: ButtonStyle(backgroundColor: MaterialStatePropertyAll(Colors.red)),
       icon: const Icon(Icons.close),
       onPressed: () {
-        bind.crateFlutterFfiCmCloseConnection(connId: client.id);
+        bind.cmCloseConnection(connId: client.id);
         gFFI.invokeMethod("cancel_notification", client.id);
       },
       label: Text(translate("Disconnect")),
@@ -739,7 +740,7 @@ class ConnectionManager extends StatelessWidget {
           icon: const Icon(Icons.phone),
           label: Text(translate("Stop")),
           onPressed: () {
-            bind.crateFlutterFfiCmCloseVoiceCall(id: client.id);
+            bind.cmCloseVoiceCall(id: client.id);
             gFFI.invokeMethod("cancel_notification", client.id);
           },
         ),

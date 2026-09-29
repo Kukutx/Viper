@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:io';
 
@@ -8,7 +10,6 @@ import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:zxing2/qrcode.dart';
 
 import '../../common.dart';
-import '../../models/platform_model.dart';
 import '../widgets/dialog.dart';
 
 class ScanPage extends StatefulWidget {
@@ -97,7 +98,7 @@ class _ScanPageState extends State<ScanPage> {
 
         var reader = QRCodeReader();
         var result = reader.decode(bitmap);
-        if (result.text.startsWith(bind.crateFlutterFfiMainUriPrefixSync())) {
+        if (result.text.startsWith(bind.mainUriPrefixSync())) {
           handleUriLink(uriString: result.text);
         } else {
           showServerSettingFromQr(result.text);

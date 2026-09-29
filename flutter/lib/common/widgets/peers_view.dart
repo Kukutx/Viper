@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:collection';
 
@@ -15,7 +17,6 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../common.dart';
 import '../../models/peer_model.dart';
-import '../../models/platform_model.dart';
 import 'peer_card.dart';
 
 typedef PeerFilter = bool Function(Peer peer);
@@ -57,7 +58,7 @@ final peerSearchText = "".obs;
 /// for peer sort, global obs value
 RxString? _peerSort;
 RxString get peerSort {
-  _peerSort ??= bind.crateFlutterFfiGetLocalFlutterOption(k: kOptionPeerSorting).obs;
+  _peerSort ??= bind.getLocalFlutterOption(k: kOptionPeerSorting).obs;
   return _peerSort!;
 }
 
@@ -314,7 +315,7 @@ class _PeersViewState extends State<_PeersView>
 
   void _startCheckOnlines() {
     () async {
-      final p = await bind.crateFlutterFfiMainIsUsingPublicServer();
+      final p = await bind.mainIsUsingPublicServer();
       if (!p) {
         _queryInterval = const Duration(seconds: 6);
       }
@@ -333,7 +334,7 @@ class _PeersViewState extends State<_PeersView>
           if (!skipIfNotActive && (_queryCount < _maxQueryCount || !p)) {
             if (now.difference(_lastQueryTime) >= _queryInterval) {
               if (_curPeers.isNotEmpty) {
-                bind.crateFlutterFfiQueryOnlines(ids: _curPeers.toList(growable: false));
+                bind.queryOnlines(ids: _curPeers.toList(growable: false));
                 _lastQueryTime = DateTime.now();
                 _queryCount += 1;
               }
@@ -347,7 +348,7 @@ class _PeersViewState extends State<_PeersView>
 
   _queryOnlines(bool isLoadEvent) {
     if (_curPeers.isNotEmpty) {
-      bind.crateFlutterFfiQueryOnlines(ids: _curPeers.toList(growable: false));
+      bind.queryOnlines(ids: _curPeers.toList(growable: false));
       _queryCount = 0;
     }
     _lastQueryPeers = {..._curPeers};
@@ -367,7 +368,7 @@ class _PeersViewState extends State<_PeersView>
     // fallback to id sorting
     if (!PeerSortType.values.contains(sortedBy)) {
       sortedBy = PeerSortType.remoteId;
-      bind.crateFlutterFfiSetLocalFlutterOption(
+      bind.setLocalFlutterOption(
         k: kOptionPeerSorting,
         v: sortedBy,
       );
@@ -465,7 +466,7 @@ class RecentPeersView extends BasePeersView {
   @override
   Widget build(BuildContext context) {
     final widget = super.build(context);
-    bind.crateFlutterFfiMainLoadRecentPeers();
+    bind.mainLoadRecentPeers();
     return widget;
   }
 }
@@ -485,7 +486,7 @@ class FavoritePeersView extends BasePeersView {
   @override
   Widget build(BuildContext context) {
     final widget = super.build(context);
-    bind.crateFlutterFfiMainLoadFavPeers();
+    bind.mainLoadFavPeers();
     return widget;
   }
 }
@@ -505,8 +506,8 @@ class DiscoveredPeersView extends BasePeersView {
   @override
   Widget build(BuildContext context) {
     final widget = super.build(context);
-    bind.crateFlutterFfiMainLoadLanPeers();
-    bind.crateFlutterFfiMainDiscover();
+    bind.mainLoadLanPeers();
+    bind.mainDiscover();
     return widget;
   }
 }

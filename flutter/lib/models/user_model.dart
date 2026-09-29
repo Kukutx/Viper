@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 
@@ -10,7 +12,6 @@ import 'package:get/get.dart';
 import '../common.dart';
 import '../utils/http_service.dart' as http;
 import 'model.dart';
-import 'platform_model.dart';
 
 bool refreshingUser = false;
 
@@ -51,19 +52,19 @@ class UserModel {
   }
 
   void refreshCurrentUser() async {
-    if (bind.crateFlutterFfiIsDisableAccount()) return;
+    if (bind.isDisableAccount()) return;
     networkError.value = '';
     networkErrorFromServer.value = false;
-    final token = bind.crateFlutterFfiMainGetLocalOption(key: 'access_token');
+    final token = bind.mainGetLocalOption(key: 'access_token');
     if (token == '') {
       await updateOtherModels();
       return;
     }
     _updateLocalUserInfo();
-    final url = await bind.crateFlutterFfiMainGetApiServer();
+    final url = await bind.mainGetApiServer();
     final body = {
-      'id': await bind.crateFlutterFfiMainGetMyId(),
-      'uuid': await bind.crateFlutterFfiMainGetUuid()
+      'id': await bind.mainGetMyId(),
+      'uuid': await bind.mainGetUuid()
     };
     if (refreshingUser) return;
     try {
@@ -114,7 +115,7 @@ class UserModel {
   }
 
   static Map<String, dynamic>? getLocalUserInfo() {
-    final userInfo = bind.crateFlutterFfiMainGetLocalOption(key: 'user_info');
+    final userInfo = bind.mainGetLocalOption(key: 'user_info');
     if (userInfo == '') {
       return null;
     }
@@ -136,8 +137,8 @@ class UserModel {
   }
 
   Future<void> reset({bool resetOther = false}) async {
-    await bind.crateFlutterFfiMainSetLocalOption(key: 'access_token', value: '');
-    await bind.crateFlutterFfiMainSetLocalOption(key: 'user_info', value: '');
+    await bind.mainSetLocalOption(key: 'access_token', value: '');
+    await bind.mainSetLocalOption(key: 'user_info', value: '');
     if (resetOther) {
       await gFFI.abModel.reset();
       await gFFI.groupModel.reset();
@@ -152,10 +153,10 @@ class UserModel {
     displayName.value = user.displayName;
     avatar.value = user.avatar;
     isAdmin.value = user.isAdmin;
-    bind.crateFlutterFfiMainSetLocalOption(key: 'user_info', value: jsonEncode(user));
+    bind.mainSetLocalOption(key: 'user_info', value: jsonEncode(user));
     if (isWeb) {
       // ugly here, tmp solution
-      bind.crateFlutterFfiMainSetLocalOption(key: 'verifier', value: user.verifier ?? '');
+      bind.mainSetLocalOption(key: 'verifier', value: user.verifier ?? '');
     }
   }
 
@@ -170,14 +171,14 @@ class UserModel {
   Future<void> logOut({String? apiServer}) async {
     final tag = gFFI.dialogManager.showLoading(translate('Waiting'));
     try {
-      final url = apiServer ?? await bind.crateFlutterFfiMainGetApiServer();
+      final url = apiServer ?? await bind.mainGetApiServer();
       final authHeaders = getHttpHeaders();
       authHeaders['Content-Type'] = "application/json";
       await http
           .post(Uri.parse('$url/api/logout'),
               body: jsonEncode({
-                'id': await bind.crateFlutterFfiMainGetMyId(),
-                'uuid': await bind.crateFlutterFfiMainGetUuid(),
+                'id': await bind.mainGetMyId(),
+                'uuid': await bind.mainGetUuid(),
               }),
               headers: authHeaders)
           .timeout(Duration(seconds: 2));
@@ -191,7 +192,7 @@ class UserModel {
 
   /// throw [RequestException]
   Future<LoginResponse> login(LoginRequest loginRequest) async {
-    final url = await bind.crateFlutterFfiMainGetApiServer();
+    final url = await bind.mainGetApiServer();
     final resp = await http.post(Uri.parse('$url/api/login'),
         body: jsonEncode(loginRequest.toJson()));
 
@@ -238,7 +239,7 @@ class UserModel {
   /// data. Returns an empty list when no API server is configured or a
   /// successful response contains no third-party login options.
   static Future<List<dynamic>> queryOidcLoginOptions() async {
-    final url = await bind.crateFlutterFfiMainGetApiServer();
+    final url = await bind.mainGetApiServer();
     if (url.trim().isEmpty) return [];
     final resp = await http.get(Uri.parse('$url/api/login-options'));
     const successStatusCodeStart = 200;

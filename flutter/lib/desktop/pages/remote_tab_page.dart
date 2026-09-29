@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:convert';
 import 'dart:async';
 import 'dart:ui' as ui;
@@ -21,7 +23,6 @@ import 'package:get/get.dart';
 import 'package:bot_toast/bot_toast.dart';
 
 import '../../common/widgets/dialog.dart';
-import '../../models/platform_model.dart';
 
 class _MenuTheme {
   static const Color blueColor = MyTheme.button;
@@ -69,7 +70,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
         final remotePage = tabController.widget(id);
         if (remotePage is RemotePage) {
           final ffi = remotePage.ffi;
-          bind.crateFlutterFfiSetCurSessionId(sessionId: ffi.sessionId);
+          bind.setCurSessionId(sessionId: ffi.sessionId);
         }
         WindowController.fromWindowId(params['windowId'])
             .setTitle(getWindowNameWithId(id));
@@ -405,7 +406,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
     } else {
       final bool res;
       if (!option2bool(kOptionEnableConfirmClosingTabs,
-          bind.crateFlutterFfiMainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
+          bind.mainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
         res = true;
       } else {
         res = await closeConfirmDialog();

@@ -518,18 +518,18 @@ class _FileManagerPageState extends State<FileManagerPage> {
                     selectedItems?.isLocal == true &&
                     selectedItems?.items.isNotEmpty == true) ...[
                   if (selectedItems!.items.length == 1 &&
-                      selectedItems!.items.single.isFile)
+                      selectedItems.items.single.isFile)
                     IconButton(
                       tooltip: translate("Save as"),
                       icon: Icon(Icons.save_alt),
                       onPressed: () =>
-                          _exportFile(selectedItems!.items.single),
+                          _exportFile(selectedItems.items.single),
                     )
                   else
                     IconButton(
                       tooltip: translate("Export"),
                       icon: Icon(Icons.drive_folder_upload),
-                      onPressed: () => _exportItems(selectedItems!),
+                      onPressed: () => _exportItems(selectedItems),
                     ),
                 ],
                 IconButton(

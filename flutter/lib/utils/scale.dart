@@ -1,5 +1,6 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:flutter_hbb/consts.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:uuid/uuid.dart';
 
 /// Clamp custom scale percent to supported bounds.
@@ -22,7 +23,7 @@ double percentToScale(int percent) => clampCustomScalePercent(percent) / 100.0;
 
 /// Fetch, parse and clamp the custom scale percent for a session.
 Future<int> getSessionCustomScalePercent(UuidValue sessionId) async {
-  final opt = await bind.crateFlutterFfiSessionGetFlutterOption(
+  final opt = await bind.sessionGetFlutterOption(
       sessionId: sessionId, k: kCustomScalePercentKey);
   return parseCustomScalePercent(opt);
 }

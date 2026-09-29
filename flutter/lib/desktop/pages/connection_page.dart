@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 // main window right pane
 
 import 'dart:async';
@@ -18,7 +20,6 @@ import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
-import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 
 class OnlineStatusWidget extends StatefulWidget {
@@ -38,7 +39,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   Timer? _updateTimer;
 
   double get em => 14.0;
-  double? get height => bind.crateFlutterFfiIsIncomingOnly() ? null : em * 3;
+  double? get height => bind.isIncomingOnly() ? null : em * 3;
 
   void onUsePublicServerGuide() {
     const url = "https://rustdesk.com/pricing";
@@ -65,7 +66,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final isIncomingOnly = bind.crateFlutterFfiIsIncomingOnly();
+    final isIncomingOnly = bind.isIncomingOnly();
     startServiceWidget() => Offstage(
           offstage: !_svcStopped.value,
           child: InkWell(
@@ -169,7 +170,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
   updateStatus() async {
     final status =
-        jsonDecode(await bind.crateFlutterFfiMainGetConnectStatus()) as Map<String, dynamic>;
+        jsonDecode(await bind.mainGetConnectStatus()) as Map<String, dynamic>;
     final statusNum = status['status_num'] as int;
     if (statusNum == 0) {
       stateGlobal.svcStatus.value = SvcStatus.connecting;
@@ -180,7 +181,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
     } else {
       stateGlobal.svcStatus.value = SvcStatus.notReady;
     }
-    _svcIsUsingPublicServer.value = await bind.crateFlutterFfiMainIsUsingPublicServer();
+    _svcIsUsingPublicServer.value = await bind.mainIsUsingPublicServer();
     try {
       stateGlobal.videoConnCount.value = status['video_conn_count'] as int;
     } catch (_) {}
@@ -223,7 +224,7 @@ class _ConnectionPageState extends State<ConnectionPage>
     _idFocusNode.addListener(onFocusChanged);
     if (_idController.text.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final lastRemoteId = await bind.crateFlutterFfiMainGetLastRemoteId();
+        final lastRemoteId = await bind.mainGetLastRemoteId();
         if (lastRemoteId != _idController.id) {
           setState(() {
             _idController.id = lastRemoteId;
@@ -284,7 +285,7 @@ class _ConnectionPageState extends State<ConnectionPage>
   @override
   void onWindowClose() {
     super.onWindowClose();
-    bind.crateFlutterFfiMainOnMainWindowClose();
+    bind.mainOnMainWindowClose();
   }
 
   void onFocusChanged() {
@@ -303,7 +304,7 @@ class _ConnectionPageState extends State<ConnectionPage>
 
   @override
   Widget build(BuildContext context) {
-    final isOutgoingOnly = bind.crateFlutterFfiIsOutgoingOnly();
+    final isOutgoingOnly = bind.isOutgoingOnly();
     return Column(
       children: [
         Expanded(

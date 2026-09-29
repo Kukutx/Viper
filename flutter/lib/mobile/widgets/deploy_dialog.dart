@@ -1,8 +1,9 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../common.dart';
-import '../../models/platform_model.dart';
 
 const _deployDialogTag = 'android-deploy-device';
 
@@ -49,7 +50,7 @@ void showDeployDialog() {
       });
       String res;
       try {
-        res = await bind.crateFlutterFfiMainDeployDevice(
+        res = await bind.mainDeployDevice(
             token: token, id: idController.text.trim());
       } catch (e) {
         setState(() {

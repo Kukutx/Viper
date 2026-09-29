@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -12,7 +14,6 @@ import 'package:get/get.dart';
 
 import '../common.dart';
 import '../consts.dart';
-import 'platform_model.dart';
 
 class RelativeMouseModel {
   final SessionID sessionId;
@@ -189,7 +190,7 @@ class RelativeMouseModel {
 
   bool get isSupported {
     // On Linux/Wayland, cursor warping is not supported, hide the option entirely.
-    if (isDesktop && isLinux && bind.crateFlutterFfiMainCurrentIsWayland()) {
+    if (isDesktop && isLinux && bind.mainCurrentIsWayland()) {
       return false;
     }
     // Relative mouse mode is unsupported on remote Linux:
@@ -700,7 +701,7 @@ class RelativeMouseModel {
     if (isViewCamera()) return false;
 
     try {
-      await bind.crateFlutterFfiSessionSendMouse(
+      await bind.sessionSendMouse(
         sessionId: sessionId,
         msg: json.encode(modify(msg)),
       );
@@ -738,7 +739,7 @@ class RelativeMouseModel {
         // Check preconditions before each attempt.
         if (!enabled.value || !getPointerInsideImage()) return;
 
-        final ok = bind.crateFlutterFfiMainSetCursorPosition(
+        final ok = bind.mainSetCursorPosition(
           x: center.dx.toInt(),
           y: center.dy.toInt(),
         );
@@ -959,7 +960,7 @@ class RelativeMouseModel {
       bottom = (frame.top + frame.height - borderBottom).toInt();
     }
 
-    _cursorClipApplied = bind.crateFlutterFfiMainClipCursor(
+    _cursorClipApplied = bind.mainClipCursor(
       left: left,
       top: top,
       right: right,
@@ -973,7 +974,7 @@ class RelativeMouseModel {
     _cursorClipApplied = false;
     if (!isWindows) return;
 
-    bind.crateFlutterFfiMainClipCursor(
+    bind.mainClipCursor(
       left: 0,
       top: 0,
       right: 0,

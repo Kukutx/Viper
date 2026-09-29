@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 
@@ -14,7 +16,7 @@ void handleUpdate(String releasePageUrl) {
   String downloadUrl = releasePageUrl.replaceAll('tag', 'download');
   String version = downloadUrl.substring(downloadUrl.lastIndexOf('/') + 1);
   final String downloadFile =
-      bind.crateFlutterFfiMainGetCommonSync(key: 'download-file-$version');
+      bind.mainGetCommonSync(key: 'download-file-$version');
   if (downloadFile.startsWith('error:')) {
     final error = downloadFile.replaceFirst('error:', '');
     msgBox(gFFI.sessionId, 'custom-nocancel-nook-hasclose', 'Error', error,
@@ -38,13 +40,13 @@ void handleUpdate(String releasePageUrl) {
         actions: [
           if (_isExtracting.isFalse) dialogButton(translate('Cancel'), onPressed: () async {
             onCanceled.value();
-            await bind.crateFlutterFfiMainSetCommon(
+            await bind.mainSetCommon(
                 key: 'cancel-downloader', value: downloadId.value);
             // Wait for the downloader to be removed.
             for (int i = 0; i < 10; i++) {
               await Future.delayed(const Duration(milliseconds: 300));
               final isCanceled = 'error:Downloader not found' ==
-                  await bind.crateFlutterFfiMainGetCommon(
+                  await bind.mainGetCommon(
                       key: 'download-data-${downloadId.value}');
               if (isCanceled) {
                 break;
@@ -87,7 +89,7 @@ class UpdateProgressState extends State<UpdateProgress> {
     platformFFI.registerEventHandler(_eventKeyDownloadNewVersion,
         _eventKeyDownloadNewVersion, handleDownloadNewVersion,
         replace: true);
-    bind.crateFlutterFfiMainSetCommon(key: 'download-new-version', value: widget.downloadUrl);
+    bind.mainSetCommon(key: 'download-new-version', value: widget.downloadUrl);
     if (isMacOS) {
       platformFFI.registerEventHandler(_eventKeyExtractUpdateDmg,
           _eventKeyExtractUpdateDmg, handleExtractUpdateDmg,
@@ -174,7 +176,7 @@ class UpdateProgressState extends State<UpdateProgress> {
   void _updateDownloadData() {
     String err = '';
     String downloadData =
-        bind.crateFlutterFfiMainGetCommonSync(key: 'download-data-${widget.downloadId.value}');
+        bind.mainGetCommonSync(key: 'download-data-${widget.downloadId.value}');
     if (downloadData.startsWith('error:')) {
       err = downloadData.substring('error:'.length);
     } else {
@@ -206,14 +208,14 @@ class UpdateProgressState extends State<UpdateProgress> {
     } else {
       if (_totalSize != null && _downloadedSize >= _totalSize!) {
         cancelQueryTimer();
-        bind.crateFlutterFfiMainSetCommon(
+        bind.mainSetCommon(
             key: 'remove-downloader', value: widget.downloadId.value);
         if (_totalSize == 0) {
           _onError('The download file size is 0.');
         } else {
           setState(() {});
           if (isMacOS) {
-            bind.crateFlutterFfiMainSetCommon(
+            bind.mainSetCommon(
                 key: 'extract-update-dmg', value: widget.downloadUrl);
             _isExtracting.value = true;
           } else {
@@ -236,7 +238,7 @@ class UpdateProgressState extends State<UpdateProgress> {
       gFFI.dialogManager,
       onSubmit: () {
         debugPrint('Downloaded, update to new version now');
-        bind.crateFlutterFfiMainSetCommon(key: 'update-me', value: widget.downloadUrl);
+        bind.mainSetCommon(key: 'update-me', value: widget.downloadUrl);
       },
       submitTimeout: 5,
     );

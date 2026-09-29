@@ -1,10 +1,11 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart';
@@ -76,8 +77,8 @@ class _InstallPageBodyState extends State<_InstallPageBody>
   );
 
   _InstallPageBodyState() {
-    controller = TextEditingController(text: bind.crateFlutterFfiInstallInstallPath());
-    final installOptions = jsonDecode(bind.crateFlutterFfiInstallInstallOptions());
+    controller = TextEditingController(text: bind.installInstallPath());
+    final installOptions = jsonDecode(bind.installInstallOptions());
     startmenu.value = installOptions['STARTMENUSHORTCUTS'] != '0';
     desktopicon.value = installOptions['DESKTOPSHORTCUTS'] != '0';
     printer.value = installOptions['PRINTER'] == '1';
@@ -231,13 +232,13 @@ class _InstallPageBodyState extends State<_InstallPageBody>
                     ),
                   ),
                   Offstage(
-                    offstage: bind.crateFlutterFfiInstallShowRunWithoutInstall(),
+                    offstage: bind.installShowRunWithoutInstall(),
                     child: Obx(
                       () => OutlinedButton.icon(
                         icon: Icon(Icons.screen_share_outlined, size: 16),
                         label: Text(translate('Run without install')),
                         onPressed: btnEnabled.value
-                            ? () => bind.crateFlutterFfiInstallRunWithoutInstall()
+                            ? () => bind.installRunWithoutInstall()
                             : null,
                         style: buttonStyle,
                       ).marginOnly(left: 10),
@@ -258,17 +259,17 @@ class _InstallPageBodyState extends State<_InstallPageBody>
       if (startmenu.value) args += ' startmenu';
       if (desktopicon.value) args += ' desktopicon';
       if (printer.value) args += ' printer';
-      bind.crateFlutterFfiInstallInstallMe(options: args, path: controller.text);
+      bind.installInstallMe(options: args, path: controller.text);
     }
 
     do_install();
   }
 
   void selectInstallPath() async {
-    String? install_path = await FilePicker.platform
+    String? install_path = await FilePicker
         .getDirectoryPath(initialDirectory: controller.text);
     if (install_path != null) {
-      controller.text = join(install_path, await bind.crateFlutterFfiMainGetAppName());
+      controller.text = join(install_path, await bind.mainGetAppName());
     }
   }
 }

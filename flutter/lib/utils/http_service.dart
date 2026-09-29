@@ -1,8 +1,9 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:http/http.dart' as http;
-import '../models/platform_model.dart';
 import 'package:flutter_hbb/common.dart';
 export 'package:http/http.dart' show Response;
 
@@ -25,7 +26,7 @@ class HttpService {
       // Use flutter http if:
       // Not `enableFlutterHttpOnRust` and no proxy is set
       useFlutterHttp =
-          !(enableFlutterHttpOnRust || await bind.crateFlutterFfiMainGetProxyStatus());
+          !(enableFlutterHttpOnRust || await bind.mainGetProxyStatus());
     }
 
     if (useFlutterHttp) {
@@ -34,7 +35,7 @@ class HttpService {
 
     String headersJson = jsonEncode(headers);
     String methodName = method.toString().split('.').last;
-    await bind.crateFlutterFfiMainHttpRequest(
+    await bind.mainHttpRequest(
         url: url.toString(),
         method: methodName.toLowerCase(),
         body: body,
@@ -81,8 +82,6 @@ class HttpService {
               .delete(url, headers: headers, body: body)
               .timeout(_requestTimeout);
           break;
-        default:
-          throw Exception('Unsupported HTTP method');
       }
 
       return response;
@@ -94,7 +93,7 @@ class HttpService {
   Future<String> _pollForResponse(String url) async {
     String? responseJson = " ";
     while (responseJson == " ") {
-      responseJson = await bind.crateFlutterFfiMainGetHttpStatus(url: url);
+      responseJson = await bind.mainGetHttpStatus(url: url);
       if (responseJson == null) {
         throw Exception('The HTTP request failed');
       }

@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/mobile/pages/server_page.dart';
 import 'package:flutter_hbb/mobile/pages/settings_page.dart';
@@ -5,7 +7,6 @@ import 'package:flutter_hbb/web/settings_page.dart';
 import 'package:get/get.dart';
 import '../../common.dart';
 import '../../common/widgets/chat_page.dart';
-import '../../models/platform_model.dart';
 import '../../models/state_model.dart';
 import 'connection_page.dart';
 
@@ -47,12 +48,12 @@ class HomePageState extends State<HomePage> {
 
   void initPages() {
     _pages.clear();
-    if (!bind.crateFlutterFfiIsIncomingOnly()) {
+    if (!bind.isIncomingOnly()) {
       _pages.add(ConnectionPage(
         appBarActions: [],
       ));
     }
-    if (isAndroid && !bind.crateFlutterFfiIsOutgoingOnly()) {
+    if (isAndroid && !bind.isOutgoingOnly()) {
       _chatPageTabIndex = _pages.length;
       _pages.addAll([ChatPage(type: ChatPageType.mobileMain), ServerPage()]);
     }
@@ -150,7 +151,7 @@ class HomePageState extends State<HomePage> {
         ],
       );
     }
-    return Text(bind.crateFlutterFfiMainGetAppNameSync());
+    return Text(bind.mainGetAppNameSync());
   }
 }
 
@@ -166,7 +167,7 @@ class WebHomePage extends StatelessWidget {
       // backgroundColor: MyTheme.grayBg,
       appBar: AppBar(
         centerTitle: true,
-        title: Text("${bind.crateFlutterFfiMainGetAppNameSync()} (Preview)"),
+        title: Text("${bind.mainGetAppNameSync()} (Preview)"),
         actions: connectionPage.appBarActions,
       ),
       body: connectionPage,

@@ -1,8 +1,9 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:debounce_throttle/debounce_throttle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
@@ -257,7 +258,7 @@ class DraggableKeyPosition {
   get pos => _pos;
 
   _loadPosition(String k) {
-    final value = bind.crateFlutterFfiGetLocalFlutterOption(k: k);
+    final value = bind.getLocalFlutterOption(k: k);
     if (value.isNotEmpty) {
       final parts = value.split(',');
       if (parts.length == 2) {
@@ -310,7 +311,7 @@ class DraggableKeyPosition {
 
   _triggerStore() => _debouncerStore.value = _debouncerStore.value + 1;
   _store() {
-    bind.crateFlutterFfiSetLocalFlutterOption(k: key, v: '${_pos.dx},${_pos.dy}');
+    bind.setLocalFlutterOption(k: key, v: '${_pos.dx},${_pos.dy}');
   }
 }
 

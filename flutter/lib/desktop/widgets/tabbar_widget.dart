@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
@@ -11,7 +13,6 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/remote_page.dart';
 import 'package:flutter_hbb/desktop/pages/view_camera_page.dart';
 import 'package:flutter_hbb/main.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 import 'package:get/get_rx/src/rx_workers/utils/debouncer.dart';
@@ -169,7 +170,7 @@ class DesktopTabController {
         }));
       }
     });
-    if ((isDesktop && (bind.crateFlutterFfiIsIncomingOnly() || bind.crateFlutterFfiIsOutgoingOnly())) ||
+    if ((isDesktop && (bind.isIncomingOnly() || bind.isOutgoingOnly())) ||
         callOnSelected) {
       if (state.value.tabs.length > index) {
         final key = state.value.tabs[index].key;
@@ -280,7 +281,7 @@ class DesktopTab extends StatefulWidget {
   }) : super(key: key);
 
   static RxString tablabelGetter(String peerId) {
-    final alias = bind.crateFlutterFfiMainGetPeerOptionSync(id: peerId, key: 'alias');
+    final alias = bind.mainGetPeerOptionSync(id: peerId, key: 'alias');
     return RxString(getDesktopTabLabel(peerId, alias));
   }
 
@@ -327,11 +328,6 @@ class _DesktopTabState extends State<DesktopTab>
       tabType == DesktopTabType.install;
 
   _DesktopTabState() : super();
-
-  static RxString tablabelGetter(String peerId) {
-    final alias = bind.crateFlutterFfiMainGetPeerOptionSync(id: peerId, key: 'alias');
-    return RxString(getDesktopTabLabel(peerId, alias));
-  }
 
   @override
   void initState() {
@@ -593,7 +589,7 @@ class _DesktopTabState extends State<DesktopTab>
   }
 
   Widget _buildBar() {
-    final isIncomingHomePage = bind.crateFlutterFfiIsIncomingOnly() && isInHomePage();
+    final isIncomingHomePage = bind.isIncomingOnly() && isInHomePage();
     return Row(
       children: [
         Expanded(
@@ -604,7 +600,7 @@ class _DesktopTabState extends State<DesktopTab>
                         final current = DateTime.now().millisecondsSinceEpoch;
                         final elapsed = current - _lastClickTime;
                         _lastClickTime = current;
-                        if (elapsed < bind.crateFlutterFfiGetDoubleClickTime()) {
+                        if (elapsed < bind.getDoubleClickTime()) {
                           // onDoubleTap
                           toggleMaximize(isMainWindow)
                               .then((value) => stateGlobal.setMaximized(value));
@@ -790,7 +786,7 @@ class WindowActionPanelState extends State<WindowActionPanel> {
                       icon: stateGlobal.isMaximized.isTrue
                           ? IconFont.restore
                           : IconFont.max,
-                      onTap: bind.crateFlutterFfiIsIncomingOnly() && isInHomePage()
+                      onTap: bind.isIncomingOnly() && isInHomePage()
                           ? null
                           : _toggleMaximize,
                       isClose: false,
@@ -874,7 +870,7 @@ Future<bool> closeConfirmDialog() async {
   final res = await gFFI.dialogManager.show<bool>((setState, close, context) {
     submit() {
       String value = bool2option(kOptionEnableConfirmClosingTabs, confirm);
-      bind.crateFlutterFfiMainSetLocalOption(
+      bind.mainSetLocalOption(
           key: kOptionEnableConfirmClosingTabs, value: value);
       close(true);
     }

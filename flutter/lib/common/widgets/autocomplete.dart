@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -123,7 +125,7 @@ class AllPeersLoader {
   AllPeersLoader({
     @visibleForTesting Future<void> Function(List<String> ids)? queryOnlines,
     @visibleForTesting Duration? queryOnlineDebounce,
-  })  : _queryOnlines = queryOnlines ?? ((ids) => bind.crateFlutterFfiQueryOnlines(ids: ids)),
+  })  : _queryOnlines = queryOnlines ?? ((ids) => bind.queryOnlines(ids: ids)),
         _queryOnlineDebounce =
             queryOnlineDebounce ?? _defaultQueryOnlineDebounce;
 
@@ -159,10 +161,10 @@ class AllPeersLoader {
     _isPeersLoading = true;
 
     if (gFFI.recentPeersModel.peers.isEmpty) {
-      bind.crateFlutterFfiMainLoadRecentPeers();
+      bind.mainLoadRecentPeers();
     }
     if (gFFI.lanPeersModel.peers.isEmpty) {
-      bind.crateFlutterFfiMainLoadLanPeers();
+      bind.mainLoadLanPeers();
     }
     // No need to care about peers from abModel, and group model.
     // Because they will pull data in `refreshCurrentUser()` on startup.

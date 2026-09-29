@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 
@@ -16,17 +18,17 @@ import '../common.dart';
 
 final syncAbOption = 'sync-ab-with-recent-sessions';
 bool shouldSyncAb() {
-  return bind.crateFlutterFfiMainGetLocalOption(key: syncAbOption) == 'Y';
+  return bind.mainGetLocalOption(key: syncAbOption) == 'Y';
 }
 
 final sortAbTagsOption = 'sync-ab-tags';
 bool shouldSortTags() {
-  return bind.crateFlutterFfiMainGetLocalOption(key: sortAbTagsOption) == 'Y';
+  return bind.mainGetLocalOption(key: sortAbTagsOption) == 'Y';
 }
 
 final filterAbTagOption = 'filter-ab-by-intersection';
 bool filterAbTagByIntersection() {
-  return bind.crateFlutterFfiMainGetLocalOption(key: filterAbTagOption) == 'Y';
+  return bind.mainGetLocalOption(key: filterAbTagOption) == 'Y';
 }
 
 const _personalAddressBookName = "My address book";
@@ -101,7 +103,7 @@ class AbModel {
     _currentName.value = '';
     _listPullError.value = '';
     _pulledOnce = false;
-    await bind.crateFlutterFfiMainClearAb();
+    await bind.mainClearAb();
     listInitialized = false;
   }
 
@@ -119,7 +121,7 @@ class AbModel {
   var _pulling = false;
   Future<void> pullAb(
       {required ForcePullAb? force, required bool quiet}) async {
-    if (bind.crateFlutterFfiIsDisableAb()) return;
+    if (bind.isDisableAb()) return;
     if (!gFFI.userModel.isLogin) return;
     if (gFFI.userModel.networkError.isNotEmpty) return;
     if (_pulling) return;
@@ -230,7 +232,7 @@ class AbModel {
   Future<bool> _getAbSettings({required bool quiet}) async {
     int? statusCode;
     try {
-      final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/settings";
+      final api = "${await bind.mainGetApiServer()}/api/ab/settings";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       _setEmptyBody(headers);
@@ -262,7 +264,7 @@ class AbModel {
   Future<bool> _getPersonalAbGuid({required bool quiet}) async {
     int? statusCode;
     try {
-      final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/personal";
+      final api = "${await bind.mainGetApiServer()}/api/ab/personal";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       _setEmptyBody(headers);
@@ -294,7 +296,7 @@ class AbModel {
 
   Future<bool> _getSharedAbProfiles(List<AbProfile> profiles,
       {required bool quiet}) async {
-    final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/shared/profiles";
+    final api = "${await bind.mainGetApiServer()}/api/ab/shared/profiles";
     int? statusCode;
     try {
       var uri0 = Uri.parse(api);
@@ -477,7 +479,7 @@ class AbModel {
         if (!shouldSyncAb()) return;
         var hasSynced = false;
         for (var id in ids) {
-          if (await bind.crateFlutterFfiMainPeerExists(id: id)) {
+          if (await bind.mainPeerExists(id: id)) {
             hasSynced = true;
             break;
           }
@@ -552,14 +554,14 @@ class AbModel {
           _syncAllFromRecent = false;
           filteredPeerIDs = [];
         } else {
-          final new_stored_str = await bind.crateFlutterFfiMainGetNewStoredPeers();
+          final new_stored_str = await bind.mainGetNewStoredPeers();
           if (new_stored_str.isEmpty) return [];
           filteredPeerIDs = (jsonDecode(new_stored_str) as List<dynamic>)
               .map((e) => e.toString())
               .toList();
           if (filteredPeerIDs.isEmpty) return [];
         }
-        final loadStr = await bind.crateFlutterFfiMainLoadRecentPeersForAb(
+        final loadStr = await bind.mainLoadRecentPeersForAb(
             filter: jsonEncode(filteredPeerIDs));
         if (loadStr.isEmpty) {
           return [];
@@ -592,7 +594,7 @@ class AbModel {
   }
 
   void setShouldAsync(bool v) async {
-    await bind.crateFlutterFfiMainSetLocalOption(
+    await bind.mainSetLocalOption(
         key: syncAbOption, value: v ? 'Y' : defaultOptionNo);
     _syncAllFromRecent = true;
     _timerCounter = 0;
@@ -605,10 +607,10 @@ class AbModel {
     try {
       var ab_entries = _serializeCache();
       Map<String, dynamic> m = <String, dynamic>{
-        "access_token": bind.crateFlutterFfiMainGetLocalOption(key: 'access_token'),
+        "access_token": bind.mainGetLocalOption(key: 'access_token'),
         "ab_entries": ab_entries,
       };
-      bind.crateFlutterFfiMainSaveAb(json: jsonEncode(m));
+      bind.mainSaveAb(json: jsonEncode(m));
     } catch (e) {
       debugPrint('ab save:$e');
     }
@@ -632,7 +634,7 @@ class AbModel {
   }
 
   trySetCurrentToLast() {
-    final name = bind.crateFlutterFfiGetLocalFlutterOption(k: kOptionCurrentAbName);
+    final name = bind.getLocalFlutterOption(k: kOptionCurrentAbName);
     if (addressbooks.containsKey(name)) {
       _currentName.value = name;
     }
@@ -642,9 +644,9 @@ class AbModel {
     try {
       if (_cacheLoadOnceFlag || currentAbLoading.value) return;
       _cacheLoadOnceFlag = true;
-      final access_token = bind.crateFlutterFfiMainGetLocalOption(key: 'access_token');
+      final access_token = bind.mainGetLocalOption(key: 'access_token');
       if (access_token.isEmpty) return;
-      final cache = await bind.crateFlutterFfiMainLoadAb();
+      final cache = await bind.mainLoadAb();
       if (currentAbLoading.value) return;
       final data = jsonDecode(cache);
       if (data == null || data['access_token'] != access_token) return;
@@ -1007,7 +1009,7 @@ class LegacyAb extends BaseAb {
   @override
   Future<bool> pullAbImpl({quiet = false}) async {
     bool ret = false;
-    final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab";
+    final api = "${await bind.mainGetApiServer()}/api/ab";
     int? statusCode;
     try {
       var authHeaders = getHttpHeaders();
@@ -1061,7 +1063,7 @@ class LegacyAb extends BaseAb {
     try {
       //https: //stackoverflow.com/questions/68249333/flutter-getx-updating-item-in-children-list-is-not-reactive
       peers.refresh();
-      final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab";
+      final api = "${await bind.mainGetApiServer()}/api/ab";
       var authHeaders = getHttpHeaders();
       authHeaders['Content-Type'] = "application/json";
       final body = jsonEncode({"data": jsonEncode(_serialize())});
@@ -1430,7 +1432,7 @@ class Ab extends BaseAb {
   }
 
   Future<bool> _fetchPeers(List<Peer> tmpPeers, {quiet = false}) async {
-    final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/peers";
+    final api = "${await bind.mainGetApiServer()}/api/ab/peers";
     int? statusCode;
     try {
       var uri0 = Uri.parse(api);
@@ -1497,7 +1499,7 @@ class Ab extends BaseAb {
   }
 
   Future<bool> _fetchTags(List<AbTag> tmpTags, {quiet = false}) async {
-    final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/tags/${profile.guid}";
+    final api = "${await bind.mainGetApiServer()}/api/ab/tags/${profile.guid}";
     int? statusCode;
     try {
       var uri0 = Uri.parse(api);
@@ -1548,7 +1550,7 @@ class Ab extends BaseAb {
   Future<String?> addPeers(List<Map<String, dynamic>> ps) async {
     try {
       final api =
-          "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/peer/add/${profile.guid}";
+          "${await bind.mainGetApiServer()}/api/ab/peer/add/${profile.guid}";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       for (var p in ps) {
@@ -1581,7 +1583,7 @@ class Ab extends BaseAb {
   Future<bool> changeTagForPeers(List<String> ids, List<dynamic> tags) async {
     try {
       final api =
-          "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/peer/update/${profile.guid}";
+          "${await bind.mainGetApiServer()}/api/ab/peer/update/${profile.guid}";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       var ret = true;
@@ -1607,7 +1609,7 @@ class Ab extends BaseAb {
   Future<bool> changeAlias({required String id, required String alias}) async {
     try {
       final api =
-          "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/peer/update/${profile.guid}";
+          "${await bind.mainGetApiServer()}/api/ab/peer/update/${profile.guid}";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       final body = jsonEncode({"id": id, "alias": alias});
@@ -1628,7 +1630,7 @@ class Ab extends BaseAb {
   Future<bool> changeNote({required String id, required String note}) async {
     try {
       final api =
-          "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/peer/update/${profile.guid}";
+          "${await bind.mainGetApiServer()}/api/ab/peer/update/${profile.guid}";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       final body = jsonEncode({"id": id, "note": note});
@@ -1648,7 +1650,7 @@ class Ab extends BaseAb {
   Future<bool> _setPassword(Object bodyContent) async {
     try {
       final api =
-          "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/peer/update/${profile.guid}";
+          "${await bind.mainGetApiServer()}/api/ab/peer/update/${profile.guid}";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       final body = jsonEncode(bodyContent);
@@ -1683,7 +1685,7 @@ class Ab extends BaseAb {
     bool uiUpdate = false;
     bool saveCache = false;
     final api =
-        "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/peer/update/${profile.guid}";
+        "${await bind.mainGetApiServer()}/api/ab/peer/update/${profile.guid}";
     var headers = getHttpHeaders();
     headers['Content-Type'] = "application/json";
 
@@ -1752,7 +1754,7 @@ class Ab extends BaseAb {
   Future<bool> deletePeers(List<String> ids) async {
     try {
       final api =
-          "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/peer/${profile.guid}";
+          "${await bind.mainGetApiServer()}/api/ab/peer/${profile.guid}";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       final body = jsonEncode(ids);
@@ -1777,7 +1779,7 @@ class Ab extends BaseAb {
       List<String> tagList, Map<String, int> tagColorMap) async {
     try {
       final api =
-          "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/tag/add/${profile.guid}";
+          "${await bind.mainGetApiServer()}/api/ab/tag/add/${profile.guid}";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       for (var t in tagList) {
@@ -1810,7 +1812,7 @@ class Ab extends BaseAb {
     }
     try {
       final api =
-          "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/tag/rename/${profile.guid}";
+          "${await bind.mainGetApiServer()}/api/ab/tag/rename/${profile.guid}";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       final body = jsonEncode({
@@ -1834,7 +1836,7 @@ class Ab extends BaseAb {
   Future<bool> setTagColor(String tag, Color color) async {
     try {
       final api =
-          "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/tag/update/${profile.guid}";
+          "${await bind.mainGetApiServer()}/api/ab/tag/update/${profile.guid}";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       final body = jsonEncode({
@@ -1857,7 +1859,7 @@ class Ab extends BaseAb {
   @override
   Future<bool> deleteTag(String tag) async {
     try {
-      final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/ab/tag/${profile.guid}";
+      final api = "${await bind.mainGetApiServer()}/api/ab/tag/${profile.guid}";
       var headers = getHttpHeaders();
       headers['Content-Type'] = "application/json";
       final body = jsonEncode([tag]);
