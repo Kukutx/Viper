@@ -596,7 +596,7 @@ impl FlutterHandler {
             if push {
                 if let Some(stream) = &session.event_stream {
                     if let Err(error) = stream.add(EventToUI::Event(out.clone())) {
-                        log::debug!("Flutter event receiver closed: {error}");
+                        hbb_common::log::debug!("Flutter event receiver closed: {error}");
                     }
                 }
             }
@@ -876,7 +876,7 @@ impl InvokeUiSession for FlutterHandler {
             if session.renderer.on_texture(display, texture) {
                 if let Some(stream) = &session.event_stream {
                     if let Err(error) = stream.add(EventToUI::Texture(display, true)) {
-                        log::debug!("Flutter event receiver closed: {error}");
+                        hbb_common::log::debug!("Flutter event receiver closed: {error}");
                     }
                 }
             }
@@ -1215,7 +1215,7 @@ impl FlutterHandler {
             }
             if let Some(stream) = &h.event_stream {
                 if let Err(error) = stream.add(EventToUI::Rgba(display)) {
-                    log::debug!("Flutter event receiver closed: {error}");
+                    hbb_common::log::debug!("Flutter event receiver closed: {error}");
                 }
                 is_sent = true;
             }
@@ -1247,7 +1247,7 @@ impl FlutterHandler {
                 if session.renderer.on_rgba(display, rgba) {
                     if let Some(stream) = &session.event_stream {
                         if let Err(error) = stream.add(EventToUI::Texture(display, false)) {
-                            log::debug!("Flutter event receiver closed: {error}");
+                            hbb_common::log::debug!("Flutter event receiver closed: {error}");
                         }
                     }
                 }
@@ -1418,7 +1418,7 @@ pub fn session_start_(
 fn try_send_close_event(event_stream: &Option<StreamSink<EventToUI>>) {
     if let Some(stream) = &event_stream {
         if let Err(error) = stream.add(EventToUI::Event("close".to_owned())) {
-            log::debug!("Flutter event receiver closed: {error}");
+            hbb_common::log::debug!("Flutter event receiver closed: {error}");
         }
     }
 }
@@ -1579,7 +1579,7 @@ pub mod connection_manager {
 
             if let Some(s) = GLOBAL_EVENT_STREAM.read().unwrap().get(super::APP_TYPE_CM) {
                 if let Err(error) = s.add(serde_json::ser::to_string(&h).unwrap_or("".to_owned())) {
-                    log::debug!("Flutter event receiver closed: {error}");
+                    hbb_common::log::debug!("Flutter event receiver closed: {error}");
                 }
             } else {
                 println!(
