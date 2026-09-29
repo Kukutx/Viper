@@ -178,12 +178,12 @@ class _OidcAuthController {
         return;
       }
       try {
-        await bind.mainAccountAuthCancel();
+        await bind.crateFlutterFfiMainAccountAuthCancel();
         if (!_isCurrent(authAttempt, op)) {
           completer.complete(false);
           return;
         }
-        await bind.mainAccountAuth(op: op, rememberMe: true);
+        await bind.crateFlutterFfiMainAccountAuth(op: op, rememberMe: true);
         completer.complete(_isCurrent(authAttempt, op));
       } catch (error, stackTrace) {
         completer.completeError(error, stackTrace);
@@ -193,7 +193,7 @@ class _OidcAuthController {
   }
 
   Future<bool> _startWeb(int authAttempt, String op) async {
-    await bind.mainAccountAuth(op: op, rememberMe: true);
+    await bind.crateFlutterFfiMainAccountAuth(op: op, rememberMe: true);
     return _isCurrent(authAttempt, op);
   }
 
@@ -210,7 +210,7 @@ class _OidcAuthController {
     _cancelInProgress.value = true;
     _pendingOperation = _pendingOperation.then((_) async {
       try {
-        await bind.mainAccountAuthCancel();
+        await bind.crateFlutterFfiMainAccountAuthCancel();
         completer.complete(_isCurrent(authAttempt, op));
       } catch (error, stackTrace) {
         completer.completeError(error, stackTrace);
@@ -223,7 +223,7 @@ class _OidcAuthController {
 
   Future<void> _cancelBackend() async {
     try {
-      await bind.mainAccountAuthCancel();
+      await bind.crateFlutterFfiMainAccountAuthCancel();
     } catch (error, stackTrace) {
       debugPrint('Failed to cancel account authentication $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -396,7 +396,7 @@ class _WidgetOPState extends State<WidgetOP> {
       _updateTimer?.cancel();
       return Future<void>.value();
     }
-    return bind.mainAccountAuthResult().then<void>((result) {
+    return bind.crateFlutterFfiMainAccountAuthResult().then<void>((result) {
       if (!mounted ||
           authAttempt != _authAttempt ||
           widget.curOP.value != widget.config.op ||
@@ -776,9 +776,9 @@ Future<bool?> _openLoginDialog() async {
         case HttpType.kAuthResTypeToken:
           if (resp.access_token != null) {
             if (storeIfAccessToken) {
-              await bind.mainSetLocalOption(
+              await bind.crateFlutterFfiMainSetLocalOption(
                   key: 'access_token', value: resp.access_token!);
-              await bind.mainSetLocalOption(
+              await bind.crateFlutterFfiMainSetLocalOption(
                   key: 'user_info', value: jsonEncode(resp.user ?? {}));
             }
             if (close != null) {
@@ -842,8 +842,8 @@ Future<bool?> _openLoginDialog() async {
         final resp = await gFFI.userModel.login(LoginRequest(
             username: username.text,
             password: password.text,
-            id: await bind.mainGetMyId(),
-            uuid: await bind.mainGetUuid(),
+            id: await bind.crateFlutterFfiMainGetMyId(),
+            uuid: await bind.crateFlutterFfiMainGetUuid(),
             autoLogin: true,
             type: HttpType.kAuthReqTypeAccount));
         await handleLoginResponse(resp, true, close);
@@ -1018,15 +1018,15 @@ Future<bool?> verificationCodeDialog(
             tfaCode: isEmailVerification ? null : code.text,
             secret: secret,
             username: user?.name,
-            id: await bind.mainGetMyId(),
-            uuid: await bind.mainGetUuid(),
+            id: await bind.crateFlutterFfiMainGetMyId(),
+            uuid: await bind.crateFlutterFfiMainGetUuid(),
             autoLogin: autoLogin,
             type: HttpType.kAuthReqTypeEmailCode));
 
         switch (resp.type) {
           case HttpType.kAuthResTypeToken:
             if (resp.access_token != null) {
-              await bind.mainSetLocalOption(
+              await bind.crateFlutterFfiMainSetLocalOption(
                   key: 'access_token', value: resp.access_token!);
               close(true);
               return;

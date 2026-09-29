@@ -257,7 +257,7 @@ class DraggableKeyPosition {
   get pos => _pos;
 
   _loadPosition(String k) {
-    final value = bind.getLocalFlutterOption(k: k);
+    final value = bind.crateFlutterFfiGetLocalFlutterOption(k: k);
     if (value.isNotEmpty) {
       final parts = value.split(',');
       if (parts.length == 2) {
@@ -310,7 +310,7 @@ class DraggableKeyPosition {
 
   _triggerStore() => _debouncerStore.value = _debouncerStore.value + 1;
   _store() {
-    bind.setLocalFlutterOption(k: key, v: '${_pos.dx},${_pos.dy}');
+    bind.crateFlutterFfiSetLocalFlutterOption(k: key, v: '${_pos.dx},${_pos.dy}');
   }
 }
 

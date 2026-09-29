@@ -38,7 +38,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   Timer? _updateTimer;
 
   double get em => 14.0;
-  double? get height => bind.isIncomingOnly() ? null : em * 3;
+  double? get height => bind.crateFlutterFfiIsIncomingOnly() ? null : em * 3;
 
   void onUsePublicServerGuide() {
     const url = "https://rustdesk.com/pricing";
@@ -65,7 +65,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final isIncomingOnly = bind.isIncomingOnly();
+    final isIncomingOnly = bind.crateFlutterFfiIsIncomingOnly();
     startServiceWidget() => Offstage(
           offstage: !_svcStopped.value,
           child: InkWell(
@@ -169,7 +169,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
   updateStatus() async {
     final status =
-        jsonDecode(await bind.mainGetConnectStatus()) as Map<String, dynamic>;
+        jsonDecode(await bind.crateFlutterFfiMainGetConnectStatus()) as Map<String, dynamic>;
     final statusNum = status['status_num'] as int;
     if (statusNum == 0) {
       stateGlobal.svcStatus.value = SvcStatus.connecting;
@@ -180,7 +180,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
     } else {
       stateGlobal.svcStatus.value = SvcStatus.notReady;
     }
-    _svcIsUsingPublicServer.value = await bind.mainIsUsingPublicServer();
+    _svcIsUsingPublicServer.value = await bind.crateFlutterFfiMainIsUsingPublicServer();
     try {
       stateGlobal.videoConnCount.value = status['video_conn_count'] as int;
     } catch (_) {}
@@ -223,7 +223,7 @@ class _ConnectionPageState extends State<ConnectionPage>
     _idFocusNode.addListener(onFocusChanged);
     if (_idController.text.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final lastRemoteId = await bind.mainGetLastRemoteId();
+        final lastRemoteId = await bind.crateFlutterFfiMainGetLastRemoteId();
         if (lastRemoteId != _idController.id) {
           setState(() {
             _idController.id = lastRemoteId;
@@ -284,7 +284,7 @@ class _ConnectionPageState extends State<ConnectionPage>
   @override
   void onWindowClose() {
     super.onWindowClose();
-    bind.mainOnMainWindowClose();
+    bind.crateFlutterFfiMainOnMainWindowClose();
   }
 
   void onFocusChanged() {
@@ -303,7 +303,7 @@ class _ConnectionPageState extends State<ConnectionPage>
 
   @override
   Widget build(BuildContext context) {
-    final isOutgoingOnly = bind.isOutgoingOnly();
+    final isOutgoingOnly = bind.crateFlutterFfiIsOutgoingOnly();
     return Column(
       children: [
         Expanded(

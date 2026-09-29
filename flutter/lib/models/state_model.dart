@@ -122,14 +122,14 @@ class StateGlobal {
 
   String getInputSource({bool force = false}) {
     if (force || _inputSource.isEmpty) {
-      _inputSource = bind.mainGetInputSource();
+      _inputSource = bind.crateFlutterFfiMainGetInputSource();
     }
     return _inputSource;
   }
 
   setInputSource(SessionID sessionId, String v) async {
-    await bind.mainSetInputSource(sessionId: sessionId, value: v);
-    _inputSource = bind.mainGetInputSource();
+    await bind.crateFlutterFfiMainSetInputSource(sessionId: sessionId, value: v);
+    _inputSource = bind.crateFlutterFfiMainGetInputSource();
   }
 
   StateGlobal._() {

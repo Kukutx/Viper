@@ -42,7 +42,7 @@ typedef HandleEvent = Future<void> Function(Map<String, dynamic> evt);
 
 class PlatformFFI {
   final _eventHandlers = <String, Map<String, HandleEvent>>{};
-  final RustdeskImpl _ffiBind = RustdeskImpl();
+  final RustLibApi _ffiBind = RustLibApi();
 
   static String getByName(String name, [String arg = '']) {
     return context.callMethod('getByName', [name, arg]);
@@ -71,7 +71,7 @@ class PlatformFFI {
   static final PlatformFFI instance = PlatformFFI._();
 
   static get localeName => window.navigator.language;
-  RustdeskImpl get ffiBind => _ffiBind;
+  RustLibApi get ffiBind => _ffiBind;
 
   static Future<String> getVersion() async {
     throw UnimplementedError();
@@ -120,21 +120,21 @@ class PlatformFFI {
   }
 
   String translate(String name, String locale) =>
-      _ffiBind.translate(name: name, locale: locale);
+      _ffiBind.crateFlutterFfiTranslate(name: name, locale: locale);
 
   Uint8List? getRgba(SessionID sessionId, int display, int bufSize) {
     throw UnimplementedError();
   }
 
   int getRgbaSize(SessionID sessionId, int display) =>
-      _ffiBind.sessionGetRgbaSize(sessionId: sessionId, display: display);
+      _ffiBind.crateFlutterFfiSessionGetRgbaSize(sessionId: sessionId, display: display);
   void nextRgba(SessionID sessionId, int display) =>
-      _ffiBind.sessionNextRgba(sessionId: sessionId, display: display);
+      _ffiBind.crateFlutterFfiSessionNextRgba(sessionId: sessionId, display: display);
   void registerPixelbufferTexture(SessionID sessionId, int display, int ptr) =>
-      _ffiBind.sessionRegisterPixelbufferTexture(
+      _ffiBind.crateFlutterFfiSessionRegisterPixelbufferTexture(
           sessionId: sessionId, display: display, ptr: ptr);
   void registerGpuTexture(SessionID sessionId, int display, int ptr) =>
-      _ffiBind.sessionRegisterGpuTexture(
+      _ffiBind.crateFlutterFfiSessionRegisterGpuTexture(
           sessionId: sessionId, display: display, ptr: ptr);
 
   Future<void> init(String appType) async {

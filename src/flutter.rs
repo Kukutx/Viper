@@ -3,7 +3,7 @@ use crate::{
     flutter_ffi::{EventToUI, SessionID},
     ui_session_interface::{io_loop, InvokeUiSession, Session},
 };
-use flutter_rust_bridge::StreamSink;
+use crate::bridge_generated::StreamSink;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use hbb_common::dlopen::{
     symbor::{Library, Symbol},
@@ -1816,7 +1816,7 @@ pub fn push_session_event(session_id: &SessionID, name: &str, event: Vec<(&str, 
 
 #[inline]
 pub fn push_global_event(channel: &str, event: String) -> Option<bool> {
-    Some(GLOBAL_EVENT_STREAM.read().unwrap().get(channel)?.add(event))
+    Some(GLOBAL_EVENT_STREAM.read().unwrap().get(channel)?.add(event).is_ok())
 }
 
 #[inline]

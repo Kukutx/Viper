@@ -83,10 +83,10 @@ class ServerModel with ChangeNotifier {
   String get approveMode => _approveMode;
 
   setVerificationMethod(String method) async {
-    await bind.mainSetOption(key: kOptionVerificationMethod, value: method);
+    await bind.crateFlutterFfiMainSetOption(key: kOptionVerificationMethod, value: method);
     /*
     if (method != kUsePermanentPassword) {
-      await bind.mainSetOption(
+      await bind.crateFlutterFfiMainSetOption(
           key: 'allow-hide-cm', value: bool2option('allow-hide-cm', false));
     }
     */
@@ -101,14 +101,14 @@ class ServerModel with ChangeNotifier {
   }
 
   setTemporaryPasswordLength(String length) async {
-    await bind.mainSetOption(key: "temporary-password-length", value: length);
+    await bind.crateFlutterFfiMainSetOption(key: "temporary-password-length", value: length);
   }
 
   setApproveMode(String mode) async {
-    await bind.mainSetOption(key: kOptionApproveMode, value: mode);
+    await bind.crateFlutterFfiMainSetOption(key: kOptionApproveMode, value: mode);
     /*
     if (mode != 'password') {
-      await bind.mainSetOption(
+      await bind.crateFlutterFfiMainSetOption(
           key: 'allow-hide-cm', value: bool2option('allow-hide-cm', false));
     }
     */
@@ -137,10 +137,10 @@ class ServerModel with ChangeNotifier {
     /*
     // initital _hideCm at startup
     final verificationMethod =
-        bind.mainGetOptionSync(key: kOptionVerificationMethod);
-    final approveMode = bind.mainGetOptionSync(key: kOptionApproveMode);
+        bind.crateFlutterFfiMainGetOptionSync(key: kOptionVerificationMethod);
+    final approveMode = bind.crateFlutterFfiMainGetOptionSync(key: kOptionApproveMode);
     _hideCm = option2bool(
-        'allow-hide-cm', bind.mainGetOptionSync(key: 'allow-hide-cm'));
+        'allow-hide-cm', bind.crateFlutterFfiMainGetOptionSync(key: 'allow-hide-cm'));
     if (!(approveMode == 'password' &&
         verificationMethod == kUsePermanentPassword)) {
       _hideCm = false;
@@ -149,7 +149,7 @@ class ServerModel with ChangeNotifier {
 
     timerCallback() async {
       final connectionStatus =
-          jsonDecode(await bind.mainGetConnectStatus()) as Map<String, dynamic>;
+          jsonDecode(await bind.crateFlutterFfiMainGetConnectStatus()) as Map<String, dynamic>;
       final statusNum = connectionStatus['status_num'] as int;
       if (statusNum != _connectStatus) {
         _connectStatus = statusNum;
@@ -157,7 +157,7 @@ class ServerModel with ChangeNotifier {
       }
 
       if (desktopType == DesktopType.cm) {
-        final res = await bind.cmCheckClientsLength(length: _clients.length);
+        final res = await bind.crateFlutterFfiCmCheckClientsLength(length: _clients.length);
         if (res != null) {
           debugPrint("clients not match!");
           updateClientState(res);
@@ -180,7 +180,7 @@ class ServerModel with ChangeNotifier {
 
     if (!isTest) {
       Future.delayed(Duration.zero, () async {
-        if (await bind.optionSynced()) {
+        if (await bind.crateFlutterFfiOptionSynced()) {
           await timerCallback();
         }
       });
@@ -191,7 +191,7 @@ class ServerModel with ChangeNotifier {
 
     // Initial keyboard status is off on mobile
     if (isMobile) {
-      bind.mainSetOption(key: kOptionEnableKeyboard, value: 'N');
+      bind.crateFlutterFfiMainSetOption(key: kOptionEnableKeyboard, value: 'N');
     }
   }
 
@@ -204,19 +204,19 @@ class ServerModel with ChangeNotifier {
     if (androidVersion < 30 ||
         !await AndroidPermissionManager.check(kRecordAudio)) {
       _audioOk = false;
-      bind.mainSetOption(key: kOptionEnableAudio, value: "N");
+      bind.crateFlutterFfiMainSetOption(key: kOptionEnableAudio, value: "N");
     } else {
-      final audioOption = await bind.mainGetOption(key: kOptionEnableAudio);
+      final audioOption = await bind.crateFlutterFfiMainGetOption(key: kOptionEnableAudio);
       _audioOk = audioOption != 'N';
     }
 
     // Android file transfer is confined to app-specific storage. Files enter
     // and leave the workspace through Android's system document picker.
-    final fileOption = await bind.mainGetOption(key: kOptionEnableFileTransfer);
+    final fileOption = await bind.crateFlutterFfiMainGetOption(key: kOptionEnableFileTransfer);
     _fileOk = fileOption != 'N';
 
     // clipboard
-    final clipOption = await bind.mainGetOption(key: kOptionEnableClipboard);
+    final clipOption = await bind.crateFlutterFfiMainGetOption(key: kOptionEnableClipboard);
     _clipboardOk = clipOption != 'N';
 
     notifyListeners();
@@ -224,17 +224,17 @@ class ServerModel with ChangeNotifier {
 
   updatePasswordModel() async {
     var update = false;
-    final temporaryPassword = await bind.mainGetTemporaryPassword();
+    final temporaryPassword = await bind.crateFlutterFfiMainGetTemporaryPassword();
     final verificationMethod =
-        await bind.mainGetOption(key: kOptionVerificationMethod);
+        await bind.crateFlutterFfiMainGetOption(key: kOptionVerificationMethod);
     final temporaryPasswordLength =
-        await bind.mainGetOption(key: "temporary-password-length");
-    final approveMode = await bind.mainGetOption(key: kOptionApproveMode);
+        await bind.crateFlutterFfiMainGetOption(key: "temporary-password-length");
+    final approveMode = await bind.crateFlutterFfiMainGetOption(key: kOptionApproveMode);
     final numericOneTimePassword =
         await mainGetBoolOption(kOptionAllowNumericOneTimePassword);
     /*
     var hideCm = option2bool(
-        'allow-hide-cm', await bind.mainGetOption(key: 'allow-hide-cm'));
+        'allow-hide-cm', await bind.crateFlutterFfiMainGetOption(key: 'allow-hide-cm'));
     if (!(approveMode == 'password' &&
         verificationMethod == kUsePermanentPassword)) {
       hideCm = false;
@@ -265,7 +265,7 @@ class ServerModel with ChangeNotifier {
     }
     if (_temporaryPasswordLength != temporaryPasswordLength) {
       if (_temporaryPasswordLength.isNotEmpty) {
-        bind.mainUpdateTemporaryPassword();
+        bind.crateFlutterFfiMainUpdateTemporaryPassword();
       }
       _temporaryPasswordLength = temporaryPasswordLength;
       update = true;
@@ -305,7 +305,7 @@ class ServerModel with ChangeNotifier {
     }
 
     _audioOk = !_audioOk;
-    bind.mainSetOption(
+    bind.crateFlutterFfiMainSetOption(
         key: kOptionEnableAudio, value: _audioOk ? defaultOptionYes : 'N');
     notifyListeners();
   }
@@ -315,7 +315,7 @@ class ServerModel with ChangeNotifier {
       await showClientsMayNotBeChangedAlert(parent.target);
     }
     _fileOk = !_fileOk;
-    bind.mainSetOption(
+    bind.crateFlutterFfiMainSetOption(
         key: kOptionEnableFileTransfer,
         value: _fileOk ? defaultOptionYes : 'N');
     notifyListeners();
@@ -323,7 +323,7 @@ class ServerModel with ChangeNotifier {
 
   toggleClipboard() async {
     _clipboardOk = !clipboardOk;
-    bind.mainSetOption(
+    bind.crateFlutterFfiMainSetOption(
         key: kOptionEnableClipboard,
         value: clipboardOk ? defaultOptionYes : 'N');
     notifyListeners();
@@ -335,7 +335,7 @@ class ServerModel with ChangeNotifier {
     }
     if (_inputOk) {
       parent.target?.invokeMethod("stop_input");
-      bind.mainSetOption(key: kOptionEnableKeyboard, value: 'N');
+      bind.crateFlutterFfiMainSetOption(key: kOptionEnableKeyboard, value: 'N');
     } else {
       if (parent.target != null) {
         /// the result of toggle-on depends on user actions in the settings page.
@@ -400,7 +400,7 @@ class ServerModel with ChangeNotifier {
       }
     } else {
       await checkRequestNotificationPermission();
-      if (bind.mainGetLocalOption(key: kOptionDisableFloatingWindow) != 'Y') {
+      if (bind.crateFlutterFfiMainGetLocalOption(key: kOptionDisableFloatingWindow) != 'Y') {
         await checkFloatingWindowPermission();
       }
       final res = await parent.target?.dialogManager
@@ -435,7 +435,7 @@ class ServerModel with ChangeNotifier {
     parent.target?.ffiModel.updateEventListener(parent.target!.sessionId, "");
     await parent.target?.invokeMethod("init_service");
     // ugly is here, because for desktop, below is useless
-    await bind.mainStartService();
+    await bind.crateFlutterFfiMainStartService();
     updateClientState();
     if (isAndroid) {
       androidUpdatekeepScreenOn();
@@ -447,14 +447,14 @@ class ServerModel with ChangeNotifier {
     _isStart = false;
     closeAll();
     await parent.target?.invokeMethod("stop_service");
-    await bind.mainStopService();
+    await bind.crateFlutterFfiMainStopService();
     notifyListeners();
     // for androidUpdatekeepScreenOn only
     WakelockManager.disable(_wakelockKey);
   }
 
   fetchID() async {
-    final id = await bind.mainGetMyId();
+    final id = await bind.crateFlutterFfiMainGetMyId();
     if (id != _serverId.id) {
       _serverId.id = id;
       notifyListeners();
@@ -472,7 +472,7 @@ class ServerModel with ChangeNotifier {
         break;
       case "input":
         if (_inputOk != value) {
-          bind.mainSetOption(
+          bind.crateFlutterFfiMainSetOption(
               key: kOptionEnableKeyboard,
               value: value ? defaultOptionYes : 'N');
         }
@@ -487,7 +487,7 @@ class ServerModel with ChangeNotifier {
   // force
   updateClientState([String? json]) async {
     if (isTest) return;
-    var res = await bind.cmGetClientsState();
+    var res = await bind.crateFlutterFfiCmGetClientsState();
     List<dynamic> clientsJson;
     try {
       clientsJson = jsonDecode(res);
@@ -608,7 +608,7 @@ class ServerModel with ChangeNotifier {
 
   handleVoiceCall(Client client, bool accept) {
     parent.target?.invokeMethod("cancel_notification", client.id);
-    bind.cmHandleIncomingVoiceCall(id: client.id, accept: accept);
+    bind.crateFlutterFfiCmHandleIncomingVoiceCall(id: client.id, accept: accept);
   }
 
   showVoiceCallDialog(Client client) {
@@ -676,7 +676,7 @@ class ServerModel with ChangeNotifier {
 
   void sendLoginResponse(Client client, bool res) async {
     if (res) {
-      bind.cmLoginRes(connId: client.id, res: res);
+      bind.crateFlutterFfiCmLoginRes(connId: client.id, res: res);
       if (!client.isFileTransfer && !client.isTerminal) {
         parent.target?.invokeMethod("start_capture");
       }
@@ -684,7 +684,7 @@ class ServerModel with ChangeNotifier {
       client.authorized = true;
       notifyListeners();
     } else {
-      bind.cmLoginRes(connId: client.id, res: res);
+      bind.crateFlutterFfiCmLoginRes(connId: client.id, res: res);
       parent.target?.invokeMethod("cancel_notification", client.id);
       final index = _clients.indexOf(client);
       tabController.remove(index);
@@ -725,8 +725,8 @@ class ServerModel with ChangeNotifier {
   /// whether the peer is allowed to reconnect. See `ipc::Data::CmWindowClosed`.
   Future<void> closeAll({bool byOperator = true}) async {
     await Future.wait(_clients.map((client) => byOperator
-        ? bind.cmCloseConnection(connId: client.id)
-        : bind.cmCloseConnectionWindow(connId: client.id)));
+        ? bind.crateFlutterFfiCmCloseConnection(connId: client.id)
+        : bind.crateFlutterFfiCmCloseConnectionWindow(connId: client.id)));
     _clients.clear();
     tabController.state.value.tabs.clear();
     if (isAndroid) androidUpdatekeepScreenOn();
@@ -771,12 +771,12 @@ class ServerModel with ChangeNotifier {
   void androidUpdatekeepScreenOn() async {
     if (!isAndroid) return;
     var floatingWindowDisabled =
-        bind.mainGetLocalOption(key: kOptionDisableFloatingWindow) == "Y" ||
+        bind.crateFlutterFfiMainGetLocalOption(key: kOptionDisableFloatingWindow) == "Y" ||
             !await AndroidPermissionManager.check(kSystemAlertWindow);
     final keepScreenOn = floatingWindowDisabled
         ? KeepScreenOn.never
         : optionToKeepScreenOn(
-            bind.mainGetLocalOption(key: kOptionKeepScreenOn));
+            bind.crateFlutterFfiMainGetLocalOption(key: kOptionKeepScreenOn));
     final on = ((keepScreenOn == KeepScreenOn.serviceOn) && _isStart) ||
         (keepScreenOn == KeepScreenOn.duringControlled &&
             _clients.map((e) => !e.disconnected).isNotEmpty);

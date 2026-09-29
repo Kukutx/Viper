@@ -3,7 +3,6 @@ def legacyPluginNamespaces = [
     flutter_keyboard_visibility: 'com.jrai.flutter_keyboard_visibility',
     qr_code_scanner: 'net.touchcapture.qr.flutterqr',
     sqflite: 'com.tekartik.sqflite',
-    uni_links: 'name.avioli.unilinks',
 ]
 
 def java8JvmTarget = JavaVersion.VERSION_1_8.toString()

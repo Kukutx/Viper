@@ -135,7 +135,7 @@ void runMainApp(bool startService) async {
   await initEnv(kAppTypeMain);
   checkUpdate();
   // trigger connection status updater
-  await bind.mainCheckConnectStatus();
+  await bind.crateFlutterFfiMainCheckConnectStatus();
   if (startService) {
     gFFI.serverModel.startService();
   }
@@ -146,7 +146,7 @@ void runMainApp(bool startService) async {
   bool? alwaysOnTop;
   if (isDesktop) {
     alwaysOnTop =
-        bind.mainGetBuildinOption(key: "main-window-always-on-top") == 'Y';
+        bind.crateFlutterFfiMainGetBuildinOption(key: "main-window-always-on-top") == 'Y';
   }
 
   // Set window option.
@@ -169,7 +169,7 @@ void runMainApp(bool startService) async {
     windowManager.setOpacity(1);
     windowManager.setTitle(getWindowName());
     // Do not use `windowManager.setResizable()` here.
-    setResizable(!bind.isIncomingOnly());
+    setResizable(!bind.crateFlutterFfiIsIncomingOnly());
   });
 }
 
@@ -289,7 +289,7 @@ void runConnectionManagerScreen() async {
     const DesktopServerPage(),
     MyTheme.currentThemeMode(),
   );
-  final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
+  final hide = await bind.crateFlutterFfiCmGetConfig(name: "hide_cm") == 'true';
   gFFI.serverModel.hideCm = hide;
   if (hide) {
     await hideCmWindow(isStartup: true);
@@ -308,7 +308,7 @@ showCmWindow({bool isStartup = false}) async {
     WindowOptions windowOptions = getHiddenTitleBarWindowOptions(
         size: kConnectionManagerWindowSizeClosedChat, alwaysOnTop: true);
     await windowManager.waitUntilReadyToShow(windowOptions, null);
-    bind.mainHideDock();
+    bind.crateFlutterFfiMainHideDock();
     await Future.wait([
       windowManager.show(),
       windowManager.focus(),
@@ -336,14 +336,14 @@ hideCmWindow({bool isStartup = false}) async {
         size: kConnectionManagerWindowSizeClosedChat);
     windowManager.setOpacity(0);
     await windowManager.waitUntilReadyToShow(windowOptions, null);
-    bind.mainHideDock();
+    bind.crateFlutterFfiMainHideDock();
     await windowManager.minimize();
     await windowManager.hide();
     _isCmReadyToShow = true;
   } else if (_isCmReadyToShow) {
     if (await windowManager.getOpacity() != 0) {
       await windowManager.setOpacity(0);
-      bind.mainHideDock();
+      bind.crateFlutterFfiMainHideDock();
       await windowManager.minimize();
       await windowManager.hide();
     }
@@ -444,7 +444,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       // Synchronize the window theme of the system.
       updateSystemWindowTheme();
       if (desktopType == DesktopType.main) {
-        bind.mainChangeTheme(dark: to.toShortString());
+        bind.crateFlutterFfiMainChangeTheme(dark: to.toShortString());
       }
     };
     WidgetsBinding.instance.addObserver(this);
@@ -496,8 +496,8 @@ class _AppState extends State<App> with WidgetsBindingObserver {
           navigatorKey: globalKey,
           debugShowCheckedModeBanner: false,
           title: isWeb
-              ? '${bind.mainGetAppNameSync()} Web Client V2 (Preview)'
-              : bind.mainGetAppNameSync(),
+              ? '${bind.crateFlutterFfiMainGetAppNameSync()} Web Client V2 (Preview)'
+              : bind.crateFlutterFfiMainGetAppNameSync(),
           theme: MyTheme.lightTheme,
           darkTheme: MyTheme.darkTheme,
           themeMode: MyTheme.currentThemeMode(),

@@ -251,7 +251,7 @@ class ToolbarState {
 
   ToolbarState() {
     _pin = RxBool(false);
-    final s = bind.getLocalFlutterOption(k: kOptionRemoteMenubarState);
+    final s = bind.crateFlutterFfiGetLocalFlutterOption(k: kOptionRemoteMenubarState);
     if (s.isEmpty) {
       return;
     }
@@ -277,9 +277,9 @@ class ToolbarState {
     try {
       // Load both states in parallel for better performance
       final results = await Future.wait([
-        bind.sessionGetToggleOption(
+        bind.crateFlutterFfiSessionGetToggleOption(
             sessionId: sessionId, arg: kOptionCollapseToolbar),
-        bind.sessionGetToggleOption(
+        bind.crateFlutterFfiSessionGetToggleOption(
             sessionId: sessionId, arg: kOptionHideToolbar),
       ]);
 
@@ -292,14 +292,14 @@ class ToolbarState {
   }
 
   switchCollapse(SessionID sessionId) async {
-    bind.sessionToggleOption(
+    bind.crateFlutterFfiSessionToggleOption(
         sessionId: sessionId, value: kOptionCollapseToolbar);
     collapse.value = !collapse.value;
   }
 
   // Switch hide state for entire toolbar visibility
   switchHide(SessionID sessionId) async {
-    bind.sessionToggleOption(sessionId: sessionId, value: kOptionHideToolbar);
+    bind.crateFlutterFfiSessionToggleOption(sessionId: sessionId, value: kOptionHideToolbar);
     hide.value = !hide.value;
   }
 
@@ -318,7 +318,7 @@ class ToolbarState {
   }
 
   _savePin() async {
-    bind.setLocalFlutterOption(
+    bind.crateFlutterFfiSetLocalFlutterOption(
         k: kOptionRemoteMenubarState, v: jsonEncode({'pin': _pin.value}));
   }
 }
@@ -401,7 +401,7 @@ class RemoteMenuEntry {
         style: style,
       ),
       proc: () {
-        bind.sessionLockScreen(sessionId: sessionId);
+        bind.crateFlutterFfiSessionLockScreen(sessionId: sessionId);
         if (dismissFunc != null) {
           dismissFunc();
         }
@@ -424,7 +424,7 @@ class RemoteMenuEntry {
         style: style,
       ),
       proc: () {
-        bind.sessionCtrlAltDel(sessionId: sessionId);
+        bind.crateFlutterFfiSessionCtrlAltDel(sessionId: sessionId);
         if (dismissFunc != null) {
           dismissFunc();
         }
@@ -529,10 +529,10 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       return;
     }
 
-    final savedFraction = await bind.sessionGetOption(
+    final savedFraction = await bind.crateFlutterFfiSessionGetOption(
         sessionId: widget.ffi.sessionId, arg: kOptionRemoteMenubarFraction);
     // Backward compat: legacy horizontal-only position.
-    final legacyFraction = await bind.sessionGetOption(
+    final legacyFraction = await bind.crateFlutterFfiSessionGetOption(
         sessionId: widget.ffi.sessionId, arg: _legacyRemoteMenubarDragX);
     if (!mounted || syncSerial != _dockingOptionSyncSerial) return;
 
@@ -542,7 +542,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     if (!multiEdgeEnabled) {
       nextEdge = _ToolbarEdge.top;
     } else if (force || wasMultiEdgeEnabled || cached == null) {
-      final edgeStr = await bind.sessionGetOption(
+      final edgeStr = await bind.crateFlutterFfiSessionGetOption(
           sessionId: widget.ffi.sessionId, arg: kOptionRemoteMenubarEdge);
       if (!mounted || syncSerial != _dockingOptionSyncSerial) return;
       nextEdge = _parseToolbarEdge(edgeStr);
@@ -564,10 +564,10 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     // Clamp to the saved drag-bound contract so a corrupted or out-of-range
     // saved value can't bypass it until the user drags again.
     final dragLeft = double.tryParse(
-            bind.mainGetLocalOption(key: kOptionRemoteMenubarDragLeft)) ??
+            bind.crateFlutterFfiMainGetLocalOption(key: kOptionRemoteMenubarDragLeft)) ??
         0.0;
     final dragRight = double.tryParse(
-            bind.mainGetLocalOption(key: kOptionRemoteMenubarDragRight)) ??
+            bind.crateFlutterFfiMainGetLocalOption(key: kOptionRemoteMenubarDragRight)) ??
         1.0;
     final fractionBounds =
         _fractionBoundsForEdge(nextEdge, dragLeft, dragRight);
@@ -591,12 +591,12 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     );
     _pendingDockingOptionSync = false;
     if (!multiEdgeEnabled || keepCurrentPosition) {
-      bind.sessionPeerOption(
+      bind.crateFlutterFfiSessionPeerOption(
         sessionId: widget.ffi.sessionId,
         name: kOptionRemoteMenubarEdge,
         value: _toolbarEdgeToString(nextEdge),
       );
-      bind.sessionPeerOption(
+      bind.crateFlutterFfiSessionPeerOption(
         sessionId: widget.ffi.sessionId,
         name: kOptionRemoteMenubarFraction,
         value: nextFraction.toString(),
@@ -993,7 +993,7 @@ class _MonitorCycle {
     final from = _inRange ? _current : -1;
     final target = (from + 1) % t;
     final isChooseDisplayToOpenInNewWindow = _pi.isSupportMultiDisplay &&
-        bind.sessionGetDisplaysAsIndividualWindows(sessionId: ffi.sessionId) ==
+        bind.crateFlutterFfiSessionGetDisplaysAsIndividualWindows(sessionId: ffi.sessionId) ==
             'Y';
     if (isChooseDisplayToOpenInNewWindow) {
       openMonitorInNewTabOrWindow(target, ffi.id, _pi);
@@ -1070,7 +1070,7 @@ class _MonitorMenu extends StatelessWidget {
   }) : super(key: key);
 
   bool get showMonitorsToolbar =>
-      bind.mainGetUserDefaultOption(key: kKeyShowMonitorsToolbar) == 'Y';
+      bind.crateFlutterFfiMainGetUserDefaultOption(key: kKeyShowMonitorsToolbar) == 'Y';
 
   bool get supportIndividualWindows =>
       !isWeb && ffi.ffiModel.pi.isSupportMultiDisplay;
@@ -1122,13 +1122,13 @@ class _MonitorMenu extends StatelessWidget {
 
   Widget chooseDisplayBehavior() {
     final value =
-        bind.sessionGetDisplaysAsIndividualWindows(sessionId: ffi.sessionId) ==
+        bind.crateFlutterFfiSessionGetDisplaysAsIndividualWindows(sessionId: ffi.sessionId) ==
             'Y';
     return CkbMenuButton(
         value: value,
         onChanged: (value) async {
           if (value == null) return;
-          await bind.sessionSetDisplaysAsIndividualWindows(
+          await bind.crateFlutterFfiSessionSetDisplaysAsIndividualWindows(
               sessionId: ffi.sessionId, value: value ? 'Y' : 'N');
         },
         ffi: ffi,
@@ -1286,7 +1286,7 @@ class _MonitorMenu extends StatelessWidget {
     RxInt display = CurrentDisplayState.find(id);
     if (display.value != i) {
       final isChooseDisplayToOpenInNewWindow = pi.isSupportMultiDisplay &&
-          bind.sessionGetDisplaysAsIndividualWindows(
+          bind.crateFlutterFfiSessionGetDisplaysAsIndividualWindows(
                   sessionId: ffi.sessionId) ==
               'Y';
       if (isChooseDisplayToOpenInNewWindow) {
@@ -1451,7 +1451,7 @@ class ScreenAdjustor {
       String monitorLayoutMode;
       try {
         monitorLayoutMode =
-            await bind.mainGetCommon(key: 'gnome-monitor-layout-mode');
+            await bind.crateFlutterFfiMainGetCommon(key: 'gnome-monitor-layout-mode');
       } catch (_) {
         monitorLayoutMode = '';
       }
@@ -1490,7 +1490,7 @@ class ScreenAdjustor {
       final canvasModel = ffi.canvasModel;
       // canvasModel.scale is the rendered scale and already applies kIgnoreDpi.
       // Use it instead of the remote source resolution.
-      final isWayland = isLinux && bind.mainCurrentIsWayland();
+      final isWayland = isLinux && bind.crateFlutterFfiMainCurrentIsWayland();
       final isX11 = isLinux && !isWayland;
       await _updateLinuxWorkAreaCache(
         screen: screen,
@@ -1666,7 +1666,7 @@ class ScreenAdjustor {
     final view = context != null ? View.of(context) : views.first;
     final mediaSize = MediaQueryData.fromView(view).size;
     final viewStyle =
-        await bind.sessionGetViewStyle(sessionId: ffi.sessionId) ?? '';
+        await bind.crateFlutterFfiSessionGetViewStyle(sessionId: ffi.sessionId) ?? '';
     if (viewStyle != kRemoteViewStyleOriginal) {
       return false;
     }
@@ -1839,7 +1839,7 @@ class _DisplayMenuState extends State<_DisplayMenu> {
 
   Widget _customControlsIfCustomSelected({ValueChanged<int>? onChanged}) {
     return futureBuilder(future: () async {
-      final current = await bind.sessionGetViewStyle(sessionId: ffi.sessionId);
+      final current = await bind.crateFlutterFfiSessionGetViewStyle(sessionId: ffi.sessionId);
       return current == kRemoteViewStyleCustom;
     }(), hasData: (data) {
       final isCustom = data as bool;
@@ -1857,13 +1857,13 @@ class _DisplayMenuState extends State<_DisplayMenu> {
   scrollStyle(_IconSubmenuButtonState state, ColorScheme colorScheme) {
     return futureBuilder(future: () async {
       final viewStyle =
-          await bind.sessionGetViewStyle(sessionId: ffi.sessionId) ?? '';
+          await bind.crateFlutterFfiSessionGetViewStyle(sessionId: ffi.sessionId) ?? '';
       final visible = viewStyle == kRemoteViewStyleOriginal ||
           viewStyle == kRemoteViewStyleCustom;
       final scrollStyle =
-          await bind.sessionGetScrollStyle(sessionId: ffi.sessionId) ?? '';
+          await bind.crateFlutterFfiSessionGetScrollStyle(sessionId: ffi.sessionId) ?? '';
       final edgeScrollEdgeThickness = await bind
-          .sessionGetEdgeScrollEdgeThickness(sessionId: ffi.sessionId);
+          .crateFlutterFfiSessionGetEdgeScrollEdgeThickness(sessionId: ffi.sessionId);
       return {
         'visible': visible,
         'scrollStyle': scrollStyle,
@@ -1877,7 +1877,7 @@ class _DisplayMenuState extends State<_DisplayMenu> {
 
       onChangeScrollStyle(String? value) async {
         if (value == null) return;
-        await bind.sessionSetScrollStyle(
+        await bind.crateFlutterFfiSessionSetScrollStyle(
             sessionId: ffi.sessionId, value: value);
         widget.ffi.canvasModel.updateScrollStyle();
         state.setState(() {});
@@ -1886,7 +1886,7 @@ class _DisplayMenuState extends State<_DisplayMenu> {
       onChangeEdgeScrollEdgeThickness(double? value) async {
         if (value == null) return;
         final newThickness = value.round();
-        await bind.sessionSetEdgeScrollEdgeThickness(
+        await bind.crateFlutterFfiSessionSetEdgeScrollEdgeThickness(
             sessionId: ffi.sessionId, value: newThickness);
         widget.ffi.canvasModel.updateEdgeScrollEdgeThickness(newThickness);
         state.setState(() {});
@@ -2220,7 +2220,7 @@ class _ResolutionsMenuState extends State<_ResolutionsMenu> {
   FfiModel get ffiModel => widget.ffi.ffiModel;
   Rect? get rect => scaledRect();
   List<Resolution> get resolutions => pi.resolutions;
-  bool get isWayland => bind.mainCurrentIsWayland();
+  bool get isWayland => bind.crateFlutterFfiMainCurrentIsWayland();
 
   @override
   void initState() {
@@ -2310,7 +2310,7 @@ class _ResolutionsMenuState extends State<_ResolutionsMenu> {
 
   _getLocalResolution() {
     _localResolution = null;
-    final String mainDisplay = bind.mainGetMainDisplay();
+    final String mainDisplay = bind.crateFlutterFfiMainGetMainDisplay();
     if (mainDisplay.isNotEmpty) {
       try {
         final display = json.decode(mainDisplay);
@@ -2364,7 +2364,7 @@ class _ResolutionsMenuState extends State<_ResolutionsMenu> {
     if (pi.currentDisplay == kAllDisplayValue) {
       return;
     }
-    await bind.sessionChangeResolution(
+    await bind.crateFlutterFfiSessionChangeResolution(
       sessionId: ffi.sessionId,
       display: pi.currentDisplay,
       width: w,
@@ -2586,7 +2586,7 @@ class _KeyboardMenu extends StatelessWidget {
 
   keyboardMode() {
     return futureBuilder(future: () async {
-      return await bind.sessionGetKeyboardMode(sessionId: ffi.sessionId) ??
+      return await bind.crateFlutterFfiSessionGetKeyboardMode(sessionId: ffi.sessionId) ??
           kKeyLegacyMode;
     }(), hasData: (data) {
       final groupValue = data as String;
@@ -2599,7 +2599,7 @@ class _KeyboardMenu extends StatelessWidget {
       final enabled = !ffi.ffiModel.viewOnly;
       onChanged(String? value) async {
         if (value == null) return;
-        await bind.sessionSetKeyboardMode(
+        await bind.crateFlutterFfiSessionSetKeyboardMode(
             sessionId: ffi.sessionId, value: value);
         await ffi.inputModel.updateKeyboardMode();
       }
@@ -2610,10 +2610,10 @@ class _KeyboardMenu extends StatelessWidget {
       // Keep both map and legacy mode on web at the moment.
       // TODO: Remove legacy mode after web supports translate mode on web.
       if (isInputSourceFlutter && isDesktop) {
-        if (bind.sessionIsKeyboardModeSupported(
+        if (bind.crateFlutterFfiSessionIsKeyboardModeSupported(
             sessionId: ffi.sessionId, mode: kKeyMapMode)) {
           modeOnly = kKeyMapMode;
-        } else if (bind.sessionIsKeyboardModeSupported(
+        } else if (bind.crateFlutterFfiSessionIsKeyboardModeSupported(
             sessionId: ffi.sessionId, mode: kKeyLegacyMode)) {
           modeOnly = kKeyLegacyMode;
         }
@@ -2622,7 +2622,7 @@ class _KeyboardMenu extends StatelessWidget {
       for (InputModeMenu mode in modes) {
         if (modeOnly != null && mode.key != modeOnly) {
           continue;
-        } else if (!bind.sessionIsKeyboardModeSupported(
+        } else if (!bind.crateFlutterFfiSessionIsKeyboardModeSupported(
             sessionId: ffi.sessionId, mode: mode.key)) {
           continue;
         }
@@ -2669,7 +2669,7 @@ class _KeyboardMenu extends StatelessWidget {
   }
 
   inputSource() {
-    final supportedInputSource = bind.mainSupportedInputSource();
+    final supportedInputSource = bind.crateFlutterFfiMainSupportedInputSource();
     if (supportedInputSource.isEmpty) return Offstage();
     late final List<dynamic> supportedInputSourceList;
     try {
@@ -2713,12 +2713,12 @@ class _KeyboardMenu extends StatelessWidget {
         onChanged: enabled
             ? (value) async {
                 if (value == null) return;
-                await bind.sessionToggleOption(
+                await bind.crateFlutterFfiSessionToggleOption(
                     sessionId: ffi.sessionId, value: kOptionToggleViewOnly);
-                final viewOnly = await bind.sessionGetToggleOption(
+                final viewOnly = await bind.crateFlutterFfiSessionGetToggleOption(
                     sessionId: ffi.sessionId, arg: kOptionToggleViewOnly);
                 ffiModel.setViewOnly(id, viewOnly ?? value);
-                final showMyCursor = await bind.sessionGetToggleOption(
+                final showMyCursor = await bind.crateFlutterFfiSessionGetToggleOption(
                     sessionId: ffi.sessionId, arg: kOptionToggleShowMyCursor);
                 ffiModel.setShowMyCursor(showMyCursor ?? value);
               }
@@ -2733,9 +2733,9 @@ class _KeyboardMenu extends StatelessWidget {
             value: ffiModel.showMyCursor,
             onChanged: (value) async {
               if (value == null) return;
-              await bind.sessionToggleOption(
+              await bind.crateFlutterFfiSessionToggleOption(
                   sessionId: ffi.sessionId, value: kOptionToggleShowMyCursor);
-              final showMyCursor = await bind.sessionGetToggleOption(
+              final showMyCursor = await bind.crateFlutterFfiSessionGetToggleOption(
                       sessionId: ffi.sessionId,
                       arg: kOptionToggleShowMyCursor) ??
                   value;
@@ -2743,9 +2743,9 @@ class _KeyboardMenu extends StatelessWidget {
 
               // Also set view only if showMyCursor is enabled and viewOnly is not enabled.
               if (showMyCursor && !ffiModel.viewOnly) {
-                await bind.sessionToggleOption(
+                await bind.crateFlutterFfiSessionToggleOption(
                     sessionId: ffi.sessionId, value: kOptionToggleViewOnly);
-                final viewOnly = await bind.sessionGetToggleOption(
+                final viewOnly = await bind.crateFlutterFfiSessionGetToggleOption(
                     sessionId: ffi.sessionId, arg: kOptionToggleViewOnly);
                 ffiModel.setViewOnly(id, viewOnly ?? value);
               }
@@ -2858,7 +2858,7 @@ class _ChatMenuState extends State<_ChatMenu> {
       child: Text(translate('Voice call')),
       ffi: widget.ffi,
       onPressed: () =>
-          bind.sessionRequestVoiceCall(sessionId: widget.ffi.sessionId),
+          bind.crateFlutterFfiSessionRequestVoiceCall(sessionId: widget.ffi.sessionId),
     );
   }
 }
@@ -2905,7 +2905,7 @@ class _VoiceCallMenu extends StatelessWidget {
         Divider(),
         MenuButton(
           child: Text(translate('End call')),
-          onPressed: () => bind.sessionCloseVoiceCall(sessionId: ffi.sessionId),
+          onPressed: () => bind.crateFlutterFfiSessionCloseVoiceCall(sessionId: ffi.sessionId),
           ffi: ffi,
         ),
       ];
@@ -2936,7 +2936,7 @@ class _VoiceCallMenu extends StatelessWidget {
     return _IconMenuButton(
       assetName: "assets/call_wait.svg",
       tooltip: "Waiting",
-      onPressed: () => bind.sessionCloseVoiceCall(sessionId: ffi.sessionId),
+      onPressed: () => bind.crateFlutterFfiSessionCloseVoiceCall(sessionId: ffi.sessionId),
       color: _ToolbarTheme.redColor,
       hoverColor: _ToolbarTheme.hoverRedColor,
     );
@@ -2951,7 +2951,7 @@ class _RecordMenu extends StatelessWidget {
     var ffi = Provider.of<FfiModel>(context);
     var recordingModel = Provider.of<RecordingModel>(context);
     final hideRecordingButton =
-        bind.mainGetLocalOption(key: kOptionHideRecordingButton) == 'Y';
+        bind.crateFlutterFfiMainGetLocalOption(key: kOptionHideRecordingButton) == 'Y';
     final visible = !hideRecordingButton &&
         (recordingModel.start || ffi.permissions['recording'] != false);
     if (!visible) return Offstage();
@@ -3338,17 +3338,17 @@ class _DraggableShowHideState extends State<_DraggableShowHide> {
     super.initState();
 
     final confLeft = double.tryParse(
-        bind.mainGetLocalOption(key: kOptionRemoteMenubarDragLeft));
+        bind.crateFlutterFfiMainGetLocalOption(key: kOptionRemoteMenubarDragLeft));
     if (confLeft == null) {
-      bind.mainSetLocalOption(
+      bind.crateFlutterFfiMainSetLocalOption(
           key: kOptionRemoteMenubarDragLeft, value: left.toString());
     } else {
       left = confLeft;
     }
     final confRight = double.tryParse(
-        bind.mainGetLocalOption(key: kOptionRemoteMenubarDragRight));
+        bind.crateFlutterFfiMainGetLocalOption(key: kOptionRemoteMenubarDragRight));
     if (confRight == null) {
-      bind.mainSetLocalOption(
+      bind.crateFlutterFfiMainSetLocalOption(
           key: kOptionRemoteMenubarDragRight, value: right.toString());
     } else {
       right = confRight;
@@ -3471,12 +3471,12 @@ class _DraggableShowHideState extends State<_DraggableShowHide> {
       fraction: frac,
       multiEdgeEnabled: widget.multiEdgeEnabled,
     );
-    bind.sessionPeerOption(
+    bind.crateFlutterFfiSessionPeerOption(
       sessionId: widget.sessionId,
       name: kOptionRemoteMenubarEdge,
       value: _toolbarEdgeToString(newEdge),
     );
-    bind.sessionPeerOption(
+    bind.crateFlutterFfiSessionPeerOption(
       sessionId: widget.sessionId,
       name: kOptionRemoteMenubarFraction,
       value: frac.toString(),
@@ -3484,7 +3484,7 @@ class _DraggableShowHideState extends State<_DraggableShowHide> {
     if (widget.multiEdgeEnabled) {
       return;
     }
-    bind.sessionPeerOption(
+    bind.crateFlutterFfiSessionPeerOption(
       sessionId: widget.sessionId,
       name: _legacyRemoteMenubarDragX,
       value: frac.toString(),

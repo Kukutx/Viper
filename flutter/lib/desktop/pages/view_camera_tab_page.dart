@@ -69,7 +69,7 @@ class _ViewCameraTabPageState extends State<ViewCameraTabPage> {
         final viewCameraPage = tabController.widget(id);
         if (viewCameraPage is ViewCameraPage) {
           final ffi = viewCameraPage.ffi;
-          bind.setCurSessionId(sessionId: ffi.sessionId);
+          bind.crateFlutterFfiSetCurSessionId(sessionId: ffi.sessionId);
         }
         WindowController.fromWindowId(params['windowId'])
             .setTitle(getWindowNameWithId(id));
@@ -369,7 +369,7 @@ class _ViewCameraTabPageState extends State<ViewCameraTabPage> {
     } else {
       final bool res;
       if (!option2bool(kOptionEnableConfirmClosingTabs,
-          bind.mainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
+          bind.crateFlutterFfiMainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
         res = true;
       } else {
         res = await closeConfirmDialog();

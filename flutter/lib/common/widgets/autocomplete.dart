@@ -123,7 +123,7 @@ class AllPeersLoader {
   AllPeersLoader({
     @visibleForTesting Future<void> Function(List<String> ids)? queryOnlines,
     @visibleForTesting Duration? queryOnlineDebounce,
-  })  : _queryOnlines = queryOnlines ?? ((ids) => bind.queryOnlines(ids: ids)),
+  })  : _queryOnlines = queryOnlines ?? ((ids) => bind.crateFlutterFfiQueryOnlines(ids: ids)),
         _queryOnlineDebounce =
             queryOnlineDebounce ?? _defaultQueryOnlineDebounce;
 
@@ -159,10 +159,10 @@ class AllPeersLoader {
     _isPeersLoading = true;
 
     if (gFFI.recentPeersModel.peers.isEmpty) {
-      bind.mainLoadRecentPeers();
+      bind.crateFlutterFfiMainLoadRecentPeers();
     }
     if (gFFI.lanPeersModel.peers.isEmpty) {
-      bind.mainLoadLanPeers();
+      bind.crateFlutterFfiMainLoadLanPeers();
     }
     // No need to care about peers from abModel, and group model.
     // Because they will pull data in `refreshCurrentUser()` on startup.

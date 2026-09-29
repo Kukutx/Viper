@@ -449,9 +449,9 @@ class ChatModel with ChangeNotifier {
     message.text = trimmedText;
     insertMessage(_currentKey, message);
     if (_currentKey.connId == clientModeID && parent.target != null) {
-      bind.sessionSendChat(sessionId: sessionId, text: message.text);
+      bind.crateFlutterFfiSessionSendChat(sessionId: sessionId, text: message.text);
     } else {
-      bind.cmSendChat(connId: _currentKey.connId, msg: message.text);
+      bind.crateFlutterFfiCmSendChat(connId: _currentKey.connId, msg: message.text);
     }
 
     notifyListeners();
@@ -549,7 +549,7 @@ class ChatModel with ChangeNotifier {
   }
 
   void closeVoiceCall() {
-    bind.sessionCloseVoiceCall(sessionId: sessionId);
+    bind.crateFlutterFfiSessionCloseVoiceCall(sessionId: sessionId);
   }
 }
 

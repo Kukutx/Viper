@@ -76,7 +76,7 @@ class _PeerTabPageState extends State<PeerTabPage>
   }
 
   void _loadLocalOptions() {
-    final uiType = bind.getLocalFlutterOption(k: kOptionPeerCardUiType);
+    final uiType = bind.crateFlutterFfiGetLocalFlutterOption(k: kOptionPeerCardUiType);
     if (uiType != '') {
       peerCardUiType.value = int.parse(uiType) == 0
           ? PeerUiType.grid
@@ -85,7 +85,7 @@ class _PeerTabPageState extends State<PeerTabPage>
               : PeerUiType.list;
     }
     hideAbTagsPanel.value =
-        bind.mainGetLocalOption(key: kOptionHideAbTagsPanel) == 'Y';
+        bind.crateFlutterFfiMainGetLocalOption(key: kOptionHideAbTagsPanel) == 'Y';
   }
 
   Future<void> handleTabSelection(int tabIndex) async {
@@ -176,7 +176,7 @@ class _PeerTabPageState extends State<PeerTabPage>
                           ? null
                           : () async {
                               await handleTabSelection(t);
-                              await bind.setLocalFlutterOption(
+                              await bind.crateFlutterFfiSetLocalFlutterOption(
                                   k: kOptionPeerTabIndex, v: t.toString());
                             },
                       onHover: (value) => hover.value = value,
@@ -396,23 +396,23 @@ class _PeerTabPageState extends State<PeerTabPage>
             switch (model.currentTab) {
               case 0:
                 for (var p in peers) {
-                  await bind.mainRemovePeer(id: p.id);
+                  await bind.crateFlutterFfiMainRemovePeer(id: p.id);
                 }
-                bind.mainLoadRecentPeers();
+                bind.crateFlutterFfiMainLoadRecentPeers();
                 break;
               case 1:
-                final favs = (await bind.mainGetFav()).toList();
+                final favs = (await bind.crateFlutterFfiMainGetFav()).toList();
                 peers.map((p) {
                   favs.remove(p.id);
                 }).toList();
-                await bind.mainStoreFav(favs: favs);
-                bind.mainLoadFavPeers();
+                await bind.crateFlutterFfiMainStoreFav(favs: favs);
+                bind.crateFlutterFfiMainLoadFavPeers();
                 break;
               case 2:
                 for (var p in peers) {
-                  await bind.mainRemoveDiscovered(id: p.id);
+                  await bind.crateFlutterFfiMainRemoveDiscovered(id: p.id);
                 }
-                bind.mainLoadLanPeers();
+                bind.crateFlutterFfiMainLoadLanPeers();
                 break;
               case 3:
                 await gFFI.abModel.deletePeers(peers.map((p) => p.id).toList());
@@ -439,13 +439,13 @@ class _PeerTabPageState extends State<PeerTabPage>
         toolTip: translate('Add to Favorites'),
         onTap: () async {
           final peers = model.selectedPeers;
-          final favs = (await bind.mainGetFav()).toList();
+          final favs = (await bind.crateFlutterFfiMainGetFav()).toList();
           for (var p in peers) {
             if (!favs.contains(p.id)) {
               favs.add(p.id);
             }
           }
-          await bind.mainStoreFav(favs: favs);
+          await bind.crateFlutterFfiMainStoreFav(favs: favs);
           model.setMultiSelectionMode(false);
           showToast(translate('Successful'));
         },
@@ -542,7 +542,7 @@ class _PeerTabPageState extends State<PeerTabPage>
           size: 18,
         ),
         onTap: () async {
-          await bind.mainSetLocalOption(
+          await bind.crateFlutterFfiMainSetLocalOption(
               key: kOptionHideAbTagsPanel,
               value: hideAbTagsPanel.value ? defaultOptionNo : "Y");
           hideAbTagsPanel.value = !hideAbTagsPanel.value;
@@ -820,7 +820,7 @@ class _PeerViewDropdownState extends State<PeerViewDropdown> {
                               if (v != null) {
                                 peerCardUiType.value = v;
                                 setState(() {});
-                                await bind.setLocalFlutterOption(
+                                await bind.crateFlutterFfiSetLocalFlutterOption(
                                   k: kOptionPeerCardUiType,
                                   v: peerCardUiType.value.index.toString(),
                                 );
@@ -875,7 +875,7 @@ class _PeerSortDropdownState extends State<PeerSortDropdown> {
 
   void _loadLocalOptions() {
     peerSort.value = PeerSortType.remoteId;
-    bind.setLocalFlutterOption(
+    bind.crateFlutterFfiSetLocalFlutterOption(
       k: kOptionPeerSorting,
       v: peerSort.value,
     );
@@ -903,7 +903,7 @@ class _PeerSortDropdownState extends State<PeerSortDropdown> {
                       dense: true, (String? v) async {
                     if (v != null) {
                       peerSort.value = v;
-                      await bind.setLocalFlutterOption(
+                      await bind.crateFlutterFfiSetLocalFlutterOption(
                         k: kOptionPeerSorting,
                         v: peerSort.value,
                       );

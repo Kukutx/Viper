@@ -32,7 +32,7 @@ class JobID {
   int next() {
     try {
       if (!isWeb) {
-        String v = bind.mainGetCommonSync(key: 'transfer-job-id');
+        String v = bind.crateFlutterFfiMainGetCommonSync(key: 'transfer-job-id');
         return int.parse(v);
       }
     } catch (e) {
@@ -197,7 +197,7 @@ class FileModel {
         jobController.rememberTransferConflictBatch(id, resp);
         evtLoop.setSkip(!need_override);
       }
-      await bind.sessionSetConfirmOverrideFile(
+      await bind.crateFlutterFfiSessionSetConfirmOverrideFile(
           sessionId: sessionId,
           actId: id,
           fileNum: int.parse(evt['file_num']),
@@ -410,9 +410,9 @@ class FileController {
 
   Future<void> onReady() async {
     if (isLocal) {
-      options.value.home = await bind.mainGetHomeDir();
+      options.value.home = await bind.crateFlutterFfiMainGetHomeDir();
     }
-    options.value.showHidden = (await bind.sessionGetPeerOption(
+    options.value.showHidden = (await bind.crateFlutterFfiSessionGetPeerOption(
             sessionId: sessionId,
             name: isLocal ? "local_show_hidden" : "remote_show_hidden"))
         .isNotEmpty;
@@ -422,11 +422,11 @@ class FileController {
 
     await Future.delayed(Duration(milliseconds: 100));
 
-    var savedDir = (await bind.sessionGetPeerOption(
+    var savedDir = (await bind.crateFlutterFfiSessionGetPeerOption(
         sessionId: sessionId, name: isLocal ? "local_dir" : "remote_dir"));
     if (savedDir.isNotEmpty && !_isPathAllowed(savedDir)) {
       savedDir = options.value.home;
-      await bind.sessionPeerOption(
+      await bind.crateFlutterFfiSessionPeerOption(
         sessionId: sessionId, name: "local_dir", value: savedDir);
     }
     Future<bool> tryOpenReadyDirs() async {
@@ -461,7 +461,7 @@ class FileController {
     msgMap[isLocal ? "local_show_hidden" : "remote_show_hidden"] =
         options.value.showHidden ? "Y" : "";
     for (final msg in msgMap.entries) {
-      await bind.sessionPeerOption(
+      await bind.crateFlutterFfiSessionPeerOption(
           sessionId: sessionId, name: msg.key, value: msg.value);
     }
     directory.value.clear();
@@ -632,7 +632,7 @@ class FileController {
     }
     jobController.registerTransferConflictBatch(transferJobIds);
     for (final (from, jobID) in transferJobs) {
-      bind.sessionSendFiles(
+      bind.crateFlutterFfiSessionSendFiles(
           sessionId: sessionId,
           actId: jobID,
           path: from.path,
@@ -873,7 +873,7 @@ class FileController {
   }
 
   void sendRemoveFile(String path, int fileNum, int actId) {
-    bind.sessionRemoveFile(
+    bind.crateFlutterFfiSessionRemoveFile(
         sessionId: sessionId,
         actId: actId,
         path: path,
@@ -883,12 +883,12 @@ class FileController {
 
   Future<void> sendRemoveEmptyDir(String path, int fileNum, int actId) async {
     history.removeWhere((element) => element.contains(path));
-    await bind.sessionRemoveAllEmptyDirs(
+    await bind.crateFlutterFfiSessionRemoveAllEmptyDirs(
         sessionId: sessionId, actId: actId, path: path, isRemote: !isLocal);
   }
 
   Future<void> createDirWithRemote(String path, bool isRemote) async {
-    bind.sessionCreateDir(
+    bind.crateFlutterFfiSessionCreateDir(
         sessionId: sessionId,
         actId: JobController.jobID.next(),
         path: path,
@@ -932,7 +932,7 @@ class FileController {
           });
           return;
         }
-        await bind.sessionRenameFile(
+        await bind.crateFlutterFfiSessionRenameFile(
             sessionId: sessionId,
             actId: JobController.jobID.next(),
             path: item.path,
@@ -1229,7 +1229,7 @@ class JobController {
 
   Future<void> cancelJob(int id) async {
     unregisterTransferConflictJob(id);
-    await bind.sessionCancelJob(sessionId: sessionId, actId: id);
+    await bind.crateFlutterFfiSessionCancelJob(sessionId: sessionId, actId: id);
   }
 
   Future<void> cancelTransferConflictBatch(int jobId) async {
@@ -1257,7 +1257,7 @@ class JobController {
     jobTable.refresh();
     for (final id in batchJobIds) {
       try {
-        await bind.sessionCancelJob(sessionId: sessionId, actId: id);
+        await bind.crateFlutterFfiSessionCancelJob(sessionId: sessionId, actId: id);
       } catch (e) {
         debugPrint("Failed to cancel transfer job $id in conflict batch: $e");
       }
@@ -1311,7 +1311,7 @@ class JobController {
       jobTable.add(jobProgress);
     }
     registerTransferConflictBatch([currJobId]);
-    await bind.sessionAddJob(
+    await bind.crateFlutterFfiSessionAddJob(
       sessionId: sessionId,
       isRemote: isRemote,
       includeHidden: showHidden,
@@ -1322,7 +1322,7 @@ class JobController {
     );
 
     if (isAutoStart) {
-      await bind.sessionResumeJob(
+      await bind.crateFlutterFfiSessionResumeJob(
           sessionId: sessionId, actId: currJobId, isRemote: isRemote);
     }
   }
@@ -1331,7 +1331,7 @@ class JobController {
     final jobIndex = getJob(jobId);
     if (jobIndex != -1) {
       final job = jobTable[jobIndex];
-      bind.sessionResumeJob(
+      bind.crateFlutterFfiSessionResumeJob(
           sessionId: sessionId, actId: job.id, isRemote: job.isRemoteToLocal);
       job.state = JobState.inProgress;
       jobTable.refresh();
@@ -1427,7 +1427,7 @@ class FileFetcher {
 
   FileFetcher(this.getSessionID, {ReadRemoteDirectory? readRemoteDirectory})
       : _readRemoteDirectory = readRemoteDirectory ??
-            ((sessionId, path, includeHidden) => bind.sessionReadRemoteDir(
+            ((sessionId, path, includeHidden) => bind.crateFlutterFfiSessionReadRemoteDir(
                 sessionId: sessionId,
                 path: path,
                 includeHidden: includeHidden));
@@ -1577,7 +1577,7 @@ class FileFetcher {
       String path, bool isLocal, bool showHidden) async {
     try {
       if (isLocal) {
-        final res = await bind.sessionReadLocalEmptyDirsRecursiveSync(
+        final res = await bind.crateFlutterFfiSessionReadLocalEmptyDirsRecursiveSync(
             sessionId: sessionId, path: path, includeHidden: showHidden);
 
         final List<dynamic> fdJsons = jsonDecode(res);
@@ -1586,7 +1586,7 @@ class FileFetcher {
             fdJsons.map((fdJson) => FileDirectory.fromJson(fdJson)).toList();
         return fds;
       } else {
-        await bind.sessionReadRemoteEmptyDirsRecursiveSync(
+        await bind.crateFlutterFfiSessionReadRemoteEmptyDirsRecursiveSync(
             sessionId: sessionId, path: path, includeHidden: showHidden);
         return registerReadEmptyDirsTask(isLocal, path);
       }
@@ -1599,7 +1599,7 @@ class FileFetcher {
       String path, bool isLocal, bool showHidden) async {
     try {
       if (isLocal) {
-        final res = await bind.sessionReadLocalDirSync(
+        final res = await bind.crateFlutterFfiSessionReadLocalDirSync(
             sessionId: sessionId, path: path, showHidden: showHidden);
         final fd = FileDirectory.fromJson(jsonDecode(res));
         return fd;
@@ -1634,7 +1634,7 @@ class FileFetcher {
       int actID, String path, bool isLocal, bool showHidden) async {
     // TODO test Recursive is show hidden default?
     try {
-      await bind.sessionReadDirToRemoveRecursive(
+      await bind.crateFlutterFfiSessionReadDirToRemoveRecursive(
           sessionId: sessionId,
           actId: actID,
           path: path,

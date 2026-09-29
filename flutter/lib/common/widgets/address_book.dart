@@ -239,7 +239,7 @@ class _AddressBookState extends State<AddressBook> {
           : (value) {
               if (value != null) {
                 gFFI.abModel.setCurrentName(value);
-                bind.setLocalFlutterOption(k: kOptionCurrentAbName, v: value);
+                bind.crateFlutterFfiSetLocalFlutterOption(k: kOptionCurrentAbName, v: value);
               }
             },
       customButton: Obx(() => Container(
@@ -392,7 +392,7 @@ class _AddressBookState extends State<AddressBook> {
         return shouldSortTags();
       },
       setter: (bool v) async {
-        bind.mainSetLocalOption(
+        bind.crateFlutterFfiMainSetLocalOption(
             key: sortAbTagsOption, value: v ? 'Y' : defaultOptionNo);
         gFFI.abModel.sortTags.value = v;
       },
@@ -411,7 +411,7 @@ class _AddressBookState extends State<AddressBook> {
         return filterAbTagByIntersection();
       },
       setter: (bool v) async {
-        bind.mainSetLocalOption(
+        bind.crateFlutterFfiMainSetLocalOption(
             key: filterAbTagOption, value: v ? 'Y' : defaultOptionNo);
         gFFI.abModel.filterByIntersection.value = v;
       },
@@ -434,7 +434,7 @@ class _AddressBookState extends State<AddressBook> {
         MenuEntryDivider<String>(),
       if (!gFFI.abModel.legacyMode.value && canWrite)
         getEntry(translate("ab_web_console_tip"), () async {
-          final url = await bind.mainGetApiServer();
+          final url = await bind.crateFlutterFfiMainGetApiServer();
           if (await canLaunchUrlString(url)) {
             launchUrlString(url);
           }

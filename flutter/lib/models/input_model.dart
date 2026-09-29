@@ -591,7 +591,7 @@ class InputModel {
   updateKeyboardMode() async {
     // * Currently mobile does not enable map mode
     if (isDesktop || isWebDesktop) {
-      keyboardMode = await bind.sessionGetKeyboardMode(sessionId: sessionId) ??
+      keyboardMode = await bind.crateFlutterFfiSessionGetKeyboardMode(sessionId: sessionId) ??
           kKeyLegacyMode;
     }
   }
@@ -609,7 +609,7 @@ class InputModel {
   /// - Default: `kDefaultTrackpadSpeed`
   Future<void> updateTrackpadSpeed() async {
     _trackpadSpeed =
-        (await bind.sessionGetTrackpadSpeed(sessionId: sessionId) ??
+        (await bind.crateFlutterFfiSessionGetTrackpadSpeed(sessionId: sessionId) ??
             kDefaultTrackpadSpeed);
     if (_trackpadSpeed < kMinTrackpadSpeed ||
         _trackpadSpeed > kMaxTrackpadSpeed) {
@@ -928,7 +928,7 @@ class InputModel {
   void newKeyboardMode(
       String character, int usbHid, bool down, bool iosCapsLock) {
     final lockModes = _buildLockModes(iosCapsLock);
-    bind.sessionHandleFlutterKeyEvent(
+    bind.crateFlutterFfiSessionHandleFlutterKeyEvent(
         sessionId: sessionId,
         character: character,
         usbHid: usbHid,
@@ -975,7 +975,7 @@ class InputModel {
   void inputRawKey(String name, int platformCode, int positionCode, bool down,
       bool iosCapsLock) {
     final lockModes = _buildLockModes(iosCapsLock);
-    bind.sessionHandleFlutterRawKeyEvent(
+    bind.crateFlutterFfiSessionHandleFlutterRawKeyEvent(
         sessionId: sessionId,
         name: name,
         platformCode: platformCode,
@@ -1029,7 +1029,7 @@ class InputModel {
   void inputKey(String name, {bool? down, bool? press}) {
     if (!keyboardPerm) return;
     if (isViewCamera) return;
-    bind.sessionInputKey(
+    bind.crateFlutterFfiSessionInputKey(
         sessionId: sessionId,
         name: name,
         down: down ?? false,
@@ -1099,7 +1099,7 @@ class InputModel {
   /// Send scroll event with scroll distance [y].
   Future<void> scroll(int y) async {
     if (isViewCamera) return;
-    await bind.sessionSendMouse(
+    await bind.crateFlutterFfiSessionSendMouse(
         sessionId: sessionId,
         msg: json
             .encode(modify({'id': id, 'type': 'wheel', 'y': y.toString()})));
@@ -1123,7 +1123,7 @@ class InputModel {
   /// Used for side button releases that must go through even if permissions
   /// changed after the matching down was sent.
   Future<void> _sendMouseUnchecked(String type, MouseButtons button) async {
-    await bind.sessionSendMouse(
+    await bind.crateFlutterFfiSessionSendMouse(
         sessionId: sessionId,
         msg: json.encode(modify({'type': type, 'buttons': button.value})));
   }
@@ -1156,10 +1156,10 @@ class InputModel {
     _relativeMouse.onEnterOrLeaveImage(enter);
     _flingTimer?.cancel();
     if (!isInputSourceFlutter) {
-      bind.sessionEnterOrLeave(sessionId: sessionId, enter: enter);
+      bind.crateFlutterFfiSessionEnterOrLeave(sessionId: sessionId, enter: enter);
     }
     if (!isWeb && enter) {
-      bind.setCurSessionId(sessionId: sessionId);
+      bind.crateFlutterFfiSetCurSessionId(sessionId: sessionId);
     }
   }
 
@@ -1169,7 +1169,7 @@ class InputModel {
     if (isViewCamera) return;
     var x2 = x.toInt();
     var y2 = y.toInt();
-    await bind.sessionSendMouse(
+    await bind.crateFlutterFfiSessionSendMouse(
         sessionId: sessionId,
         msg: json.encode(modify({'x': '$x2', 'y': '$y2'})));
   }
@@ -1192,7 +1192,7 @@ class InputModel {
     _mobileDeltaRemainderX -= x;
     _mobileDeltaRemainderY -= y;
     if (x == 0 && y == 0) return;
-    await bind.sessionSendMouse(
+    await bind.crateFlutterFfiSessionSendMouse(
         sessionId: sessionId,
         msg: json.encode(modify({
           'type': 'move_relative',
@@ -1244,7 +1244,7 @@ class InputModel {
     ];
 
     for (final key in modifiersToRelease) {
-      bind.sessionInputKey(
+      bind.crateFlutterFfiSessionInputKey(
         sessionId: sessionId,
         name: key,
         down: false,
@@ -1333,7 +1333,7 @@ class InputModel {
       _lastScale = e.scale;
 
       if (scale != 0) {
-        bind.sessionSendPointer(
+        bind.crateFlutterFfiSessionSendPointer(
             sessionId: sessionId,
             msg: json.encode(
                 PointerEventToRust(kPointerEventKindTouch, 'scale', scale)
@@ -1372,7 +1372,7 @@ class InputModel {
             Offset(x.toDouble(), y.toDouble()));
       } else {
         if (isViewCamera) return;
-        bind.sessionSendMouse(
+        bind.crateFlutterFfiSessionSendMouse(
             sessionId: sessionId,
             msg: '{"type": "trackpad", "x": "$x", "y": "$y"}');
       }
@@ -1429,7 +1429,7 @@ class InputModel {
         return;
       }
 
-      bind.sessionSendMouse(
+      bind.crateFlutterFfiSessionSendMouse(
           sessionId: sessionId,
           msg: '{"type": "trackpad", "x": "$dx", "y": "$dy"}');
       _scheduleFling(x, y, delay);
@@ -1456,7 +1456,7 @@ class InputModel {
       return;
     }
 
-    bind.sessionSendPointer(
+    bind.crateFlutterFfiSessionSendPointer(
         sessionId: sessionId,
         msg: json.encode(
             PointerEventToRust(kPointerEventKindTouch, 'scale', 0).toJson()));
@@ -1697,7 +1697,7 @@ class InputModel {
       } else if (dy < 0) {
         dy = accel;
       }
-      bind.sessionSendMouse(
+      bind.crateFlutterFfiSessionSendMouse(
           sessionId: sessionId,
           msg: '{"type": "wheel", "x": "$dx", "y": "$dy"}');
     }
@@ -1782,7 +1782,7 @@ class InputModel {
 
     final evt = PointerEventToRust(kind, type, evtValue).toJson();
     if (isViewCamera) return;
-    bind.sessionSendPointer(
+    bind.crateFlutterFfiSessionSendPointer(
         sessionId: sessionId, msg: json.encode(modify(evt)));
   }
 
@@ -1898,7 +1898,7 @@ class InputModel {
     final evtToPeer = processEventToPeer(evt, offset,
         onExit: onExit, moveCanvas: moveCanvas, edgeScroll: edgeScroll);
     if (evtToPeer != null) {
-      bind.sessionSendMouse(
+      bind.crateFlutterFfiSessionSendMouse(
           sessionId: sessionId, msg: json.encode(modify(evtToPeer)));
     }
     return evtToPeer;

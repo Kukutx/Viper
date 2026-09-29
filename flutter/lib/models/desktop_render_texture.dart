@@ -24,7 +24,7 @@ class _PixelbufferTexture {
 
   create(int d, SessionID sessionId, FFI ffi) {
     _display = d;
-    _textureKey = bind.getNextTextureKey();
+    _textureKey = bind.crateFlutterFfiGetNextTextureKey();
     _sessionId = sessionId;
 
     textureRenderer.createTexture(_textureKey).then((id) async {
@@ -59,7 +59,7 @@ class _PixelbufferTexture {
 class _GpuTexture {
   int _textureId = -1;
   SessionID? _sessionId;
-  final support = bind.mainHasGpuTextureRender();
+  final support = bind.crateFlutterFfiMainHasGpuTextureRender();
   bool _destroying = false;
   int _display = 0;
   int? _id;

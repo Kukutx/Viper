@@ -21,7 +21,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:get/get_rx/src/rx_workers/utils/debouncer.dart';
 import 'package:provider/provider.dart';
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -379,7 +379,7 @@ class MyTheme {
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
     ),
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       elevation: 15,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18.0),
@@ -410,7 +410,7 @@ class MyTheme {
     cardColor: grayBg,
     hintColor: Color(0xFFAAAAAA),
     visualDensity: VisualDensity.adaptivePlatformDensity,
-    tabBarTheme: const TabBarTheme(
+    tabBarTheme: const TabBarThemeData(
       labelColor: Colors.black87,
     ),
     tooltipTheme: tooltipTheme(),
@@ -477,7 +477,7 @@ class MyTheme {
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
     ),
-    dialogTheme: DialogTheme(
+    dialogTheme: DialogThemeData(
       elevation: 15,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18.0),
@@ -511,7 +511,7 @@ class MyTheme {
     ),
     cardColor: Color(0xFF24252B),
     visualDensity: VisualDensity.adaptivePlatformDensity,
-    tabBarTheme: const TabBarTheme(
+    tabBarTheme: const TabBarThemeData(
       labelColor: Colors.white70,
     ),
     tooltipTheme: tooltipTheme(),
@@ -577,20 +577,20 @@ class MyTheme {
   );
 
   static ThemeMode getThemeModePreference() {
-    return themeModeFromString(bind.mainGetLocalOption(key: kCommConfKeyTheme));
+    return themeModeFromString(bind.crateFlutterFfiMainGetLocalOption(key: kCommConfKeyTheme));
   }
 
   static Future<void> changeDarkMode(ThemeMode mode) async {
     Get.changeThemeMode(mode);
     if (desktopType == DesktopType.main || isAndroid || isIOS || isWeb) {
       if (mode == ThemeMode.system) {
-        await bind.mainSetLocalOption(
+        await bind.crateFlutterFfiMainSetLocalOption(
             key: kCommConfKeyTheme, value: defaultOptionTheme);
       } else {
-        await bind.mainSetLocalOption(
+        await bind.crateFlutterFfiMainSetLocalOption(
             key: kCommConfKeyTheme, value: mode.toShortString());
       }
-      if (!isWeb) await bind.mainChangeTheme(dark: mode.toShortString());
+      if (!isWeb) await bind.crateFlutterFfiMainChangeTheme(dark: mode.toShortString());
       // Synchronize the window theme of the system.
       updateSystemWindowTheme();
     }
@@ -793,7 +793,7 @@ class OverlayDialogManager {
 
   setMobileActionsOverlayVisible(bool v, {store = true}) {
     if (store) {
-      bind.setLocalFlutterOption(k: kOptionShowMobileAction, v: v ? 'Y' : 'N');
+      bind.crateFlutterFfiSetLocalFlutterOption(k: kOptionShowMobileAction, v: v ? 'Y' : 'N');
     }
     // No need to read the value from local storage after setting it.
     // It better to toggle the value directly.
@@ -802,7 +802,7 @@ class OverlayDialogManager {
 
   loadMobileActionsOverlayVisible() {
     mobileActionsOverlayVisible.value =
-        bind.getLocalFlutterOption(k: kOptionShowMobileAction) != 'N';
+        bind.crateFlutterFfiGetLocalFlutterOption(k: kOptionShowMobileAction) != 'N';
   }
 
   void setOverlayState(OverlayKeyState overlayKeyState) {
@@ -1185,7 +1185,7 @@ void msgBox(SessionID sessionId, String type, String title, String text,
   dialogManager.dismissAll();
   if (type.contains('insecure-connection')) {
     Future<void> closeSession() async {
-      await bind.sessionSetCommon(
+      await bind.crateFlutterFfiSessionSetCommon(
         sessionId: sessionId,
         key: 'continue-insecure-connection',
         value: 'N',
@@ -1196,7 +1196,7 @@ void msgBox(SessionID sessionId, String type, String title, String text,
 
     void continueSession() {
       unawaited(
-        bind.sessionSetCommon(
+        bind.crateFlutterFfiSessionSetCommon(
           sessionId: sessionId,
           key: 'continue-insecure-connection',
           value: 'Y',
@@ -1649,28 +1649,28 @@ String bool2option(String option, bool b) {
 
 mainSetBoolOption(String key, bool value) async {
   String v = bool2option(key, value);
-  await bind.mainSetOption(key: key, value: v);
+  await bind.crateFlutterFfiMainSetOption(key: key, value: v);
 }
 
 Future<bool> mainGetBoolOption(String key) async {
-  return option2bool(key, await bind.mainGetOption(key: key));
+  return option2bool(key, await bind.crateFlutterFfiMainGetOption(key: key));
 }
 
 bool mainGetBoolOptionSync(String key) {
-  return option2bool(key, bind.mainGetOptionSync(key: key));
+  return option2bool(key, bind.crateFlutterFfiMainGetOptionSync(key: key));
 }
 
 mainSetLocalBoolOption(String key, bool value) async {
   String v = bool2option(key, value);
-  await bind.mainSetLocalOption(key: key, value: v);
+  await bind.crateFlutterFfiMainSetLocalOption(key: key, value: v);
 }
 
 bool mainGetLocalBoolOptionSync(String key) {
-  return option2bool(key, bind.mainGetLocalOption(key: key));
+  return option2bool(key, bind.crateFlutterFfiMainGetLocalOption(key: key));
 }
 
 bool mainGetPeerBoolOptionSync(String id, String key) {
-  return option2bool(key, bind.mainGetPeerOptionSync(id: id, key: key));
+  return option2bool(key, bind.crateFlutterFfiMainGetPeerOptionSync(id: id, key: key));
 }
 
 // Don't use `option2bool()` and `bool2option()` to convert the session option.
@@ -1770,9 +1770,9 @@ class LastWindowPosition {
 
 String get windowFramePrefix =>
     kWindowPrefix +
-    (bind.isIncomingOnly()
+    (bind.crateFlutterFfiIsIncomingOnly()
         ? "incoming_"
-        : (bind.isOutgoingOnly() ? "outgoing_" : ""));
+        : (bind.crateFlutterFfiIsOutgoingOnly() ? "outgoing_" : ""));
 
 typedef WindowKey = ({WindowType type, int? windowId});
 
@@ -1794,7 +1794,7 @@ Future<void> saveWindowPosition(WindowType type,
   bool isFullscreen = stateGlobal.fullscreen.isTrue;
 
   setPreFrame() {
-    final pos = bind.getLocalFlutterOption(k: windowFramePrefix + type.name);
+    final pos = bind.crateFlutterFfiGetLocalFlutterOption(k: windowFramePrefix + type.name);
     var lpos = LastWindowPosition.loadFromString(pos);
     if (lpos != null) {
       if (lpos.offsetWidth != null && lpos.offsetHeight != null) {
@@ -1808,13 +1808,13 @@ Future<void> saveWindowPosition(WindowType type,
 
   switch (type) {
     case WindowType.Main:
-      // Checking `bind.isIncomingOnly()` is a simple workaround for MacOS.
+      // Checking `bind.crateFlutterFfiIsIncomingOnly()` is a simple workaround for MacOS.
       // `await windowManager.isMaximized()` will always return true
       // if is not resizable. The reason is unknown.
       //
-      // `setResizable(!bind.isIncomingOnly());` in main.dart
+      // `setResizable(!bind.crateFlutterFfiIsIncomingOnly());` in main.dart
       isMaximized =
-          bind.isIncomingOnly() ? false : await windowManager.isMaximized();
+          bind.crateFlutterFfiIsIncomingOnly() ? false : await windowManager.isMaximized();
       if (isFullscreen || isMaximized) {
         setPreFrame();
       } else {
@@ -1884,7 +1884,7 @@ Future<void> _saveWindowPositionActual(WindowKey key) async {
     debugPrint(
         "Saving frame: ${key.windowId}: ${pos.width}/${pos.height}, offset:${pos.offsetWidth}/${pos.offsetHeight}, isMaximized:${pos.isMaximized}, isFullscreen:${pos.isFullscreen}");
 
-    await bind.setLocalFlutterOption(
+    await bind.crateFlutterFfiSetLocalFlutterOption(
         k: windowFramePrefix + key.type.name, v: pos.toString());
 
     if ((key.type == WindowType.RemoteDesktop ||
@@ -1902,7 +1902,7 @@ Future _saveSessionWindowPosition(WindowType windowType, int windowId,
       windowId, kWindowEventGetRemoteList, null);
   getPeerPos(String peerId) {
     if (isMaximized || isFullscreen) {
-      final peerPos = bind.mainGetPeerFlutterOptionSync(
+      final peerPos = bind.crateFlutterFfiMainGetPeerFlutterOptionSync(
           id: peerId, k: windowFramePrefix + windowType.name);
       var lpos = LastWindowPosition.loadFromString(peerPos);
       return LastWindowPosition(
@@ -1920,7 +1920,7 @@ Future _saveSessionWindowPosition(WindowType windowType, int windowId,
 
   if (remoteList != null) {
     for (final peerId in remoteList.split(',')) {
-      bind.mainSetPeerFlutterOptionSync(
+      bind.crateFlutterFfiMainSetPeerFlutterOptionSync(
           id: peerId,
           k: windowFramePrefix + windowType.name,
           v: getPeerPos(peerId));
@@ -2026,7 +2026,7 @@ Future<Offset?> _adjustRestoreMainWindowOffset(
 Future<bool> restoreWindowPosition(WindowType type,
     {int? windowId, String? peerId, int? display}) async {
   if (bind
-      .mainGetEnv(key: "DISABLE_RUSTDESK_RESTORE_WINDOW_POSITION")
+      .crateFlutterFfiMainGetEnv(key: "DISABLE_RUSTDESK_RESTORE_WINDOW_POSITION")
       .isNotEmpty) {
     return false;
   }
@@ -2043,14 +2043,14 @@ Future<bool> restoreWindowPosition(WindowType type,
   if ((type == WindowType.RemoteDesktop || type == WindowType.ViewCamera) &&
       windowId != null &&
       peerId != null) {
-    final peerPos = bind.mainGetPeerFlutterOptionSync(
+    final peerPos = bind.crateFlutterFfiMainGetPeerFlutterOptionSync(
         id: peerId, k: windowFramePrefix + type.name);
     if (peerPos.isNotEmpty) {
       pos = peerPos;
     }
     isRemotePeerPos = pos != null;
   }
-  pos ??= bind.getLocalFlutterOption(k: windowFramePrefix + type.name);
+  pos ??= bind.crateFlutterFfiGetLocalFlutterOption(k: windowFramePrefix + type.name);
 
   var lpos = LastWindowPosition.loadFromString(pos);
   if (lpos == null) {
@@ -2114,11 +2114,11 @@ Future<bool> restoreWindowPosition(WindowType type,
       }
       if (lpos.isMaximized == true) {
         await restorePos();
-        if (!(bind.isIncomingOnly() || bind.isOutgoingOnly())) {
+        if (!(bind.crateFlutterFfiIsIncomingOnly() || bind.crateFlutterFfiIsOutgoingOnly())) {
           await windowManager.maximize();
         }
       } else {
-        final storeSize = !bind.isIncomingOnly() || bind.isOutgoingOnly();
+        final storeSize = !bind.crateFlutterFfiIsIncomingOnly() || bind.crateFlutterFfiIsOutgoingOnly();
         if (isWindows) {
           if (storeSize) {
             // We need to set the window size first to avoid the incorrect size in some special cases.
@@ -2222,13 +2222,13 @@ StreamSubscription? listenUniLinks({handleByFlutter = true}) {
     return null;
   }
 
-  final sub = uriLinkStream.listen((Uri? uri) {
+  final sub = AppLinks().uriLinkStream.listen((Uri? uri) {
     debugPrint("A uri was received: $uri. handleByFlutter $handleByFlutter");
     if (uri != null) {
       if (handleByFlutter) {
         handleUriLink(uri: uri);
       } else {
-        bind.sendUrlScheme(url: uri.toString());
+        bind.crateFlutterFfiSendUrlScheme(url: uri.toString());
       }
     } else {
       print("uni listen error: uri is empty.");
@@ -2249,7 +2249,7 @@ enum UriLinkType {
 }
 
 setEnvTerminalAdmin() {
-  bind.mainSetEnv(key: 'IS_TERMINAL_ADMIN', value: 'Y');
+  bind.crateFlutterFfiMainSetEnv(key: 'IS_TERMINAL_ADMIN', value: 'Y');
 }
 
 // uri link handler
@@ -2258,7 +2258,7 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
   if (cmdArgs != null && cmdArgs.isNotEmpty) {
     args = cmdArgs;
     // rustdesk <uri link>
-    if (args[0].startsWith(bind.mainUriPrefixSync())) {
+    if (args[0].startsWith(bind.crateFlutterFfiMainUriPrefixSync())) {
       final uri = Uri.tryParse(args[0]);
       if (uri != null) {
         args = urlLinkToCmdArgs(uri);
@@ -2411,7 +2411,7 @@ List<String>? urlLinkToCmdArgs(Uri uri) {
   } else if (uri.authority == "config") {
     if (isAndroid || isIOS) {
       final allowDeepLinkServerSettings =
-          bind.mainGetBuildinOption(key: kOptionAllowDeepLinkServerSettings) ==
+          bind.crateFlutterFfiMainGetBuildinOption(key: kOptionAllowDeepLinkServerSettings) ==
               'Y';
       if (!allowDeepLinkServerSettings) {
         debugPrint(
@@ -2433,7 +2433,7 @@ List<String>? urlLinkToCmdArgs(Uri uri) {
   } else if (uri.authority == "password") {
     if (isAndroid || isIOS) {
       final allowDeepLinkPassword =
-          bind.mainGetBuildinOption(key: kOptionAllowDeepLinkPassword) == 'Y';
+          bind.crateFlutterFfiMainGetBuildinOption(key: kOptionAllowDeepLinkPassword) == 'Y';
       if (!allowDeepLinkPassword) {
         debugPrint(
             "Ignore rustdesk://password because $kOptionAllowDeepLinkPassword is not enabled.");
@@ -2448,7 +2448,7 @@ List<String>? urlLinkToCmdArgs(Uri uri) {
       if (password.isNotEmpty) {
         Timer(Duration(seconds: 1), () async {
           final ok =
-              await bind.mainSetPermanentPasswordWithResult(password: password);
+              await bind.crateFlutterFfiMainSetPermanentPasswordWithResult(password: password);
           showToast(translate(ok ? 'Successful' : 'Failed'));
         });
       }
@@ -2594,7 +2594,7 @@ connect(BuildContext context, String id,
   }
   id = id.replaceAll(' ', '');
   final oldId = id;
-  id = await bind.mainHandleRelayId(id: id);
+  id = await bind.crateFlutterFfiMainHandleRelayId(id: id);
   forceRelay = id != oldId || forceRelay;
   assert(!(isFileTransfer && isTcpTunneling && isRDP),
       "more than one connect type");
@@ -2728,7 +2728,7 @@ connect(BuildContext context, String id,
 
 Map<String, String> getHttpHeaders() {
   return {
-    'Authorization': 'Bearer ${bind.mainGetLocalOption(key: 'access_token')}'
+    'Authorization': 'Bearer ${bind.crateFlutterFfiMainGetLocalOption(key: 'access_token')}'
   };
 }
 
@@ -3017,11 +3017,11 @@ Widget dialogButton(String text,
 }
 
 int versionCmp(String v1, String v2) {
-  return bind.versionToNumber(v: v1) - bind.versionToNumber(v: v2);
+  return bind.crateFlutterFfiVersionToNumber(v: v1) - bind.crateFlutterFfiVersionToNumber(v: v2);
 }
 
 String getWindowName({WindowType? overrideType}) {
-  final name = bind.mainGetAppNameSync();
+  final name = bind.crateFlutterFfiMainGetAppNameSync();
   switch (overrideType ?? kWindowType) {
     case WindowType.Main:
       return name;
@@ -3119,7 +3119,7 @@ void onCopyId(String value) {
 }
 
 Future<bool> callMainCheckSuperUserPermission() async {
-  bool checked = await bind.mainCheckSuperUserPermission();
+  bool checked = await bind.crateFlutterFfiMainCheckSuperUserPermission();
   if (isMacOS) {
     await windowManager.show();
   }
@@ -3127,7 +3127,7 @@ Future<bool> callMainCheckSuperUserPermission() async {
 }
 
 Future<void> start_service(bool is_start) async {
-  bool checked = !bind.mainIsInstalled() ||
+  bool checked = !bind.crateFlutterFfiMainIsInstalled() ||
       !isMacOS ||
       await callMainCheckSuperUserPermission();
   if (checked) {
@@ -3142,7 +3142,7 @@ Future<bool> canBeBlocked() async {
     return false;
   }
   // First check control permission
-  final controlPermission = await bind.mainGetCommon(
+  final controlPermission = await bind.crateFlutterFfiMainGetCommon(
       key: "is-remote-modify-enabled-by-control-permissions");
   if (controlPermission == "true") {
     return false;
@@ -3151,10 +3151,10 @@ Future<bool> canBeBlocked() async {
   }
 
   // Check local settings
-  var accessMode = await bind.mainGetOption(key: kOptionAccessMode);
+  var accessMode = await bind.crateFlutterFfiMainGetOption(key: kOptionAccessMode);
   var isCustomAccessMode = accessMode != 'full' && accessMode != 'view';
   var option = option2bool(kOptionAllowRemoteConfigModification,
-      await bind.mainGetOption(key: kOptionAllowRemoteConfigModification));
+      await bind.crateFlutterFfiMainGetOption(key: kOptionAllowRemoteConfigModification));
   return accessMode == 'view' || (isCustomAccessMode && !option);
 }
 
@@ -3165,9 +3165,9 @@ Future<void> shouldBeBlocked(RxBool block, WhetherUseRemoteBlock? use) async {
     return;
   }
   var time0 = DateTime.now().millisecondsSinceEpoch;
-  await bind.mainCheckMouseTime();
+  await bind.crateFlutterFfiMainCheckMouseTime();
   Timer(const Duration(milliseconds: 120), () async {
-    var d = time0 - await bind.mainGetMouseTime();
+    var d = time0 - await bind.crateFlutterFfiMainGetMouseTime();
     if (d < 120) {
       block.value = true;
     } else {
@@ -3300,7 +3300,7 @@ Widget buildErrorBanner(BuildContext context,
 String getDesktopTabLabel(String peerId, String alias) {
   String label = alias.isEmpty ? peerId : alias;
   try {
-    String peer = bind.mainGetPeerSync(id: peerId);
+    String peer = bind.crateFlutterFfiMainGetPeerSync(id: peerId);
     Map<String, dynamic> config = jsonDecode(peer);
     if (config['info']['hostname'] is String) {
       String hostname = config['info']['hostname'];
@@ -3318,10 +3318,10 @@ String getDesktopTabLabel(String peerId, String alias) {
 sessionRefreshVideo(SessionID sessionId, PeerInfo pi) async {
   if (pi.currentDisplay == kAllDisplayValue) {
     for (int i = 0; i < pi.displays.length; i++) {
-      await bind.sessionRefresh(sessionId: sessionId, display: i);
+      await bind.crateFlutterFfiSessionRefresh(sessionId: sessionId, display: i);
     }
   } else {
-    await bind.sessionRefresh(sessionId: sessionId, display: pi.currentDisplay);
+    await bind.crateFlutterFfiSessionRefresh(sessionId: sessionId, display: pi.currentDisplay);
   }
 }
 
@@ -3359,7 +3359,7 @@ Future<List<Rect>> getScreenListWayland() async {
 
 Future<List<Rect>> getScreenListNotWayland() async {
   final screenRectList = <Rect>[];
-  final displays = bind.mainGetDisplays();
+  final displays = bind.crateFlutterFfiMainGetDisplays();
   if (displays.isEmpty) {
     return screenRectList;
   }
@@ -3380,7 +3380,7 @@ Future<List<Rect>> getScreenListNotWayland() async {
 }
 
 Future<List<Rect>> getScreenRectList() async {
-  return bind.mainCurrentIsWayland()
+  return bind.crateFlutterFfiMainCurrentIsWayland()
       ? await getScreenListWayland()
       : await getScreenListNotWayland();
 }
@@ -3405,7 +3405,7 @@ openMonitorInTheSameTab(int i, FFI ffi, PeerInfo pi,
   if (pi.forceTextureRender && i != kAllDisplayValue) {
     ffi.imageModel.clearImage();
   }
-  bind.sessionSwitchDisplay(
+  bind.crateFlutterFfiSessionSwitchDisplay(
     isDesktop: isDesktop,
     sessionId: ffi.sessionId,
     value: Int32List.fromList(displays),
@@ -3602,7 +3602,7 @@ Future<bool> setServerConfig(
   }
   // id
   if (config.idServer.isNotEmpty && errMsgs != null) {
-    errMsgs[0].value = translate(await bind.mainTestIfValidServer(
+    errMsgs[0].value = translate(await bind.crateFlutterFfiMainTestIfValidServer(
         server: config.idServer, testWithProxy: true));
     if (errMsgs[0].isNotEmpty) {
       return false;
@@ -3610,7 +3610,7 @@ Future<bool> setServerConfig(
   }
   // relay
   if (config.relayServer.isNotEmpty && errMsgs != null) {
-    errMsgs[1].value = translate(await bind.mainTestIfValidServer(
+    errMsgs[1].value = translate(await bind.crateFlutterFfiMainTestIfValidServer(
         server: config.relayServer, testWithProxy: true));
     if (errMsgs[1].isNotEmpty) {
       return false;
@@ -3625,15 +3625,15 @@ Future<bool> setServerConfig(
       return false;
     }
   }
-  final oldApiServer = await bind.mainGetApiServer();
+  final oldApiServer = await bind.crateFlutterFfiMainGetApiServer();
 
   // should set one by one
-  await bind.mainSetOption(
+  await bind.crateFlutterFfiMainSetOption(
       key: 'custom-rendezvous-server', value: config.idServer);
-  await bind.mainSetOption(key: 'relay-server', value: config.relayServer);
-  await bind.mainSetOption(key: 'api-server', value: config.apiServer);
-  await bind.mainSetOption(key: 'key', value: config.key);
-  final newApiServer = await bind.mainGetApiServer();
+  await bind.crateFlutterFfiMainSetOption(key: 'relay-server', value: config.relayServer);
+  await bind.crateFlutterFfiMainSetOption(key: 'api-server', value: config.apiServer);
+  await bind.crateFlutterFfiMainSetOption(key: 'key', value: config.key);
+  final newApiServer = await bind.crateFlutterFfiMainGetApiServer();
   if (oldApiServer.isNotEmpty &&
       oldApiServer != newApiServer &&
       gFFI.userModel.isLogin) {
@@ -3731,7 +3731,7 @@ Color? disabledTextColor(BuildContext context, bool enabled) {
 }
 
 Widget loadPowered(BuildContext context) {
-  if (bind.mainGetBuildinOption(key: "hide-powered-by-me") == 'Y') {
+  if (bind.crateFlutterFfiMainGetBuildinOption(key: "hide-powered-by-me") == 'Y') {
     return SizedBox.shrink();
   }
   return MouseRegion(
@@ -3850,7 +3850,7 @@ bool isInHomePage() {
 }
 
 Widget _buildPresetPasswordWarning() {
-  if (bind.mainGetBuildinOption(key: kOptionRemovePresetPasswordWarning) !=
+  if (bind.crateFlutterFfiMainGetBuildinOption(key: kOptionRemovePresetPasswordWarning) !=
       'N') {
     return SizedBox.shrink();
   }
@@ -3878,7 +3878,7 @@ Widget _buildPresetPasswordWarning() {
 }
 
 Widget buildPresetPasswordWarningMobile() {
-  if (bind.isPresetPasswordMobileOnly()) {
+  if (bind.crateFlutterFfiIsPresetPasswordMobileOnly()) {
     return _buildPresetPasswordWarning();
   } else {
     return SizedBox.shrink();
@@ -3887,7 +3887,7 @@ Widget buildPresetPasswordWarningMobile() {
 
 Widget buildPresetPasswordWarning() {
   return FutureBuilder<bool>(
-    future: bind.isPresetPassword(),
+    future: bind.crateFlutterFfiIsPresetPassword(),
     builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) {
         return CircularProgressIndicator(); // Show a loading spinner while waiting for the Future to complete
@@ -3966,21 +3966,21 @@ setResizable(bool resizable) {
   }
 }
 
-isOptionFixed(String key) => bind.mainIsOptionFixed(key: key);
+isOptionFixed(String key) => bind.crateFlutterFfiMainIsOptionFixed(key: key);
 
 bool isChangePermanentPasswordDisabled() =>
-    bind.mainGetBuildinOption(key: kOptionDisableChangePermanentPassword) ==
+    bind.crateFlutterFfiMainGetBuildinOption(key: kOptionDisableChangePermanentPassword) ==
     'Y';
 
 bool isChangeIdDisabled() =>
-    bind.mainGetBuildinOption(key: kOptionDisableChangeId) == 'Y';
+    bind.crateFlutterFfiMainGetBuildinOption(key: kOptionDisableChangeId) == 'Y';
 
 bool isUnlockPinDisabled() =>
-    bind.mainGetBuildinOption(key: kOptionDisableUnlockPin) == 'Y';
+    bind.crateFlutterFfiMainGetBuildinOption(key: kOptionDisableUnlockPin) == 'Y';
 
 bool? _isCustomClient;
 bool get isCustomClient {
-  _isCustomClient ??= bind.isCustomClient();
+  _isCustomClient ??= bind.crateFlutterFfiIsCustomClient();
   return _isCustomClient!;
 }
 
@@ -3994,12 +3994,12 @@ get defaultOptionApproveMode => isCustomClient ? 'password-click' : '';
 
 bool whitelistNotEmpty() {
   // https://rustdesk.com/docs/en/self-host/client-configuration/advanced-settings/#whitelist
-  final v = bind.mainGetOptionSync(key: kOptionWhitelist);
+  final v = bind.crateFlutterFfiMainGetOptionSync(key: kOptionWhitelist);
   return v != '' && v != ',';
 }
 
 bool idWhitelistNotEmpty() {
-  final v = bind.mainGetOptionSync(key: kOptionIdWhitelist);
+  final v = bind.crateFlutterFfiMainGetOptionSync(key: kOptionIdWhitelist);
   return v != '' && v != ',';
 }
 
@@ -4067,7 +4067,7 @@ void earlyAssert() {
 
 void checkUpdate() {
   if (!isWeb) {
-    if (!bind.isCustomClient()) {
+    if (!bind.crateFlutterFfiIsCustomClient()) {
       platformFFI.registerEventHandler(
           kCheckSoftwareUpdateFinish, kCheckSoftwareUpdateFinish,
           (Map<String, dynamic> evt) async {
@@ -4076,7 +4076,7 @@ void checkUpdate() {
         }
       });
       Timer(const Duration(seconds: 1), () async {
-        bind.mainGetSoftwareUpdateUrl();
+        bind.crateFlutterFfiMainGetSoftwareUpdateUrl();
       });
     }
   }
@@ -4167,7 +4167,7 @@ void updateTextAndPreserveSelection(
 }
 
 List<String> getPrinterNames() {
-  final printerNamesJson = bind.mainGetPrinterNames();
+  final printerNamesJson = bind.crateFlutterFfiMainGetPrinterNames();
   if (printerNamesJson.isEmpty) {
     return [];
   }
@@ -4187,7 +4187,7 @@ List<String> getPrinterNames() {
 String _appName = '';
 String get appName {
   if (_appName.isEmpty) {
-    _appName = bind.mainGetAppNameSync();
+    _appName = bind.crateFlutterFfiMainGetAppNameSync();
   }
   return _appName;
 }

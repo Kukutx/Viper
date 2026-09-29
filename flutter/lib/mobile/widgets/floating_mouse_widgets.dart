@@ -452,13 +452,13 @@ class _FloatingLeftRightButtonState extends State<FloatingLeftRightButton> {
       'x': _position.dx,
       'y': _position.dy,
     });
-    bind.setLocalFlutterOption(
+    bind.crateFlutterFfiSetLocalFlutterOption(
         k: _getPositionKey(_previousOrientation!), v: pos);
     _preSavedPos = _position;
   }
 
   void _restorePosition(Orientation ori) {
-    final ps = bind.getLocalFlutterOption(k: _getPositionKey(ori));
+    final ps = bind.crateFlutterFfiGetLocalFlutterOption(k: _getPositionKey(ori));
     final pos = _loadPositionFromString(ps);
     if (pos == null) {
       final size = MediaQuery.of(context).size;

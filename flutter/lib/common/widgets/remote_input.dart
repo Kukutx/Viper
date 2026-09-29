@@ -480,7 +480,7 @@ class _RawTouchGestureDetectorRegionState
 
       if (scale != 0) {
         if (widget.isCamera) return;
-        await bind.sessionSendPointer(
+        await bind.crateFlutterFfiSessionSendPointer(
             sessionId: sessionId,
             msg: json.encode(
                 PointerEventToRust(kPointerEventKindTouch, 'scale', scale)
@@ -501,7 +501,7 @@ class _RawTouchGestureDetectorRegionState
     }
     if ((isDesktop || isWebDesktop)) {
       if (widget.isCamera) return;
-      await bind.sessionSendPointer(
+      await bind.crateFlutterFfiSessionSendPointer(
           sessionId: sessionId,
           msg: json.encode(
               PointerEventToRust(kPointerEventKindTouch, 'scale', 0).toJson()));
@@ -509,7 +509,7 @@ class _RawTouchGestureDetectorRegionState
       // mobile
       _scale = 1;
       // No idea why we need to set the view style to "" here.
-      // bind.sessionSetViewStyle(sessionId: sessionId, value: "");
+      // bind.crateFlutterFfiSessionSetViewStyle(sessionId: sessionId, value: "");
     }
     if (!isSpecialHoldDragActive) {
       await inputModel.sendMouse('up', MouseButtons.left);

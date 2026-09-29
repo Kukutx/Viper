@@ -212,7 +212,7 @@ class _PortForwardPageState extends State<PortForwardPage>
                 remotePort != null &&
                 (remoteHostController.text.isEmpty ||
                     remoteHostController.text.trim().isNotEmpty)) {
-              await bind.sessionAddPortForward(
+              await bind.crateFlutterFfiSessionAddPortForward(
                   sessionId: _ffi.sessionId,
                   localPort: localPort,
                   remoteHost: remoteHostController.text.trim().isEmpty
@@ -272,7 +272,7 @@ class _PortForwardPageState extends State<PortForwardPage>
           child: IconButton(
             icon: const Icon(Icons.close),
             onPressed: () async {
-              await bind.sessionRemovePortForward(
+              await bind.crateFlutterFfiSessionRemovePortForward(
                   sessionId: _ffi.sessionId, localPort: pf.localPort);
               refreshTunnelConfig();
             },
@@ -283,7 +283,7 @@ class _PortForwardPageState extends State<PortForwardPage>
   }
 
   void refreshTunnelConfig() async {
-    String peer = bind.mainGetPeerSync(id: widget.id);
+    String peer = bind.crateFlutterFfiMainGetPeerSync(id: widget.id);
     Map<String, dynamic> config = jsonDecode(peer);
     List<dynamic> infos = config['port_forwards'] as List;
     List<_PortForward> result = List.empty(growable: true);
@@ -332,7 +332,7 @@ class _PortForwardPageState extends State<PortForwardPage>
                         width: 120,
                         child: ElevatedButton(
                           onPressed: () =>
-                              bind.sessionNewRdp(sessionId: _ffi.sessionId),
+                              bind.crateFlutterFfiSessionNewRdp(sessionId: _ffi.sessionId),
                           child: Text(
                             translate('New RDP'),
                           ),

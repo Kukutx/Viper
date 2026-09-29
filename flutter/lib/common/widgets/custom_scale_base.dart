@@ -105,13 +105,13 @@ abstract class CustomScaleControls<T extends StatefulWidget> extends State<T> {
       _scaleValue = v;
     });
     try {
-      await bind.sessionSetFlutterOption(
+      await bind.crateFlutterFfiSessionSetFlutterOption(
           sessionId: ffi.sessionId,
           k: kCustomScalePercentKey,
           v: v.toString());
-      final curStyle = await bind.sessionGetViewStyle(sessionId: ffi.sessionId);
+      final curStyle = await bind.crateFlutterFfiSessionGetViewStyle(sessionId: ffi.sessionId);
       if (curStyle != kRemoteViewStyleCustom) {
-        await bind.sessionSetViewStyle(
+        await bind.crateFlutterFfiSessionSetViewStyle(
             sessionId: ffi.sessionId, value: kRemoteViewStyleCustom);
       }
       await ffi.canvasModel.updateViewStyle();

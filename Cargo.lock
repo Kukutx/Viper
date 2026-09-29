@@ -109,13 +109,13 @@ dependencies = [
 
 [[package]]
 name = "allo-isolate"
-version = "0.1.25"
+version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97b6d794345b06592d0ebeed8e477e41b71e5a0a49df4fc0e4184d5938b99509"
+checksum = "449e356a4864c017286dbbec0e12767ea07efba29e3b7d984194c2a7ff3c4550"
 dependencies = [
  "anyhow",
  "atomic",
- "chrono",
+ "backtrace",
  "uuid",
 ]
 
@@ -200,9 +200,9 @@ dependencies = [
 
 [[package]]
 name = "android_log-sys"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ecc8056bf6ab9892dcd53216c83d1597487d7dacac16c8df6b877d127df9937"
+checksum = "84521a3cf562bc62942e294181d9eef17eb38ceb8c68677bc49f144e4c3d4f8d"
 
 [[package]]
 name = "android_logger"
@@ -214,6 +214,17 @@ dependencies = [
  "env_logger 0.10.2",
  "log",
  "once_cell",
+]
+
+[[package]]
+name = "android_logger"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbb4e440d04be07da1f1bf44fb4495ebd58669372fe0cffa6e48595ac5bd88a3"
+dependencies = [
+ "android_log-sys",
+ "env_filter",
+ "log",
 ]
 
 [[package]]
@@ -2114,6 +2125,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "delegate-attr"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a84c9a9c129b98e707ac9a31e204c10c064dd9f949b7da362310ff1a8b137d79"
+dependencies = [
+ "proc-macro2 1.0.93",
+ "quote 1.0.36",
+ "syn 3.0.6",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2306,7 +2328,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330c60081dcc4c72131f8eb70510f1ac07223e5d4163db481a04a0befcffa412"
 dependencies = [
- "libloading 0.7.4",
+ "libloading 0.8.4",
 ]
 
 [[package]]
@@ -2829,35 +2851,46 @@ dependencies = [
 
 [[package]]
 name = "flutter_rust_bridge"
-version = "1.80.1"
+version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd0305ebc9f097d9826530a55fc2acd63222e912c663f7adce3ab641ecc0f346"
+checksum = "24a973d15b8fc7de9fb29cdfbec58a2ac41f6252492d3b882abfdc603e32b34f"
 dependencies = [
  "allo-isolate",
+ "android_logger 0.15.1",
  "anyhow",
  "build-target",
  "bytemuck",
- "cc",
- "chrono",
+ "byteorder",
  "console_error_panic_hook",
  "dart-sys",
+ "delegate-attr",
  "flutter_rust_bridge_macros",
+ "futures",
  "js-sys",
  "lazy_static",
- "libc",
  "log",
- "parking_lot",
+ "oslog",
+ "portable-atomic",
  "threadpool",
+ "tokio",
  "uuid",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 
 [[package]]
 name = "flutter_rust_bridge_macros"
-version = "1.82.6"
+version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7fe743d921bedf4578b9472346d03a9643a01cd565ca7df7961baebad534ba5"
+checksum = "901eec2d226107dad1c55b30f7421c4687bebcf70ed43ca44d1b447ca087b238"
+dependencies = [
+ "hex",
+ "md-5",
+ "proc-macro2 1.0.93",
+ "quote 1.0.36",
+ "syn 2.0.98",
+]
 
 [[package]]
 name = "fnv"
@@ -4427,7 +4460,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e310b3a6b5907f99202fcdb4960ff45b93735d7c7d96b760fcff8db2dc0e103d"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -5813,6 +5846,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "oslog"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80d2043d1f61d77cb2f4b1f7b7b2295f40507f5f8e9d1c8bf10a1ca5f97a3969"
+dependencies = [
+ "cc",
+ "dashmap 5.5.3",
+ "log",
+]
+
+[[package]]
 name = "owned_ttf_parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7090,7 +7134,7 @@ name = "rustdesk"
 version = "1.5.0"
 dependencies = [
  "android-wakelock",
- "android_logger",
+ "android_logger 0.13.3",
  "arboard",
  "async-process",
  "async-trait",
@@ -7416,7 +7460,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 name = "scrap"
 version = "0.5.0"
 dependencies = [
- "android_logger",
+ "android_logger 0.13.3",
  "base",
  "bindgen 0.72.1",
  "block",
@@ -8119,6 +8163,17 @@ name = "syn"
 version = "2.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36147f1a48ae0ec2b5b3bc5b537d267457555a10dc06f3dbc8cb11ba3006d3b1"
+dependencies = [
+ "proc-macro2 1.0.93",
+ "quote 1.0.36",
+ "unicode-ident",
+]
+
+[[package]]
+name = "syn"
+version = "3.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8593e8e72159ed2257d083c7a454a85cbf854f37a0966d8d483aff8c8a3ebcee"
 dependencies = [
  "proc-macro2 1.0.93",
  "quote 1.0.36",

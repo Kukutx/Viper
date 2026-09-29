@@ -76,8 +76,8 @@ class _InstallPageBodyState extends State<_InstallPageBody>
   );
 
   _InstallPageBodyState() {
-    controller = TextEditingController(text: bind.installInstallPath());
-    final installOptions = jsonDecode(bind.installInstallOptions());
+    controller = TextEditingController(text: bind.crateFlutterFfiInstallInstallPath());
+    final installOptions = jsonDecode(bind.crateFlutterFfiInstallInstallOptions());
     startmenu.value = installOptions['STARTMENUSHORTCUTS'] != '0';
     desktopicon.value = installOptions['DESKTOPSHORTCUTS'] != '0';
     printer.value = installOptions['PRINTER'] == '1';
@@ -231,13 +231,13 @@ class _InstallPageBodyState extends State<_InstallPageBody>
                     ),
                   ),
                   Offstage(
-                    offstage: bind.installShowRunWithoutInstall(),
+                    offstage: bind.crateFlutterFfiInstallShowRunWithoutInstall(),
                     child: Obx(
                       () => OutlinedButton.icon(
                         icon: Icon(Icons.screen_share_outlined, size: 16),
                         label: Text(translate('Run without install')),
                         onPressed: btnEnabled.value
-                            ? () => bind.installRunWithoutInstall()
+                            ? () => bind.crateFlutterFfiInstallRunWithoutInstall()
                             : null,
                         style: buttonStyle,
                       ).marginOnly(left: 10),
@@ -258,7 +258,7 @@ class _InstallPageBodyState extends State<_InstallPageBody>
       if (startmenu.value) args += ' startmenu';
       if (desktopicon.value) args += ' desktopicon';
       if (printer.value) args += ' printer';
-      bind.installInstallMe(options: args, path: controller.text);
+      bind.crateFlutterFfiInstallInstallMe(options: args, path: controller.text);
     }
 
     do_install();
@@ -268,7 +268,7 @@ class _InstallPageBodyState extends State<_InstallPageBody>
     String? install_path = await FilePicker.platform
         .getDirectoryPath(initialDirectory: controller.text);
     if (install_path != null) {
-      controller.text = join(install_path, await bind.mainGetAppName());
+      controller.text = join(install_path, await bind.crateFlutterFfiMainGetAppName());
     }
   }
 }

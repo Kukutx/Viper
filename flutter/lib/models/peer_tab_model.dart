@@ -40,9 +40,9 @@ class PeerTabModel with ChangeNotifier {
   List<bool> isEnabled = List.from([
     true,
     true,
-    !isWeb && bind.mainGetLocalOption(key: "disable-discovery-panel") != "Y",
-    !(bind.isDisableAb() || bind.isDisableAccount()),
-    !(bind.isDisableGroupPanel() || bind.isDisableAccount()),
+    !isWeb && bind.crateFlutterFfiMainGetLocalOption(key: "disable-discovery-panel") != "Y",
+    !(bind.crateFlutterFfiIsDisableAb() || bind.crateFlutterFfiIsDisableAccount()),
+    !(bind.crateFlutterFfiIsDisableGroupPanel() || bind.crateFlutterFfiIsDisableAccount()),
   ]);
   final List<bool> _isVisible = List.filled(maxTabCount, true, growable: false);
   List<bool> get isVisibleEnabled => () {
@@ -70,7 +70,7 @@ class PeerTabModel with ChangeNotifier {
   PeerTabModel(this.parent) {
     // visible
     try {
-      final option = bind.getLocalFlutterOption(k: kOptionPeerTabVisible);
+      final option = bind.crateFlutterFfiGetLocalFlutterOption(k: kOptionPeerTabVisible);
       if (option.isNotEmpty) {
         List<dynamic> decodeList = jsonDecode(option);
         if (decodeList.length == _isVisible.length) {
@@ -86,7 +86,7 @@ class PeerTabModel with ChangeNotifier {
     }
     // order
     try {
-      final option = bind.getLocalFlutterOption(k: kOptionPeerTabOrder);
+      final option = bind.crateFlutterFfiGetLocalFlutterOption(k: kOptionPeerTabOrder);
       if (option.isNotEmpty) {
         List<dynamic> decodeList = jsonDecode(option);
         if (decodeList.length == maxTabCount) {
@@ -110,7 +110,7 @@ class PeerTabModel with ChangeNotifier {
     }
     // init currentTab
     _currentTab =
-        int.tryParse(bind.getLocalFlutterOption(k: kOptionPeerTabIndex)) ?? 0;
+        int.tryParse(bind.crateFlutterFfiGetLocalFlutterOption(k: kOptionPeerTabIndex)) ?? 0;
     if (_currentTab < 0 || _currentTab >= maxTabCount) {
       _currentTab = 0;
     }
@@ -226,7 +226,7 @@ class PeerTabModel with ChangeNotifier {
           _currentTab = index;
         }
         try {
-          bind.setLocalFlutterOption(
+          bind.crateFlutterFfiSetLocalFlutterOption(
               k: kOptionPeerTabVisible, v: jsonEncode(_isVisible));
         } catch (_) {}
         notifyListeners();
@@ -263,7 +263,7 @@ class PeerTabModel with ChangeNotifier {
       for (int i = 0; i < list.length; i++) {
         orders[i] = list[i];
       }
-      bind.setLocalFlutterOption(k: kOptionPeerTabOrder, v: jsonEncode(orders));
+      bind.crateFlutterFfiSetLocalFlutterOption(k: kOptionPeerTabOrder, v: jsonEncode(orders));
       notifyListeners();
     }
   }

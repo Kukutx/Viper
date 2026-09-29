@@ -100,13 +100,13 @@ void changeIdDialog() {
       setState(() {
         msg = "";
         isInProgress = true;
-        bind.mainChangeId(newId: newId);
+        bind.crateFlutterFfiMainChangeId(newId: newId);
       });
 
-      var status = await bind.mainGetAsyncStatus();
+      var status = await bind.crateFlutterFfiMainGetAsyncStatus();
       while (status == " ") {
         await Future.delayed(const Duration(milliseconds: 100));
-        status = await bind.mainGetAsyncStatus();
+        status = await bind.crateFlutterFfiMainGetAsyncStatus();
       }
       if (status.isEmpty) {
         // ok
@@ -187,7 +187,7 @@ void changeIdDialog() {
 }
 
 void changeWhiteList({Function()? callback}) async {
-  final curWhiteList = await bind.mainGetOption(key: kOptionWhitelist);
+  final curWhiteList = await bind.crateFlutterFfiMainGetOption(key: kOptionWhitelist);
   var newWhiteListField = curWhiteList == defaultOptionWhitelist
       ? ''
       : curWhiteList.split(',').join('\n');
@@ -235,7 +235,7 @@ void changeWhiteList({Function()? callback}) async {
         dialogButton("Cancel", onPressed: close, isOutline: true),
         if (!isOptFixed)
           dialogButton("Clear", onPressed: () async {
-            await bind.mainSetOption(
+            await bind.crateFlutterFfiMainSetOption(
                 key: kOptionWhitelist, value: defaultOptionWhitelist);
             callback?.call();
             close();
@@ -274,7 +274,7 @@ void changeWhiteList({Function()? callback}) async {
               if (newWhiteList.trim().isEmpty) {
                 newWhiteList = defaultOptionWhitelist;
               }
-              await bind.mainSetOption(
+              await bind.crateFlutterFfiMainSetOption(
                   key: kOptionWhitelist, value: newWhiteList);
               callback?.call();
               close();
@@ -287,7 +287,7 @@ void changeWhiteList({Function()? callback}) async {
 }
 
 void changeIdWhiteList({Function()? callback}) async {
-  final curIdWhiteList = await bind.mainGetOption(key: kOptionIdWhitelist);
+  final curIdWhiteList = await bind.crateFlutterFfiMainGetOption(key: kOptionIdWhitelist);
   var newIdWhiteListField = curIdWhiteList == defaultOptionWhitelist
       ? ''
       : curIdWhiteList.split(',').join('\n');
@@ -339,7 +339,7 @@ void changeIdWhiteList({Function()? callback}) async {
         dialogButton("Cancel", onPressed: close, isOutline: true),
         if (!isOptFixed)
           dialogButton("Clear", onPressed: () async {
-            await bind.mainSetOption(
+            await bind.crateFlutterFfiMainSetOption(
                 key: kOptionIdWhitelist, value: defaultOptionWhitelist);
             callback?.call();
             close();
@@ -379,7 +379,7 @@ void changeIdWhiteList({Function()? callback}) async {
               if (newIdWhiteList.trim().isEmpty) {
                 newIdWhiteList = defaultOptionWhitelist;
               }
-              await bind.mainSetOption(
+              await bind.crateFlutterFfiMainSetOption(
                   key: kOptionIdWhitelist, value: newIdWhiteList);
               callback?.call();
               close();
@@ -430,7 +430,7 @@ Future<String> changeDirectAccessPort(
       actions: [
         dialogButton("Cancel", onPressed: close, isOutline: true),
         dialogButton("OK", onPressed: () async {
-          await bind.mainSetOption(
+          await bind.crateFlutterFfiMainSetOption(
               key: kOptionDirectAccessPort, value: controller.text);
           close();
         }),
@@ -478,7 +478,7 @@ Future<String> changeAutoDisconnectTimeout(String old) async {
       actions: [
         dialogButton("Cancel", onPressed: close, isOutline: true),
         dialogButton("OK", onPressed: () async {
-          await bind.mainSetOption(
+          await bind.crateFlutterFfiMainSetOption(
               key: kOptionAutoDisconnectTimeout, value: controller.text);
           close();
         }),
@@ -971,7 +971,7 @@ _connectDialog(
   var rememberPassword = false;
   if (passwordController != null) {
     rememberPassword =
-        await bind.sessionGetRemember(sessionId: sessionId) ?? false;
+        await bind.crateFlutterFfiSessionGetRemember(sessionId: sessionId) ?? false;
   }
   if (osUsernameController != null) {
     osUsernameController.addListener(() {
@@ -1294,12 +1294,12 @@ void showRequestElevationDialog(
           errPwd.value = translate('Empty Password');
           return;
         }
-        bind.sessionElevateWithLogon(
+        bind.crateFlutterFfiSessionElevateWithLogon(
             sessionId: sessionId,
             username: userController.text,
             password: pwdController.text);
       } else {
-        bind.sessionElevateDirect(sessionId: sessionId);
+        bind.crateFlutterFfiSessionElevateDirect(sessionId: sessionId);
       }
       close();
       showWaitUacDialog(sessionId, dialogManager, "wait-uac");
@@ -1428,7 +1428,7 @@ void showRestartRemoteDevice(PeerInfo pi, String id, SessionID sessionId,
             onCancel: close,
             onSubmit: () => close(true),
           ));
-  if (res == true) bind.sessionRestartRemoteDevice(sessionId: sessionId);
+  if (res == true) bind.crateFlutterFfiSessionRestartRemoteDevice(sessionId: sessionId);
 }
 
 showSetOSPassword(
@@ -1440,10 +1440,10 @@ showSetOSPassword(
 ) async {
   final controller = TextEditingController();
   osPassword ??=
-      await bind.sessionGetOption(sessionId: sessionId, arg: 'os-password') ??
+      await bind.crateFlutterFfiSessionGetOption(sessionId: sessionId, arg: 'os-password') ??
           '';
   var autoLogin =
-      await bind.sessionGetOption(sessionId: sessionId, arg: 'auto-login') !=
+      await bind.crateFlutterFfiSessionGetOption(sessionId: sessionId, arg: 'auto-login') !=
           '';
   controller.text = osPassword;
   dialogManager.show((setState, close, context) {
@@ -1454,14 +1454,14 @@ showSetOSPassword(
 
     submit() {
       var text = controller.text.trim();
-      bind.sessionPeerOption(
+      bind.crateFlutterFfiSessionPeerOption(
           sessionId: sessionId, name: 'os-password', value: text);
-      bind.sessionPeerOption(
+      bind.crateFlutterFfiSessionPeerOption(
           sessionId: sessionId,
           name: 'auto-login',
           value: autoLogin ? 'Y' : '');
       if (text != '' && login) {
-        bind.sessionInputOsPassword(sessionId: sessionId, value: text);
+        bind.crateFlutterFfiSessionInputOsPassword(sessionId: sessionId, value: text);
       }
       closeWithCallback();
     }
@@ -1560,11 +1560,11 @@ Widget buildNoteTextField({
 
 showAuditDialog(FFI ffi) async {
   final controller = TextEditingController(
-      text: bind.sessionGetLastAuditNote(sessionId: ffi.sessionId));
+      text: bind.crateFlutterFfiSessionGetLastAuditNote(sessionId: ffi.sessionId));
   ffi.dialogManager.show((setState, close, context) {
     submit() {
       var text = controller.text;
-      bind.sessionSendNote(sessionId: ffi.sessionId, note: text);
+      bind.crateFlutterFfiSessionSendNote(sessionId: ffi.sessionId, note: text);
       close();
     }
 
@@ -1593,12 +1593,12 @@ bool allowAskForNoteAtEndOfConnection(FFI? ffi, bool closedByControlling) {
   }
   return mainGetLocalBoolOptionSync(kOptionAllowAskForNoteAtEndOfConnection) &&
       bind
-          .sessionGetAuditServerSync(sessionId: ffi.sessionId, typ: "conn")
+          .crateFlutterFfiSessionGetAuditServerSync(sessionId: ffi.sessionId, typ: "conn")
           .isNotEmpty &&
-      bind.sessionGetAuditGuid(sessionId: ffi.sessionId).isNotEmpty &&
-      bind.sessionGetLastAuditNote(sessionId: ffi.sessionId).isEmpty &&
+      bind.crateFlutterFfiSessionGetAuditGuid(sessionId: ffi.sessionId).isNotEmpty &&
+      bind.crateFlutterFfiSessionGetLastAuditNote(sessionId: ffi.sessionId).isEmpty &&
       (!closedByControlling ||
-          bind.willSessionCloseCloseSession(sessionId: ffi.sessionId));
+          bind.crateFlutterFfiWillSessionCloseCloseSession(sessionId: ffi.sessionId));
 }
 
 // return value: close canceled
@@ -1650,7 +1650,7 @@ Future<bool?> _showConnEndAuditDialogCloseCanceled({
   Future<void> updateAuditNoteByGuid(String auditGuid, String note) async {
     debugPrint('Updating audit note for GUID: $auditGuid, note: $note');
     try {
-      final apiServer = await bind.mainGetApiServer();
+      final apiServer = await bind.crateFlutterFfiMainGetApiServer();
       if (apiServer.isEmpty) {
         debugPrint('API server is empty, cannot update audit note');
         return;
@@ -1699,7 +1699,7 @@ Future<bool?> _showConnEndAuditDialogCloseCanceled({
       var text = controller.text;
       if (text.isNotEmpty) {
         await updateAuditNoteByGuid(
-                bind.sessionGetAuditGuid(sessionId: ffi.sessionId), text)
+                bind.crateFlutterFfiSessionGetAuditGuid(sessionId: ffi.sessionId), text)
             .timeout(const Duration(seconds: 6), onTimeout: () {
           debugPrint('updateAuditNoteByGuid timeout after 6s');
         });
@@ -1808,7 +1808,7 @@ void showConfirmSwitchSidesDialog(
     SessionID sessionId, String id, OverlayDialogManager dialogManager) async {
   dialogManager.show((setState, close, context) {
     submit() async {
-      await bind.sessionSwitchSides(sessionId: sessionId);
+      await bind.crateFlutterFfiSessionSwitchSides(sessionId: sessionId);
       closeConnection(id: id);
     }
 
@@ -1836,31 +1836,31 @@ customImageQualityDialog(SessionID sessionId, String id, FFI ffi) async {
     direct =
         ConnectionTypeState.find(id).direct.value == ConnectionType.strDirect;
   } catch (_) {}
-  bool hideFps = (await bind.mainIsUsingPublicServer() && direct != true) ||
+  bool hideFps = (await bind.crateFlutterFfiMainIsUsingPublicServer() && direct != true) ||
       versionCmp(ffi.ffiModel.pi.version, '1.2.0') < 0;
   bool hideMoreQuality =
-      (await bind.mainIsUsingPublicServer() && direct != true) ||
+      (await bind.crateFlutterFfiMainIsUsingPublicServer() && direct != true) ||
           versionCmp(ffi.ffiModel.pi.version, '1.2.2') < 0;
 
   setCustomValues({double? quality, double? fps}) async {
     debugPrint("setCustomValues quality:$quality, fps:$fps");
     if (quality != null) {
       qualitySet = true;
-      await bind.sessionSetCustomImageQuality(
+      await bind.crateFlutterFfiSessionSetCustomImageQuality(
           sessionId: sessionId, value: quality.toInt());
     }
     if (fps != null) {
       fpsSet = true;
-      await bind.sessionSetCustomFps(sessionId: sessionId, fps: fps.toInt());
+      await bind.crateFlutterFfiSessionSetCustomFps(sessionId: sessionId, fps: fps.toInt());
     }
     if (!qualitySet) {
       qualitySet = true;
-      await bind.sessionSetCustomImageQuality(
+      await bind.crateFlutterFfiSessionSetCustomImageQuality(
           sessionId: sessionId, value: initQuality.toInt());
     }
     if (!hideFps && !fpsSet) {
       fpsSet = true;
-      await bind.sessionSetCustomFps(
+      await bind.crateFlutterFfiSessionSetCustomFps(
           sessionId: sessionId, fps: initFps.toInt());
     }
   }
@@ -1871,7 +1871,7 @@ customImageQualityDialog(SessionID sessionId, String id, FFI ffi) async {
   });
 
   // quality
-  final quality = await bind.sessionGetCustomImageQuality(sessionId: sessionId);
+  final quality = await bind.crateFlutterFfiSessionGetCustomImageQuality(sessionId: sessionId);
   initQuality = quality != null && quality.isNotEmpty
       ? quality[0].toDouble()
       : kDefaultQuality;
@@ -1881,7 +1881,7 @@ customImageQualityDialog(SessionID sessionId, String id, FFI ffi) async {
   }
   // fps
   final fpsOption =
-      await bind.sessionGetOption(sessionId: sessionId, arg: 'custom-fps');
+      await bind.crateFlutterFfiSessionGetOption(sessionId: sessionId, arg: 'custom-fps');
   initFps = fpsOption == null
       ? kDefaultFps
       : double.tryParse(fpsOption) ?? kDefaultFps;
@@ -1921,7 +1921,7 @@ Future<void> _saveTrackpadSpeed({
   if (speed == initSpeed) {
     return;
   }
-  await bind.sessionSetTrackpadSpeed(sessionId: sessionId, value: speed);
+  await bind.crateFlutterFfiSessionSetTrackpadSpeed(sessionId: sessionId, value: speed);
   await ffi.inputModel.updateTrackpadSpeed();
 }
 
@@ -2217,8 +2217,8 @@ void renameDialog(
 }
 
 void changeBot({Function()? callback}) async {
-  if (bind.mainHasValidBotSync()) {
-    await bind.mainSetOption(key: "bot", value: "");
+  if (bind.crateFlutterFfiMainHasValidBotSync()) {
+    await bind.crateFlutterFfiMainSetOption(key: "bot", value: "");
     callback?.call();
     return;
   }
@@ -2232,7 +2232,7 @@ void changeBot({Function()? callback}) async {
       loading = true;
       errorText = '';
       setState(() {});
-      final error = await bind.mainVerifyBot(token: token);
+      final error = await bind.crateFlutterFfiMainVerifyBot(token: token);
       if (error == "") {
         callback?.call();
         close();
@@ -2277,20 +2277,20 @@ void changeBot({Function()? callback}) async {
 }
 
 void change2fa({Function()? callback}) async {
-  if (bind.mainHasValid2FaSync()) {
-    await bind.mainSetOption(key: "2fa", value: "");
-    await bind.mainClearTrustedDevices();
+  if (bind.crateFlutterFfiMainHasValid2FaSync()) {
+    await bind.crateFlutterFfiMainSetOption(key: "2fa", value: "");
+    await bind.crateFlutterFfiMainClearTrustedDevices();
     callback?.call();
     return;
   }
-  var new2fa = (await bind.mainGenerate2Fa());
+  var new2fa = (await bind.crateFlutterFfiMainGenerate2Fa());
   final secretRegex = RegExp(r'secret=([^&]+)');
   final secret = secretRegex.firstMatch(new2fa)?.group(1);
   String? errorText;
   final controller = TextEditingController();
   gFFI.dialogManager.show((setState, close, context) {
     onVerify() async {
-      if (await bind.mainVerify2Fa(code: controller.text.trim())) {
+      if (await bind.crateFlutterFfiMainVerify2Fa(code: controller.text.trim())) {
         callback?.call();
         close();
       } else {
@@ -2388,7 +2388,7 @@ void enter2FaDialog(
         content: Column(
           children: [
             codeField,
-            if (bind.sessionGetEnableTrustedDevices(sessionId: sessionId))
+            if (bind.crateFlutterFfiSessionGetEnableTrustedDevices(sessionId: sessionId))
               trustField,
           ],
         ),
@@ -2433,7 +2433,7 @@ void showWindowsSessionsDialog(
   dialogManager.dismissAll();
   dialogManager.show((setState, close, context) {
     submit() {
-      bind.sessionSendSelectedSessionId(
+      bind.crateFlutterFfiSessionSendSelectedSessionId(
           sessionId: sessionId, sid: selectedUserValue);
       close();
     }
@@ -2697,7 +2697,7 @@ void changeUnlockPinDialog(String oldPin, Function() callback) {
   final confirmController = TextEditingController(text: oldPin);
   String? pinErrorText;
   String? confirmationErrorText;
-  final maxLength = bind.mainMaxEncryptLen();
+  final maxLength = bind.crateFlutterFfiMainMaxEncryptLen();
   gFFI.dialogManager.show((setState, close, context) {
     submit() async {
       pinErrorText = null;
@@ -2711,7 +2711,7 @@ void changeUnlockPinDialog(String oldPin, Function() callback) {
         });
         return;
       }
-      final errorMsg = bind.mainSetUnlockPin(pin: pin);
+      final errorMsg = bind.crateFlutterFfiMainSetUnlockPin(pin: pin);
       if (errorMsg != '') {
         setState(() {
           pinErrorText = translate(errorMsg);
@@ -2796,12 +2796,12 @@ void confrimDeleteTrustedDevicesDialog(
       () async {
     if (selectedDevices.isEmpty) return;
     if (selectedDevices.length == trustedDevices.length) {
-      await bind.mainClearTrustedDevices();
+      await bind.crateFlutterFfiMainClearTrustedDevices();
       trustedDevices.clear();
       selectedDevices.clear();
     } else {
       final json = jsonEncode(selectedDevices.map((e) => e.toList()).toList());
-      await bind.mainRemoveTrustedDevices(json: json);
+      await bind.crateFlutterFfiMainRemoveTrustedDevices(json: json);
       trustedDevices.removeWhere((element) {
         return selectedDevices.contains(element.hwid);
       });
@@ -2865,7 +2865,7 @@ class TrustedDevice {
   static Future<List<TrustedDevice>> get() async {
     final List<TrustedDevice> devices = List.empty(growable: true);
     try {
-      final devicesJson = await bind.mainGetTrustedDevices();
+      final devicesJson = await bind.crateFlutterFfiMainGetTrustedDevices();
       if (devicesJson.isNotEmpty) {
         final devicesList = json.decode(devicesJson);
         if (devicesList is List) {

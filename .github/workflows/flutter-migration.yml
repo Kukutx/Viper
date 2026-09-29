@@ -39,18 +39,11 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: false
-      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: steps.sdk-cache.outputs.cache-hit != 'true'
-        with:
-          path: /opt/hostedtoolcache/flutter
-          key: viper-flutter-${{ runner.os }}-${{ env.FLUTTER_VERSION }}
-      - name: Prepare API migration
-        run: |
-          python tools/migrations/flutter_v2.py prepare
-          python tools/migrations/platform_packages.py
-      - name: Resolve current Flutter dependency graph
+      - name: Repair migration API differences
+        run: python tools/migrations/repair_v2.py
+      - name: Verify locked Flutter resolution
         working-directory: flutter
-        run: flutter pub upgrade
+        run: flutter pub get --enforce-lockfile
       - name: Install native development tools
         run: |
           sudo apt-get update -qq > tools/.reports/apt.log 2>&1
@@ -62,17 +55,11 @@ jobs:
           prefix-key: flutter-v2-migration
           cache-on-failure: true
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        id: native-cache
         with:
           path: ~/.cache/viper-vcpkg
           key: viper-yuv-${{ runner.os }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**') }}
-      - name: Build the repository-pinned libyuv
+      - name: Build repository-pinned libyuv
         run: bash tools/migrations/native_setup.sh
-      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: steps.native-cache.outputs.cache-hit != 'true'
-        with:
-          path: ~/.cache/viper-vcpkg
-          key: viper-yuv-${{ runner.os }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**') }}
       - name: Install pinned bridge generator
         shell: bash
         run: |
@@ -86,40 +73,47 @@ jobs:
       - name: Generate bindings
         id: generate
         run: |
-          flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml > tools/.reports/codegen.log 2>&1 || { tail -160 tools/.reports/codegen.log; exit 1; }
-          tail -40 tools/.reports/codegen.log
-      - name: Migrate Dart callsites
-        id: finish
-        run: python tools/migrations/finish_flutter_v2.py
-      - name: Analyze migrated Flutter
-        if: ${{ !cancelled() && steps.finish.outcome == 'success' }}
+          flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml > tools/.reports/codegen.log 2>&1 || { tail -100 tools/.reports/codegen.log; exit 1; }
+          tail -30 tools/.reports/codegen.log
+      - name: Analyze Flutter
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         run: python tools/migrations/analyze.py
       - name: Check Rust Flutter library
-        if: ${{ !cancelled() && steps.finish.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        id: native
         run: |
-          cargo check --lib --features flutter,linux-pkg-config > tools/.reports/cargo-check.log 2>&1 || { tail -140 tools/.reports/cargo-check.log; exit 1; }
-      - name: Preserve candidate objects for review
+          cargo check --locked --lib --features flutter,linux-pkg-config > tools/.reports/cargo-check.log 2>&1 || { tail -100 tools/.reports/cargo-check.log; exit 1; }
+          tail -10 tools/.reports/cargo-check.log
+      - name: Run Flutter regression tests
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        working-directory: flutter
+        run: flutter test test/cursor_size_test.dart test/utils_test.dart > ../tools/.reports/flutter-tests.log 2>&1 || { tail -120 ../tools/.reports/flutter-tests.log; exit 1; }
+      - name: Preserve candidate objects
         if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python tools/migrations/snapshot.py
-      - name: Inspect generated API
-        if: always()
-        run: python tools/migrations/flutter_v2.py diagnose
-      - name: Capture migration diagnostics
+      - name: Capture candidate and diagnostics
         if: always()
         run: |
           mkdir -p tools/.reports
           git diff --stat
           git diff --binary > tools/.reports/flutter-migration.patch
+          python - <<'PY'
+          import json, pathlib, subprocess, zipfile
+          paths = set(subprocess.check_output(['git', 'ls-files'], text=True).splitlines())
+          paths |= {str(p) for p in pathlib.Path('flutter/lib/generated').rglob('*') if p.is_file()}
+          with zipfile.ZipFile('tools/.reports/source.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+              for path in sorted(paths):
+                  p = pathlib.Path(path)
+                  if p.is_file() and not p.is_symlink():
+                      z.write(p, path)
+          PY
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: flutter-migration-${{ github.sha }}
-          path: |
-            tools/.reports/
-            flutter/lib/generated/
-            src/bridge_generated*.rs
+          path: tools/.reports/
           include-hidden-files: true
           retention-days: 3
           if-no-files-found: error

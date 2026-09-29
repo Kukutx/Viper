@@ -47,12 +47,12 @@ class HomePageState extends State<HomePage> {
 
   void initPages() {
     _pages.clear();
-    if (!bind.isIncomingOnly()) {
+    if (!bind.crateFlutterFfiIsIncomingOnly()) {
       _pages.add(ConnectionPage(
         appBarActions: [],
       ));
     }
-    if (isAndroid && !bind.isOutgoingOnly()) {
+    if (isAndroid && !bind.crateFlutterFfiIsOutgoingOnly()) {
       _chatPageTabIndex = _pages.length;
       _pages.addAll([ChatPage(type: ChatPageType.mobileMain), ServerPage()]);
     }
@@ -150,7 +150,7 @@ class HomePageState extends State<HomePage> {
         ],
       );
     }
-    return Text(bind.mainGetAppNameSync());
+    return Text(bind.crateFlutterFfiMainGetAppNameSync());
   }
 }
 
@@ -166,7 +166,7 @@ class WebHomePage extends StatelessWidget {
       // backgroundColor: MyTheme.grayBg,
       appBar: AppBar(
         centerTitle: true,
-        title: Text("${bind.mainGetAppNameSync()} (Preview)"),
+        title: Text("${bind.crateFlutterFfiMainGetAppNameSync()} (Preview)"),
         actions: connectionPage.appBarActions,
       ),
       body: connectionPage,

@@ -10,7 +10,7 @@ class DesktopViewCameraScreen extends StatelessWidget {
   final Map<String, dynamic> params;
 
   DesktopViewCameraScreen({Key? key, required this.params}) : super(key: key) {
-      bind.mainInitInputSource();
+      bind.crateFlutterFfiMainInitInputSource();
       stateGlobal.getInputSource(force: true);
   }
 

@@ -247,7 +247,7 @@ class _PeerCardState extends State<_PeerCard>
   Widget _buildPeerTile(
       BuildContext context, Peer peer, Rx<BoxDecoration?>? deco) {
     hideUsernameOnCard ??=
-        bind.mainGetBuildinOption(key: kHideUsernameOnCard) == 'Y';
+        bind.crateFlutterFfiMainGetBuildinOption(key: kHideUsernameOnCard) == 'Y';
     final colors = _frontN(peer.tags, 25)
         .map((e) => gFFI.abModel.getCurrentAbTagColor(e))
         .toList();
@@ -281,7 +281,7 @@ class _PeerCardState extends State<_PeerCard>
   Widget _buildPeerCard(
       BuildContext context, Peer peer, Rx<BoxDecoration?> deco) {
     hideUsernameOnCard ??=
-        bind.mainGetBuildinOption(key: kHideUsernameOnCard) == 'Y';
+        bind.crateFlutterFfiMainGetBuildinOption(key: kHideUsernameOnCard) == 'Y';
     final name = hideUsernameOnCard == true
         ? peer.hostname
         : '${peer.username}${peer.username.isNotEmpty && peer.hostname.isNotEmpty ? '@' : ''}${peer.hostname}';
@@ -674,7 +674,7 @@ abstract class BasePeerCard extends StatelessWidget {
         style: style,
       ),
       proc: () {
-        bind.mainWol(id: id);
+        bind.crateFlutterFfiMainWol(id: id);
       },
       padding: menuPadding,
       dismissOnClicked: true,
@@ -690,7 +690,7 @@ abstract class BasePeerCard extends StatelessWidget {
         style: style,
       ),
       proc: () {
-        bind.mainCreateShortcut(id: id);
+        bind.crateFlutterFfiMainCreateShortcut(id: id);
         showToast(translate('Successful'));
       },
       padding: menuPadding,
@@ -705,7 +705,7 @@ abstract class BasePeerCard extends StatelessWidget {
       text: translate(label),
       getter: () async => mainGetPeerBoolOptionSync(id, key),
       setter: (bool v) async {
-        await bind.mainSetPeerOption(
+        await bind.crateFlutterFfiMainSetPeerOption(
             id: id, key: key, value: bool2option(key, v));
         showToast(translate('Successful'));
       },
@@ -729,7 +729,7 @@ abstract class BasePeerCard extends StatelessWidget {
   @protected
   Future<bool> _isForceAlwaysRelay(String id) async {
     return option2bool(kOptionForceAlwaysRelay,
-        (await bind.mainGetPeerOption(id: id, key: kOptionForceAlwaysRelay)));
+        (await bind.crateFlutterFfiMainGetPeerOption(id: id, key: kOptionForceAlwaysRelay)));
   }
 
   @protected
@@ -741,7 +741,7 @@ abstract class BasePeerCard extends StatelessWidget {
         return await _isForceAlwaysRelay(id);
       },
       setter: (bool v) async {
-        await bind.mainSetPeerOption(
+        await bind.crateFlutterFfiMainSetPeerOption(
             id: id,
             key: kOptionForceAlwaysRelay,
             value: bool2option(kOptionForceAlwaysRelay, v));
@@ -767,9 +767,9 @@ abstract class BasePeerCard extends StatelessWidget {
               if (newName != oldName) {
                 if (tab == PeerTabIndex.ab) {
                   await gFFI.abModel.changeAlias(id: id, alias: newName);
-                  await bind.mainSetPeerAlias(id: id, alias: newName);
+                  await bind.crateFlutterFfiMainSetPeerAlias(id: id, alias: newName);
                 } else {
-                  await bind.mainSetPeerAlias(id: id, alias: newName);
+                  await bind.crateFlutterFfiMainSetPeerAlias(id: id, alias: newName);
                   showToast(translate('Successful'));
                   _update();
                 }
@@ -804,19 +804,19 @@ abstract class BasePeerCard extends StatelessWidget {
         onSubmit() async {
           switch (tab) {
             case PeerTabIndex.recent:
-              await bind.mainRemovePeer(id: id);
-              bind.mainLoadRecentPeers();
+              await bind.crateFlutterFfiMainRemovePeer(id: id);
+              bind.crateFlutterFfiMainLoadRecentPeers();
               break;
             case PeerTabIndex.fav:
-              final favs = (await bind.mainGetFav()).toList();
+              final favs = (await bind.crateFlutterFfiMainGetFav()).toList();
               if (favs.remove(id)) {
-                await bind.mainStoreFav(favs: favs);
-                bind.mainLoadFavPeers();
+                await bind.crateFlutterFfiMainStoreFav(favs: favs);
+                bind.crateFlutterFfiMainLoadFavPeers();
               }
               break;
             case PeerTabIndex.lan:
-              await bind.mainRemoveDiscovered(id: id);
-              bind.mainLoadLanPeers();
+              await bind.crateFlutterFfiMainRemoveDiscovered(id: id);
+              bind.crateFlutterFfiMainLoadLanPeers();
               break;
             case PeerTabIndex.ab:
               await gFFI.abModel.deletePeers([id]);
@@ -846,7 +846,7 @@ abstract class BasePeerCard extends StatelessWidget {
       ),
       proc: () async {
         bool succ = await gFFI.abModel.changePersonalHashPassword(id, '');
-        await bind.mainForgetPassword(id: id);
+        await bind.crateFlutterFfiMainForgetPassword(id: id);
         if (succ) {
           showToast(translate('Successful'));
         } else {
@@ -882,10 +882,10 @@ abstract class BasePeerCard extends StatelessWidget {
       ),
       proc: () {
         () async {
-          final favs = (await bind.mainGetFav()).toList();
+          final favs = (await bind.crateFlutterFfiMainGetFav()).toList();
           if (!favs.contains(id)) {
             favs.add(id);
-            await bind.mainStoreFav(favs: favs);
+            await bind.crateFlutterFfiMainStoreFav(favs: favs);
           }
           showToast(translate('Successful'));
         }();
@@ -917,9 +917,9 @@ abstract class BasePeerCard extends StatelessWidget {
       ),
       proc: () {
         () async {
-          final favs = (await bind.mainGetFav()).toList();
+          final favs = (await bind.crateFlutterFfiMainGetFav()).toList();
           if (favs.remove(id)) {
-            await bind.mainStoreFav(favs: favs);
+            await bind.crateFlutterFfiMainStoreFav(favs: favs);
             await reloadFunc();
           }
           showToast(translate('Successful'));
@@ -949,7 +949,7 @@ abstract class BasePeerCard extends StatelessWidget {
 
   @protected
   Future<String> _getAlias(String id) async =>
-      await bind.mainGetPeerOption(id: id, key: 'alias');
+      await bind.crateFlutterFfiMainGetPeerOption(id: id, key: 'alias');
 
   @protected
   void _update();
@@ -977,7 +977,7 @@ class RecentPeerCard extends BasePeerCard {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 
-    final List favs = (await bind.mainGetFav()).toList();
+    final List favs = (await bind.crateFlutterFfiMainGetFav()).toList();
 
     if (isDesktop && peer.platform != kPeerPlatformAndroid) {
       menuItems.add(_tcpTunnelingAction(context));
@@ -996,7 +996,7 @@ class RecentPeerCard extends BasePeerCard {
     if (isMobile || isDesktop || isWebDesktop) {
       menuItems.add(_renameAction(peer.id));
     }
-    if (await bind.mainPeerHasPassword(id: peer.id)) {
+    if (await bind.crateFlutterFfiMainPeerHasPassword(id: peer.id)) {
       menuItems.add(_unrememberPasswordAction(peer.id));
     }
 
@@ -1017,7 +1017,7 @@ class RecentPeerCard extends BasePeerCard {
 
   @protected
   @override
-  void _update() => bind.mainLoadRecentPeers();
+  void _update() => bind.crateFlutterFfiMainLoadRecentPeers();
 }
 
 class FavoritePeerCard extends BasePeerCard {
@@ -1059,11 +1059,11 @@ class FavoritePeerCard extends BasePeerCard {
     if (isMobile || isDesktop || isWebDesktop) {
       menuItems.add(_renameAction(peer.id));
     }
-    if (await bind.mainPeerHasPassword(id: peer.id)) {
+    if (await bind.crateFlutterFfiMainPeerHasPassword(id: peer.id)) {
       menuItems.add(_unrememberPasswordAction(peer.id));
     }
     menuItems.add(_rmFavAction(peer.id, () async {
-      await bind.mainLoadFavPeers();
+      await bind.crateFlutterFfiMainLoadFavPeers();
     }));
 
     if (gFFI.userModel.userName.isNotEmpty) {
@@ -1077,7 +1077,7 @@ class FavoritePeerCard extends BasePeerCard {
 
   @protected
   @override
-  void _update() => bind.mainLoadFavPeers();
+  void _update() => bind.crateFlutterFfiMainLoadFavPeers();
 }
 
 class DiscoveredPeerCard extends BasePeerCard {
@@ -1102,7 +1102,7 @@ class DiscoveredPeerCard extends BasePeerCard {
       menuItems.add(_terminalRunAsAdminAction(context));
     }
 
-    final List favs = (await bind.mainGetFav()).toList();
+    final List favs = (await bind.crateFlutterFfiMainGetFav()).toList();
 
     if (isDesktop && peer.platform != kPeerPlatformAndroid) {
       menuItems.add(_tcpTunnelingAction(context));
@@ -1136,7 +1136,7 @@ class DiscoveredPeerCard extends BasePeerCard {
 
   @protected
   @override
-  void _update() => bind.mainLoadLanPeers();
+  void _update() => bind.crateFlutterFfiMainLoadLanPeers();
 }
 
 class AddressBookPeerCard extends BasePeerCard {
@@ -1333,7 +1333,7 @@ class MyGroupPeerCard extends BasePeerCard {
     }
     // menuItems.add(MenuEntryDivider());
     // menuItems.add(_renameAction(peer.id));
-    // if (await bind.mainPeerHasPassword(id: peer.id)) {
+    // if (await bind.crateFlutterFfiMainPeerHasPassword(id: peer.id)) {
     //   menuItems.add(_unrememberPasswordAction(peer.id));
     // }
     if (gFFI.userModel.userName.isNotEmpty) {
@@ -1348,13 +1348,13 @@ class MyGroupPeerCard extends BasePeerCard {
 }
 
 void _rdpDialog(String id) async {
-  final maxLength = bind.mainMaxEncryptLen();
-  final port = await bind.mainGetPeerOption(id: id, key: 'rdp_port');
-  final username = await bind.mainGetPeerOption(id: id, key: 'rdp_username');
+  final maxLength = bind.crateFlutterFfiMainMaxEncryptLen();
+  final port = await bind.crateFlutterFfiMainGetPeerOption(id: id, key: 'rdp_port');
+  final username = await bind.crateFlutterFfiMainGetPeerOption(id: id, key: 'rdp_username');
   final portController = TextEditingController(text: port);
   final userController = TextEditingController(text: username);
   final passwordController = TextEditingController(
-      text: await bind.mainGetPeerOption(id: id, key: 'rdp_password'));
+      text: await bind.crateFlutterFfiMainGetPeerOption(id: id, key: 'rdp_password'));
   RxBool secure = true.obs;
 
   gFFI.dialogManager.show((setState, close, context) {
@@ -1362,10 +1362,10 @@ void _rdpDialog(String id) async {
       String port = portController.text.trim();
       String username = userController.text;
       String password = passwordController.text;
-      await bind.mainSetPeerOption(id: id, key: 'rdp_port', value: port);
-      await bind.mainSetPeerOption(
+      await bind.crateFlutterFfiMainSetPeerOption(id: id, key: 'rdp_port', value: port);
+      await bind.crateFlutterFfiMainSetPeerOption(
           id: id, key: 'rdp_username', value: username);
-      await bind.mainSetPeerOption(
+      await bind.crateFlutterFfiMainSetPeerOption(
           id: id, key: 'rdp_password', value: password);
       showToast(translate('Successful'));
       close();
@@ -1550,8 +1550,8 @@ void connectInPeerTab(BuildContext context, Peer peer, PeerTabIndex tab,
     // If recent peer's alias is empty, set it to ab's alias
     // Because the platform is not set, it may not take effect, but it is more important not to display if the connection is not successful
     if (peer.alias.isNotEmpty &&
-        (await bind.mainGetPeerOption(id: peer.id, key: "alias")).isEmpty) {
-      await bind.mainSetPeerAlias(
+        (await bind.crateFlutterFfiMainGetPeerOption(id: peer.id, key: "alias")).isEmpty) {
+      await bind.crateFlutterFfiMainSetPeerAlias(
         id: peer.id,
         alias: peer.alias,
       );

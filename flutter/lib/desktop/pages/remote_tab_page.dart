@@ -69,7 +69,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
         final remotePage = tabController.widget(id);
         if (remotePage is RemotePage) {
           final ffi = remotePage.ffi;
-          bind.setCurSessionId(sessionId: ffi.sessionId);
+          bind.crateFlutterFfiSetCurSessionId(sessionId: ffi.sessionId);
         }
         WindowController.fromWindowId(params['windowId'])
             .setTitle(getWindowNameWithId(id));
@@ -405,7 +405,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
     } else {
       final bool res;
       if (!option2bool(kOptionEnableConfirmClosingTabs,
-          bind.mainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
+          bind.crateFlutterFfiMainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
         res = true;
       } else {
         res = await closeConfirmDialog();

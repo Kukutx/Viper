@@ -52,7 +52,7 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
         page: DesktopHomePage(
           key: const ValueKey(kTabLabelHomePage),
         )));
-    if (bind.isIncomingOnly()) {
+    if (bind.crateFlutterFfiIsIncomingOnly()) {
       tabController.onSelected = (key) {
         if (key == kTabLabelHomePage) {
           windowManager.setSize(getIncomingOnlyHomeSize());
@@ -97,7 +97,7 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
             body: DesktopTab(
               controller: tabController,
               tail: Offstage(
-                offstage: bind.isIncomingOnly() || bind.isDisableSettings(),
+                offstage: bind.crateFlutterFfiIsIncomingOnly() || bind.crateFlutterFfiIsDisableSettings(),
                 child: ActionIcon(
                   message: 'Settings',
                   icon: IconFont.menu,

@@ -50,22 +50,22 @@ class EventToUI_Texture implements EventToUI {
   bool get field1 => f1;
 }
 
-class RustdeskImpl {
-  Future<void> stopGlobalEventStream({required String appType, dynamic hint}) {
+class RustLibApi {
+  Future<void> crateFlutterFfiStopGlobalEventStream({required String appType, dynamic hint}) {
     throw UnimplementedError("stopGlobalEventStream");
   }
 
-  Future<void> hostStopSystemKeyPropagate(
+  Future<void> crateFlutterFfiHostStopSystemKeyPropagate(
       {required bool stopped, dynamic hint}) {
     throw UnimplementedError("hostStopSystemKeyPropagate");
   }
 
-  int peerGetSessionsCount(
+  int crateFlutterFfiPeerGetSessionsCount(
       {required String id, required int connType, dynamic hint}) {
     return 0;
   }
 
-  String sessionAddExistedSync(
+  String crateFlutterFfiSessionAddExistedSync(
       {required String id,
       required UuidValue sessionId,
       required Int32List displays,
@@ -74,7 +74,7 @@ class RustdeskImpl {
     return '';
   }
 
-  String sessionAddSync(
+  String crateFlutterFfiSessionAddSync(
       {required UuidValue sessionId,
       required String id,
       required bool isFileTransfer,
@@ -101,7 +101,7 @@ class RustdeskImpl {
     ]);
   }
 
-  Stream<EventToUI> sessionStart(
+  Stream<EventToUI> crateFlutterFfiSessionStart(
       {required UuidValue sessionId, required String id, dynamic hint}) {
     js.context.callMethod('setByName', [
       'session_start',
@@ -110,7 +110,7 @@ class RustdeskImpl {
     return Stream.empty();
   }
 
-  Stream<EventToUI> sessionStartWithDisplays(
+  Stream<EventToUI> crateFlutterFfiSessionStartWithDisplays(
       {required UuidValue sessionId,
       required String id,
       required Int32List displays,
@@ -118,30 +118,30 @@ class RustdeskImpl {
     throw UnimplementedError("sessionStartWithDisplays");
   }
 
-  Future<bool?> sessionGetRemember(
+  Future<bool?> crateFlutterFfiSessionGetRemember(
       {required UuidValue sessionId, dynamic hint}) {
     return Future(
         () => js.context.callMethod('getByName', ['remember']) == 'true');
   }
 
-  Future<bool?> sessionGetToggleOption(
+  Future<bool?> crateFlutterFfiSessionGetToggleOption(
       {required UuidValue sessionId, required String arg, dynamic hint}) {
     return Future(
         () => sessionGetToggleOptionSync(sessionId: sessionId, arg: arg));
   }
 
-  bool sessionGetToggleOptionSync(
+  bool crateFlutterFfiSessionGetToggleOptionSync(
       {required UuidValue sessionId, required String arg, dynamic hint}) {
     return 'true' == js.context.callMethod('getByName', ['option:toggle', arg]);
   }
 
-  Future<String?> sessionGetOption(
+  Future<String?> crateFlutterFfiSessionGetOption(
       {required UuidValue sessionId, required String arg, dynamic hint}) {
     return Future(
         () => js.context.callMethod('getByName', ['option:session', arg]));
   }
 
-  Future<void> sessionLogin(
+  Future<void> crateFlutterFfiSessionLogin(
       {required UuidValue sessionId,
       required String osUsername,
       required String osPassword,
@@ -159,7 +159,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionSend2Fa(
+  Future<void> crateFlutterFfiSessionSend2Fa(
       {required UuidValue sessionId,
       required String code,
       required bool trustThisDevice,
@@ -170,36 +170,36 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionClose({required UuidValue sessionId, dynamic hint}) {
+  Future<void> crateFlutterFfiSessionClose({required UuidValue sessionId, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['session_close']));
   }
 
-  Future<void> sessionRefresh(
+  Future<void> crateFlutterFfiSessionRefresh(
       {required UuidValue sessionId, required int display, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['refresh']));
   }
 
-  Future<void> sessionRecordScreen(
+  Future<void> crateFlutterFfiSessionRecordScreen(
       {required UuidValue sessionId, required bool start, dynamic hint}) {
     throw UnimplementedError("sessionRecordScreen");
   }
 
-  bool sessionGetIsRecording({required UuidValue sessionId, dynamic hint}) {
+  bool crateFlutterFfiSessionGetIsRecording({required UuidValue sessionId, dynamic hint}) {
     return false;
   }
 
-  Future<void> sessionReconnect(
+  Future<void> crateFlutterFfiSessionReconnect(
       {required UuidValue sessionId, required bool forceRelay, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['reconnect']));
   }
 
-  Future<void> sessionToggleOption(
+  Future<void> crateFlutterFfiSessionToggleOption(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['option:toggle', value]));
   }
 
-  Future<void> sessionTogglePrivacyMode(
+  Future<void> crateFlutterFfiSessionTogglePrivacyMode(
       {required UuidValue sessionId,
       required String implKey,
       required bool on,
@@ -210,13 +210,13 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<String?> sessionGetFlutterOption(
+  Future<String?> crateFlutterFfiSessionGetFlutterOption(
       {required UuidValue sessionId, required String k, dynamic hint}) {
     return Future(
         () => js.context.callMethod('getByName', ['option:flutter:peer', k]));
   }
 
-  Future<void> sessionSetFlutterOption(
+  Future<void> crateFlutterFfiSessionSetFlutterOption(
       {required UuidValue sessionId,
       required String k,
       required String v,
@@ -227,15 +227,15 @@ class RustdeskImpl {
         ]));
   }
 
-  int getNextTextureKey({dynamic hint}) {
+  int crateFlutterFfiGetNextTextureKey({dynamic hint}) {
     return 0;
   }
 
-  String getLocalFlutterOption({required String k, dynamic hint}) {
+  String crateFlutterFfiGetLocalFlutterOption({required String k, dynamic hint}) {
     return js.context.callMethod('getByName', ['option:flutter:local', k]);
   }
 
-  Future<void> setLocalFlutterOption(
+  Future<void> crateFlutterFfiSetLocalFlutterOption(
       {required String k, required String v, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'option:flutter:local',
@@ -243,11 +243,11 @@ class RustdeskImpl {
         ]));
   }
 
-  String getLocalKbLayoutType({dynamic hint}) {
+  String crateFlutterFfiGetLocalKbLayoutType({dynamic hint}) {
     return js.context.callMethod('getByName', ['option:local', 'kb_layout']);
   }
 
-  Future<void> setLocalKbLayoutType(
+  Future<void> crateFlutterFfiSetLocalKbLayoutType(
       {required String kbLayoutType, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'option:local',
@@ -255,13 +255,13 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<String?> sessionGetViewStyle(
+  Future<String?> crateFlutterFfiSessionGetViewStyle(
       {required UuidValue sessionId, dynamic hint}) {
     return Future(() =>
         js.context.callMethod('getByName', ['option:session', 'view_style']));
   }
 
-  Future<void> sessionSetViewStyle(
+  Future<void> crateFlutterFfiSessionSetViewStyle(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'option:session',
@@ -269,23 +269,23 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<int?> sessionGetTrackpadSpeed(
+  Future<int?> crateFlutterFfiSessionGetTrackpadSpeed(
       {required UuidValue sessionId, dynamic hint}) {
     throw UnimplementedError("sessionGetTrackpadSpeed");
   }
 
-  Future<void> sessionSetTrackpadSpeed(
+  Future<void> crateFlutterFfiSessionSetTrackpadSpeed(
       {required UuidValue sessionId, required int value, dynamic hint}) {
     throw UnimplementedError("sessionSetTrackpadSpeed");
   }
 
-  Future<String?> sessionGetScrollStyle(
+  Future<String?> crateFlutterFfiSessionGetScrollStyle(
       {required UuidValue sessionId, dynamic hint}) {
     return Future(() =>
         js.context.callMethod('getByName', ['option:session', 'scroll_style']));
   }
 
-  Future<void> sessionSetScrollStyle(
+  Future<void> crateFlutterFfiSessionSetScrollStyle(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'option:session',
@@ -293,26 +293,26 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<String?> sessionGetImageQuality(
+  Future<String?> crateFlutterFfiSessionGetImageQuality(
       {required UuidValue sessionId, dynamic hint}) {
     return Future(() => js.context.callMethod('getByName', ['image_quality']));
   }
 
-  Future<void> sessionSetImageQuality(
+  Future<void> crateFlutterFfiSessionSetImageQuality(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     print('set image quality: $value');
     return Future(
         () => js.context.callMethod('setByName', ['image_quality', value]));
   }
 
-  Future<String?> sessionGetKeyboardMode(
+  Future<String?> crateFlutterFfiSessionGetKeyboardMode(
       {required UuidValue sessionId, dynamic hint}) {
     final mode =
         js.context.callMethod('getByName', ['option:session', 'keyboard_mode']);
     return Future(() => mode == '' ? null : mode);
   }
 
-  Future<void> sessionSetKeyboardMode(
+  Future<void> crateFlutterFfiSessionSetKeyboardMode(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'option:session',
@@ -320,13 +320,13 @@ class RustdeskImpl {
         ]));
   }
 
-  String? sessionGetReverseMouseWheelSync(
+  String? crateFlutterFfiSessionGetReverseMouseWheelSync(
       {required UuidValue sessionId, dynamic hint}) {
     return js.context
         .callMethod('getByName', ['option:session', 'reverse_mouse_wheel']);
   }
 
-  Future<void> sessionSetReverseMouseWheel(
+  Future<void> crateFlutterFfiSessionSetReverseMouseWheel(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'option:session',
@@ -334,28 +334,28 @@ class RustdeskImpl {
         ]));
   }
 
-  String? sessionGetDisplaysAsIndividualWindows(
+  String? crateFlutterFfiSessionGetDisplaysAsIndividualWindows(
       {required UuidValue sessionId, dynamic hint}) {
     return js.context.callMethod(
         'getByName', ['option:session', 'displays_as_individual_windows']);
   }
 
-  Future<void> sessionSetDisplaysAsIndividualWindows(
+  Future<void> crateFlutterFfiSessionSetDisplaysAsIndividualWindows(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future.value();
   }
 
-  String? sessionGetUseAllMyDisplaysForTheRemoteSession(
+  String? crateFlutterFfiSessionGetUseAllMyDisplaysForTheRemoteSession(
       {required UuidValue sessionId, dynamic hint}) {
     return '';
   }
 
-  Future<void> sessionSetUseAllMyDisplaysForTheRemoteSession(
+  Future<void> crateFlutterFfiSessionSetUseAllMyDisplaysForTheRemoteSession(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future.value();
   }
 
-  Future<Int32List?> sessionGetCustomImageQuality(
+  Future<Int32List?> crateFlutterFfiSessionGetCustomImageQuality(
       {required UuidValue sessionId, dynamic hint}) {
     try {
       return Future(() => Int32List.fromList([
@@ -367,7 +367,7 @@ class RustdeskImpl {
     }
   }
 
-  bool sessionIsKeyboardModeSupported(
+  bool crateFlutterFfiSessionIsKeyboardModeSupported(
       {required UuidValue sessionId, required String mode, dynamic hint}) {
     if (mainGetInputSource(hint: hint) == 'Input source 1') {
       return [kKeyMapMode, kKeyTranslateMode].contains(mode);
@@ -376,11 +376,11 @@ class RustdeskImpl {
     }
   }
 
-  bool sessionIsMultiUiSession({required UuidValue sessionId, dynamic hint}) {
+  bool crateFlutterFfiSessionIsMultiUiSession({required UuidValue sessionId, dynamic hint}) {
     return false;
   }
 
-  Future<void> sessionSetCustomImageQuality(
+  Future<void> crateFlutterFfiSessionSetCustomImageQuality(
       {required UuidValue sessionId, required int value, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'custom_image_quality',
@@ -388,21 +388,21 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionSetCustomFps(
+  Future<void> crateFlutterFfiSessionSetCustomFps(
       {required UuidValue sessionId, required int fps, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['custom-fps', fps]));
   }
 
-  Future<void> sessionLockScreen({required UuidValue sessionId, dynamic hint}) {
+  Future<void> crateFlutterFfiSessionLockScreen({required UuidValue sessionId, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['lock_screen']));
   }
 
-  Future<void> sessionCtrlAltDel({required UuidValue sessionId, dynamic hint}) {
+  Future<void> crateFlutterFfiSessionCtrlAltDel({required UuidValue sessionId, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['ctrl_alt_del']));
   }
 
-  Future<void> sessionSwitchDisplay(
+  Future<void> crateFlutterFfiSessionSwitchDisplay(
       {required bool isDesktop,
       required UuidValue sessionId,
       required Int32List value,
@@ -417,7 +417,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionHandleFlutterKeyEvent(
+  Future<void> crateFlutterFfiSessionHandleFlutterKeyEvent(
       {required UuidValue sessionId,
       required String character,
       required int usbHid,
@@ -435,7 +435,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionHandleFlutterRawKeyEvent(
+  Future<void> crateFlutterFfiSessionHandleFlutterRawKeyEvent(
       {required UuidValue sessionId,
       required String name,
       required int platformCode,
@@ -446,12 +446,12 @@ class RustdeskImpl {
     throw UnimplementedError("sessionHandleFlutterRawKeyEvent");
   }
 
-  void sessionEnterOrLeave(
+  void crateFlutterFfiSessionEnterOrLeave(
       {required UuidValue sessionId, required bool enter, dynamic hint}) {
     js.context.callMethod('setByName', ['enter_or_leave', enter]);
   }
 
-  Future<void> sessionInputKey(
+  Future<void> crateFlutterFfiSessionInputKey(
       {required UuidValue sessionId,
       required String name,
       required bool down,
@@ -475,19 +475,19 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionInputString(
+  Future<void> crateFlutterFfiSessionInputString(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['input_string', value]));
   }
 
-  Future<void> sessionSendChat(
+  Future<void> crateFlutterFfiSessionSendChat(
       {required UuidValue sessionId, required String text, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['send_chat', text]));
   }
 
-  Future<void> sessionPeerOption(
+  Future<void> crateFlutterFfiSessionPeerOption(
       {required UuidValue sessionId,
       required String name,
       required String value,
@@ -498,19 +498,19 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<String> sessionGetPeerOption(
+  Future<String> crateFlutterFfiSessionGetPeerOption(
       {required UuidValue sessionId, required String name, dynamic hint}) {
     return Future(
         () => js.context.callMethod('getByName', ['option:session', name]));
   }
 
-  Future<void> sessionInputOsPassword(
+  Future<void> crateFlutterFfiSessionInputOsPassword(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['input_os_password', value]));
   }
 
-  Future<void> sessionReadRemoteDir(
+  Future<void> crateFlutterFfiSessionReadRemoteDir(
       {required UuidValue sessionId,
       required String path,
       required bool includeHidden,
@@ -521,7 +521,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionSendFiles(
+  Future<void> crateFlutterFfiSessionSendFiles(
       {required UuidValue sessionId,
       required int actId,
       required String path,
@@ -545,7 +545,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionSetConfirmOverrideFile(
+  Future<void> crateFlutterFfiSessionSetConfirmOverrideFile(
       {required UuidValue sessionId,
       required int actId,
       required int fileNum,
@@ -565,7 +565,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionRemoveFile(
+  Future<void> crateFlutterFfiSessionRemoveFile(
       {required UuidValue sessionId,
       required int actId,
       required String path,
@@ -583,7 +583,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionReadDirToRemoveRecursive(
+  Future<void> crateFlutterFfiSessionReadDirToRemoveRecursive(
       {required UuidValue sessionId,
       required int actId,
       required String path,
@@ -601,7 +601,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionRemoveAllEmptyDirs(
+  Future<void> crateFlutterFfiSessionRemoveAllEmptyDirs(
       {required UuidValue sessionId,
       required int actId,
       required String path,
@@ -613,13 +613,13 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionCancelJob(
+  Future<void> crateFlutterFfiSessionCancelJob(
       {required UuidValue sessionId, required int actId, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['cancel_job', actId]));
   }
 
-  Future<void> sessionCreateDir(
+  Future<void> crateFlutterFfiSessionCreateDir(
       {required UuidValue sessionId,
       required int actId,
       required String path,
@@ -631,7 +631,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<String> sessionReadLocalDirSync(
+  Future<String> crateFlutterFfiSessionReadLocalDirSync(
       {required UuidValue sessionId,
       required String path,
       required bool showHidden,
@@ -639,7 +639,7 @@ class RustdeskImpl {
     throw UnimplementedError("sessionReadLocalDirSync");
   }
 
-  Future<String> sessionGetPlatform(
+  Future<String> crateFlutterFfiSessionGetPlatform(
       {required UuidValue sessionId, required bool isRemote, dynamic hint}) {
     if (isRemote) {
       return Future(() => js.context.callMethod('getByName', ['platform']));
@@ -648,12 +648,12 @@ class RustdeskImpl {
     }
   }
 
-  Future<void> sessionLoadLastTransferJobs(
+  Future<void> crateFlutterFfiSessionLoadLastTransferJobs(
       {required UuidValue sessionId, dynamic hint}) {
     throw UnimplementedError("sessionLoadLastTransferJobs");
   }
 
-  Future<void> sessionAddJob(
+  Future<void> crateFlutterFfiSessionAddJob(
       {required UuidValue sessionId,
       required int actId,
       required String path,
@@ -665,7 +665,7 @@ class RustdeskImpl {
     throw UnimplementedError("sessionAddJob");
   }
 
-  Future<void> sessionResumeJob(
+  Future<void> crateFlutterFfiSessionResumeJob(
       {required UuidValue sessionId,
       required int actId,
       required bool isRemote,
@@ -673,12 +673,12 @@ class RustdeskImpl {
     throw UnimplementedError("sessionResumeJob");
   }
 
-  Future<void> sessionElevateDirect(
+  Future<void> crateFlutterFfiSessionElevateDirect(
       {required UuidValue sessionId, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['elevate_direct']));
   }
 
-  Future<void> sessionElevateWithLogon(
+  Future<void> crateFlutterFfiSessionElevateWithLogon(
       {required UuidValue sessionId,
       required String username,
       required String password,
@@ -689,12 +689,12 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionSwitchSides(
+  Future<void> crateFlutterFfiSessionSwitchSides(
       {required UuidValue sessionId, dynamic hint}) {
     throw UnimplementedError("sessionSwitchSides");
   }
 
-  Future<void> sessionChangeResolution(
+  Future<void> crateFlutterFfiSessionChangeResolution(
       {required UuidValue sessionId,
       required int display,
       required int width,
@@ -707,7 +707,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionSetSize(
+  Future<void> crateFlutterFfiSessionSetSize(
       {required UuidValue sessionId,
       required int display,
       required int width,
@@ -716,13 +716,13 @@ class RustdeskImpl {
     return Future.value();
   }
 
-  Future<void> sessionSendSelectedSessionId(
+  Future<void> crateFlutterFfiSessionSendSelectedSessionId(
       {required UuidValue sessionId, required String sid, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['selected_sid', sid]));
   }
 
-  Future<List<String>> mainGetSoundInputs({dynamic hint}) {
+  Future<List<String>> crateFlutterFfiMainGetSoundInputs({dynamic hint}) {
     throw UnimplementedError("mainGetSoundInputs");
   }
 
@@ -730,7 +730,7 @@ class RustdeskImpl {
     throw UnimplementedError("mainGetDefaultSoundInput");
   }
 
-  String mainGetLoginDeviceInfo({dynamic hint}) {
+  String crateFlutterFfiMainGetLoginDeviceInfo({dynamic hint}) {
     String userAgent = html.window.navigator.userAgent;
     String appName = html.window.navigator.appName;
     String appVersion = html.window.navigator.appVersion;
@@ -742,27 +742,27 @@ class RustdeskImpl {
     });
   }
 
-  Future<void> mainChangeId({required String newId, dynamic hint}) {
+  Future<void> crateFlutterFfiMainChangeId({required String newId, dynamic hint}) {
     throw UnimplementedError("mainChangeId");
   }
 
-  Future<String> mainGetAsyncStatus({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetAsyncStatus({dynamic hint}) {
     throw UnimplementedError("mainGetAsyncStatus");
   }
 
-  Future<String> mainGetOption({required String key, dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetOption({required String key, dynamic hint}) {
     return Future.value(mainGetOptionSync(key: key));
   }
 
-  String mainGetOptionSync({required String key, dynamic hint}) {
+  String crateFlutterFfiMainGetOptionSync({required String key, dynamic hint}) {
     return js.context.callMethod('getByName', ['option', key]);
   }
 
-  Future<String> mainGetError({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetError({dynamic hint}) {
     throw UnimplementedError("mainGetError");
   }
 
-  Future<void> mainSetOption(
+  Future<void> crateFlutterFfiMainSetOption(
       {required String key, required String value, dynamic hint}) {
     js.context.callMethod('setByName', [
       'option',
@@ -772,26 +772,26 @@ class RustdeskImpl {
   }
 
   // get server settings
-  Future<String> mainGetOptions({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetOptions({dynamic hint}) {
     return Future(() => mainGetOptionsSync());
   }
 
   // get server settings
-  String mainGetOptionsSync({dynamic hint}) {
+  String crateFlutterFfiMainGetOptionsSync({dynamic hint}) {
     return js.context.callMethod('getByName', ['options']);
   }
 
-  Future<void> mainSetOptions({required String json, dynamic hint}) {
+  Future<void> crateFlutterFfiMainSetOptions({required String json, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['options', json]));
   }
 
-  Future<String> mainTestIfValidServer(
+  Future<String> crateFlutterFfiMainTestIfValidServer(
       {required String server, required bool testWithProxy, dynamic hint}) {
     // TODO: implement
     return Future.value('');
   }
 
-  Future<void> mainSetSocks(
+  Future<void> crateFlutterFfiMainSetSocks(
       {required String proxy,
       required String username,
       required String password,
@@ -799,32 +799,32 @@ class RustdeskImpl {
     throw UnimplementedError("mainSetSocks");
   }
 
-  Future<List<String>> mainGetSocks({dynamic hint}) {
+  Future<List<String>> crateFlutterFfiMainGetSocks({dynamic hint}) {
     throw UnimplementedError("mainGetSocks");
   }
 
-  Future<String> mainGetAppName({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetAppName({dynamic hint}) {
     return Future.value(mainGetAppNameSync(hint: hint));
   }
 
-  String mainGetAppNameSync({dynamic hint}) {
+  String crateFlutterFfiMainGetAppNameSync({dynamic hint}) {
     return js.context.callMethod('getByName', ['app-name']);
   }
 
-  String mainUriPrefixSync({dynamic hint}) {
+  String crateFlutterFfiMainUriPrefixSync({dynamic hint}) {
     throw UnimplementedError("mainUriPrefixSync");
   }
 
-  Future<String> mainGetLicense({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetLicense({dynamic hint}) {
     // TODO: implement
     return Future(() => '');
   }
 
-  Future<String> mainGetVersion({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetVersion({dynamic hint}) {
     return Future(() => js.context.callMethod('getByName', ['version']));
   }
 
-  Future<List<String>> mainGetFav({dynamic hint}) {
+  Future<List<String>> crateFlutterFfiMainGetFav({dynamic hint}) {
     List<String> favs = [];
     try {
       favs = (jsonDecode(js.context.callMethod('getByName', ['fav']))
@@ -837,40 +837,40 @@ class RustdeskImpl {
     return Future.value(favs);
   }
 
-  Future<void> mainStoreFav({required List<String> favs, dynamic hint}) {
+  Future<void> crateFlutterFfiMainStoreFav({required List<String> favs, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['fav', jsonEncode(favs)]));
   }
 
-  String mainGetPeerSync({required String id, dynamic hint}) {
+  String crateFlutterFfiMainGetPeerSync({required String id, dynamic hint}) {
     // TODO:
     throw UnimplementedError("mainGetPeerSync");
   }
 
-  Future<String> mainGetLanPeers({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetLanPeers({dynamic hint}) {
     throw UnimplementedError("mainGetLanPeers");
   }
 
-  Future<String> mainGetConnectStatus({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetConnectStatus({dynamic hint}) {
     return Future(
         () => js.context.callMethod('getByName', ["get_conn_status"]));
   }
 
-  Future<void> mainCheckConnectStatus({dynamic hint}) {
+  Future<void> crateFlutterFfiMainCheckConnectStatus({dynamic hint}) {
     throw UnimplementedError("mainCheckConnectStatus");
   }
 
-  Future<bool> mainIsUsingPublicServer({dynamic hint}) {
+  Future<bool> crateFlutterFfiMainIsUsingPublicServer({dynamic hint}) {
     return Future(() =>
         js.context.callMethod('getByName', ["is_using_public_server"]) ==
         'true');
   }
 
-  Future<void> mainDiscover({dynamic hint}) {
+  Future<void> crateFlutterFfiMainDiscover({dynamic hint}) {
     throw UnimplementedError("mainDiscover");
   }
 
-  Future<String> mainGetApiServer({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetApiServer({dynamic hint}) {
     return Future(() => js.context.callMethod('getByName', ['api_server']));
   }
 
@@ -882,11 +882,11 @@ class RustdeskImpl {
     throw UnimplementedError("mainPostRequest");
   }
 
-  Future<bool> mainGetProxyStatus({dynamic hint}) {
+  Future<bool> crateFlutterFfiMainGetProxyStatus({dynamic hint}) {
     return Future(() => false);
   }
 
-  Future<void> mainHttpRequest({
+  Future<void> crateFlutterFfiMainHttpRequest({
     required String url,
     required String method,
     String? body,
@@ -896,11 +896,11 @@ class RustdeskImpl {
     throw UnimplementedError("mainHttpRequest");
   }
 
-  Future<String?> mainGetHttpStatus({required String url, dynamic hint}) {
+  Future<String?> crateFlutterFfiMainGetHttpStatus({required String url, dynamic hint}) {
     throw UnimplementedError("mainGetHttpStatus");
   }
 
-  String mainGetLocalOption({required String key, dynamic hint}) {
+  String crateFlutterFfiMainGetLocalOption({required String key, dynamic hint}) {
     final v = js.context.callMethod('getByName', ['option:local', key]);
     if (key == 'lang' && (v == 'pt' || v == 'br')) {
       return 'pt-br';
@@ -910,19 +910,19 @@ class RustdeskImpl {
 
   // Do not return the real environment variables.
   // Use the global variable as the environment variable in web.
-  String mainGetEnv({required String key, dynamic hint}) {
+  String crateFlutterFfiMainGetEnv({required String key, dynamic hint}) {
     return js.context.callMethod('getByName', ['envvar', key]);
   }
 
   // Use the global variable as the environment variable in web.
-  void mainSetEnv({required String key, String? value, dynamic hint}) {
+  void crateFlutterFfiMainSetEnv({required String key, String? value, dynamic hint}) {
     js.context.callMethod('setByName', [
       'envvar',
       jsonEncode({'name': key, 'value': value})
     ]);
   }
 
-  Future<void> mainSetLocalOption(
+  Future<void> crateFlutterFfiMainSetLocalOption(
       {required String key, required String value, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'option:local',
@@ -930,7 +930,7 @@ class RustdeskImpl {
         ]));
   }
 
-  String mainGetInputSource({dynamic hint}) {
+  String crateFlutterFfiMainGetInputSource({dynamic hint}) {
     final inputSource =
         js.context.callMethod('getByName', ['option:local', 'input-source']);
     // // js grab mode
@@ -940,7 +940,7 @@ class RustdeskImpl {
     return inputSource != '' ? inputSource : 'Input source 1';
   }
 
-  Future<void> mainSetInputSource(
+  Future<void> crateFlutterFfiMainSetInputSource(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'option:local',
@@ -948,20 +948,20 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<String> mainGetMyId({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetMyId({dynamic hint}) {
     return Future(() => js.context.callMethod('getByName', ['my_id']));
   }
 
-  Future<String> mainGetUuid({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetUuid({dynamic hint}) {
     return Future(() => js.context.callMethod('getByName', ['uuid']));
   }
 
-  Future<String> mainGetPeerOption(
+  Future<String> crateFlutterFfiMainGetPeerOption(
       {required String id, required String key, dynamic hint}) {
     return Future(() => mainGetPeerOptionSync(id: id, key: key, hint: hint));
   }
 
-  String mainGetPeerOptionSync(
+  String crateFlutterFfiMainGetPeerOptionSync(
       {required String id, required String key, dynamic hint}) {
     return js.context.callMethod('getByName', [
       'option:peer',
@@ -969,12 +969,12 @@ class RustdeskImpl {
     ]);
   }
 
-  String mainGetPeerFlutterOptionSync(
+  String crateFlutterFfiMainGetPeerFlutterOptionSync(
       {required String id, required String k, dynamic hint}) {
     return js.context.callMethod('getByName', ['option:flutter:peer', k]);
   }
 
-  void mainSetPeerFlutterOptionSync(
+  void crateFlutterFfiMainSetPeerFlutterOptionSync(
       {required String id,
       required String k,
       required String v,
@@ -985,7 +985,7 @@ class RustdeskImpl {
     ]);
   }
 
-  Future<void> mainSetPeerOption(
+  Future<void> crateFlutterFfiMainSetPeerOption(
       {required String id,
       required String key,
       required String value,
@@ -994,7 +994,7 @@ class RustdeskImpl {
     return Future.value();
   }
 
-  bool mainSetPeerOptionSync(
+  bool crateFlutterFfiMainSetPeerOptionSync(
       {required String id,
       required String key,
       required String value,
@@ -1006,32 +1006,32 @@ class RustdeskImpl {
     return true;
   }
 
-  Future<void> mainSetPeerAlias(
+  Future<void> crateFlutterFfiMainSetPeerAlias(
       {required String id, required String alias, dynamic hint}) {
     mainSetPeerOptionSync(id: id, key: 'alias', value: alias, hint: hint);
     return Future.value();
   }
 
-  Future<String> mainGetNewStoredPeers({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetNewStoredPeers({dynamic hint}) {
     throw UnimplementedError("mainGetNewStoredPeers");
   }
 
-  Future<void> mainForgetPassword({required String id, dynamic hint}) {
+  Future<void> crateFlutterFfiMainForgetPassword({required String id, dynamic hint}) {
     return mainSetPeerOption(id: id, key: 'password', value: '');
   }
 
-  Future<bool> mainPeerHasPassword({required String id, dynamic hint}) {
+  Future<bool> crateFlutterFfiMainPeerHasPassword({required String id, dynamic hint}) {
     return Future(() =>
         js.context.callMethod('getByName', ['peer_has_password', id]) ==
         'true');
   }
 
-  Future<bool> mainPeerExists({required String id, dynamic hint}) {
+  Future<bool> crateFlutterFfiMainPeerExists({required String id, dynamic hint}) {
     return Future(
         () => js.context.callMethod('getByName', ['peer_exists', id]));
   }
 
-  Future<void> mainLoadRecentPeers({dynamic hint}) {
+  Future<void> crateFlutterFfiMainLoadRecentPeers({dynamic hint}) {
     return Future(
         () => js.context.callMethod('getByName', ['load_recent_peers']));
   }
@@ -1044,36 +1044,36 @@ class RustdeskImpl {
     return '{}';
   }
 
-  Future<String> mainLoadRecentPeersForAb(
+  Future<String> crateFlutterFfiMainLoadRecentPeersForAb(
       {required String filter, dynamic hint}) {
     throw UnimplementedError("mainLoadRecentPeersForAb");
   }
 
-  Future<void> mainLoadFavPeers({dynamic hint}) {
+  Future<void> crateFlutterFfiMainLoadFavPeers({dynamic hint}) {
     return Future(() => js.context.callMethod('getByName', ['load_fav_peers']));
   }
 
-  Future<void> mainLoadLanPeers({dynamic hint}) {
+  Future<void> crateFlutterFfiMainLoadLanPeers({dynamic hint}) {
     throw UnimplementedError("mainLoadLanPeers");
   }
 
-  Future<void> mainRemoveDiscovered({required String id, dynamic hint}) {
+  Future<void> crateFlutterFfiMainRemoveDiscovered({required String id, dynamic hint}) {
     throw UnimplementedError("mainRemoveDiscovered");
   }
 
-  Future<void> mainChangeTheme({required String dark, dynamic hint}) {
+  Future<void> crateFlutterFfiMainChangeTheme({required String dark, dynamic hint}) {
     throw UnimplementedError("mainChangeTheme");
   }
 
-  Future<void> mainChangeLanguage({required String lang, dynamic hint}) {
+  Future<void> crateFlutterFfiMainChangeLanguage({required String lang, dynamic hint}) {
     throw UnimplementedError("mainChangeLanguage");
   }
 
-  String mainVideoSaveDirectory({required bool root, dynamic hint}) {
+  String crateFlutterFfiMainVideoSaveDirectory({required bool root, dynamic hint}) {
     throw UnimplementedError("mainVideoSaveDirectory");
   }
 
-  Future<void> mainSetUserDefaultOption(
+  Future<void> crateFlutterFfiMainSetUserDefaultOption(
       {required String key, required String value, dynamic hint}) {
     js.context.callMethod('setByName', [
       'option:user:default',
@@ -1082,11 +1082,11 @@ class RustdeskImpl {
     return Future.value();
   }
 
-  String mainGetUserDefaultOption({required String key, dynamic hint}) {
+  String crateFlutterFfiMainGetUserDefaultOption({required String key, dynamic hint}) {
     return js.context.callMethod('getByName', ['option:user:default', key]);
   }
 
-  Future<String> mainHandleRelayId({required String id, dynamic hint}) {
+  Future<String> crateFlutterFfiMainHandleRelayId({required String id, dynamic hint}) {
     var newId = id;
     if (id.endsWith("\\r") || id.endsWith("/r")) {
       newId = id.substring(0, id.length - 2);
@@ -1094,15 +1094,15 @@ class RustdeskImpl {
     return Future.value(newId);
   }
 
-  String mainGetMainDisplay({dynamic hint}) {
+  String crateFlutterFfiMainGetMainDisplay({dynamic hint}) {
     return js.context.callMethod('getByName', ['main_display']);
   }
 
-  String mainGetDisplays({dynamic hint}) {
+  String crateFlutterFfiMainGetDisplays({dynamic hint}) {
     throw UnimplementedError("mainGetDisplays");
   }
 
-  Future<void> sessionAddPortForward(
+  Future<void> crateFlutterFfiSessionAddPortForward(
       {required UuidValue sessionId,
       required int localPort,
       required String remoteHost,
@@ -1111,122 +1111,122 @@ class RustdeskImpl {
     throw UnimplementedError("sessionAddPortForward");
   }
 
-  Future<void> sessionRemovePortForward(
+  Future<void> crateFlutterFfiSessionRemovePortForward(
       {required UuidValue sessionId, required int localPort, dynamic hint}) {
     throw UnimplementedError("sessionRemovePortForward");
   }
 
-  Future<void> sessionNewRdp({required UuidValue sessionId, dynamic hint}) {
+  Future<void> crateFlutterFfiSessionNewRdp({required UuidValue sessionId, dynamic hint}) {
     throw UnimplementedError("sessionNewRdp");
   }
 
-  Future<void> sessionRequestVoiceCall(
+  Future<void> crateFlutterFfiSessionRequestVoiceCall(
       {required UuidValue sessionId, dynamic hint}) {
     throw UnimplementedError("sessionRequestVoiceCall");
   }
 
-  Future<void> sessionCloseVoiceCall(
+  Future<void> crateFlutterFfiSessionCloseVoiceCall(
       {required UuidValue sessionId, dynamic hint}) {
     throw UnimplementedError("sessionCloseVoiceCall");
   }
 
-  Future<void> cmHandleIncomingVoiceCall(
+  Future<void> crateFlutterFfiCmHandleIncomingVoiceCall(
       {required int id, required bool accept, dynamic hint}) {
     throw UnimplementedError("cmHandleIncomingVoiceCall");
   }
 
-  Future<void> cmCloseVoiceCall({required int id, dynamic hint}) {
+  Future<void> crateFlutterFfiCmCloseVoiceCall({required int id, dynamic hint}) {
     throw UnimplementedError("cmCloseVoiceCall");
   }
 
-  Future<String> mainGetLastRemoteId({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetLastRemoteId({dynamic hint}) {
     return Future(() => mainGetLocalOption(key: 'last_remote_id'));
   }
 
-  Future<void> mainGetSoftwareUpdateUrl({dynamic hint}) {
+  Future<void> crateFlutterFfiMainGetSoftwareUpdateUrl({dynamic hint}) {
     throw UnimplementedError("mainGetSoftwareUpdateUrl");
   }
 
-  Future<String> mainGetHomeDir({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetHomeDir({dynamic hint}) {
     return Future.value('');
   }
 
-  Future<String> mainGetLangs({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetLangs({dynamic hint}) {
     return Future(() => js.context.callMethod('getByName', ['langs']));
   }
 
-  Future<String> mainGetTemporaryPassword({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetTemporaryPassword({dynamic hint}) {
     return Future.value('');
   }
 
-  Future<String> mainGetFingerprint({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetFingerprint({dynamic hint}) {
     return Future.value('');
   }
 
-  Future<String> cmGetClientsState({dynamic hint}) {
+  Future<String> crateFlutterFfiCmGetClientsState({dynamic hint}) {
     throw UnimplementedError("cmGetClientsState");
   }
 
-  Future<String?> cmCheckClientsLength({required int length, dynamic hint}) {
+  Future<String?> crateFlutterFfiCmCheckClientsLength({required int length, dynamic hint}) {
     throw UnimplementedError("cmCheckClientsLength");
   }
 
-  Future<int> cmGetClientsLength({dynamic hint}) {
+  Future<int> crateFlutterFfiCmGetClientsLength({dynamic hint}) {
     throw UnimplementedError("cmCheckClientsLength");
   }
 
-  Future<void> mainInit({required String appDir, dynamic hint}) {
+  Future<void> crateFlutterFfiMainInit({required String appDir, dynamic hint}) {
     return Future.value();
   }
 
-  Future<void> mainDeviceId({required String id, dynamic hint}) {
+  Future<void> crateFlutterFfiMainDeviceId({required String id, dynamic hint}) {
     // TODO: ?
     throw UnimplementedError("mainDeviceId");
   }
 
-  Future<void> mainDeviceName({required String name, dynamic hint}) {
+  Future<void> crateFlutterFfiMainDeviceName({required String name, dynamic hint}) {
     // TODO: ?
     throw UnimplementedError("mainDeviceName");
   }
 
-  Future<void> mainRemovePeer({required String id, dynamic hint}) {
+  Future<void> crateFlutterFfiMainRemovePeer({required String id, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['remove_peer', id]));
   }
 
-  bool mainHasHwcodec({dynamic hint}) {
+  bool crateFlutterFfiMainHasHwcodec({dynamic hint}) {
     throw UnimplementedError("mainHasHwcodec");
   }
 
-  bool mainHasVram({dynamic hint}) {
+  bool crateFlutterFfiMainHasVram({dynamic hint}) {
     throw UnimplementedError("mainHasVram");
   }
 
-  String mainSupportedHwdecodings({dynamic hint}) {
+  String crateFlutterFfiMainSupportedHwdecodings({dynamic hint}) {
     return '{}';
   }
 
-  Future<bool> mainIsRoot({dynamic hint}) {
+  Future<bool> crateFlutterFfiMainIsRoot({dynamic hint}) {
     throw UnimplementedError("mainIsRoot");
   }
 
-  int getDoubleClickTime({dynamic hint}) {
+  int crateFlutterFfiGetDoubleClickTime({dynamic hint}) {
     return 500;
   }
 
-  Future<void> mainStartDbusServer({dynamic hint}) {
+  Future<void> crateFlutterFfiMainStartDbusServer({dynamic hint}) {
     throw UnimplementedError("mainStartDbusServer");
   }
 
-  Future<void> mainSaveAb({required String json, dynamic hint}) {
+  Future<void> crateFlutterFfiMainSaveAb({required String json, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['save_ab', json]));
   }
 
-  Future<void> mainClearAb({dynamic hint}) {
+  Future<void> crateFlutterFfiMainClearAb({dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['clear_ab']));
   }
 
-  Future<String> mainLoadAb({dynamic hint}) {
+  Future<String> crateFlutterFfiMainLoadAb({dynamic hint}) {
     Completer<String> completer = Completer();
     Future<String> timeoutFuture = completer.future.timeout(
       Duration(seconds: 2),
@@ -1242,16 +1242,16 @@ class RustdeskImpl {
     return timeoutFuture;
   }
 
-  Future<void> mainSaveGroup({required String json, dynamic hint}) {
+  Future<void> crateFlutterFfiMainSaveGroup({required String json, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['save_group', json]));
   }
 
-  Future<void> mainClearGroup({dynamic hint}) {
+  Future<void> crateFlutterFfiMainClearGroup({dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['clear_group']));
   }
 
-  Future<String> mainLoadGroup({dynamic hint}) {
+  Future<String> crateFlutterFfiMainLoadGroup({dynamic hint}) {
     Completer<String> completer = Completer();
     Future<String> timeoutFuture = completer.future.timeout(
       Duration(seconds: 2),
@@ -1267,51 +1267,51 @@ class RustdeskImpl {
     return timeoutFuture;
   }
 
-  Future<void> sessionSendPointer(
+  Future<void> crateFlutterFfiSessionSendPointer(
       {required UuidValue sessionId, required String msg, dynamic hint}) {
     throw UnimplementedError("sessionSendPointer");
   }
 
-  Future<void> sessionSendMouse(
+  Future<void> crateFlutterFfiSessionSendMouse(
       {required UuidValue sessionId, required String msg, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['send_mouse', msg]));
   }
 
-  Future<void> sessionRestartRemoteDevice(
+  Future<void> crateFlutterFfiSessionRestartRemoteDevice(
       {required UuidValue sessionId, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', ['restart']));
   }
 
-  String sessionGetAuditServerSync(
+  String crateFlutterFfiSessionGetAuditServerSync(
       {required UuidValue sessionId, required String typ, dynamic hint}) {
     return js.context.callMethod('getByName', ['audit_server', typ]);
   }
 
-  Future<void> sessionSendNote(
+  Future<void> crateFlutterFfiSessionSendNote(
       {required UuidValue sessionId, required String note, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['send_note', note]));
   }
 
-  Future<String> sessionAlternativeCodecs(
+  Future<String> crateFlutterFfiSessionAlternativeCodecs(
       {required UuidValue sessionId, dynamic hint}) {
     return Future(
         () => js.context.callMethod('getByName', ['alternative_codecs']));
   }
 
-  Future<void> sessionChangePreferCodec(
+  Future<void> crateFlutterFfiSessionChangePreferCodec(
       {required UuidValue sessionId, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['change_prefer_codec']));
   }
 
-  Future<void> sessionOnWaitingForImageDialogShow(
+  Future<void> crateFlutterFfiSessionOnWaitingForImageDialogShow(
       {required UuidValue sessionId, dynamic hint}) {
     return Future.value();
   }
 
-  Future<void> sessionToggleVirtualDisplay(
+  Future<void> crateFlutterFfiSessionToggleVirtualDisplay(
       {required UuidValue sessionId,
       required int index,
       required bool on,
@@ -1322,83 +1322,83 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> mainSetHomeDir({required String home, dynamic hint}) {
+  Future<void> crateFlutterFfiMainSetHomeDir({required String home, dynamic hint}) {
     throw UnimplementedError("mainSetHomeDir");
   }
 
-  String mainGetDataDirIos({dynamic hint}) {
+  String crateFlutterFfiMainGetDataDirIos({dynamic hint}) {
     throw UnimplementedError("mainGetDataDirIos");
   }
 
-  Future<void> mainStopService({dynamic hint}) {
+  Future<void> crateFlutterFfiMainStopService({dynamic hint}) {
     throw UnimplementedError("mainStopService");
   }
 
-  Future<void> mainStartService({dynamic hint}) {
+  Future<void> crateFlutterFfiMainStartService({dynamic hint}) {
     throw UnimplementedError("mainStartService");
   }
 
-  Future<void> mainUpdateTemporaryPassword({dynamic hint}) {
+  Future<void> crateFlutterFfiMainUpdateTemporaryPassword({dynamic hint}) {
     throw UnimplementedError("mainUpdateTemporaryPassword");
   }
 
-  Future<bool> mainSetPermanentPasswordWithResult(
+  Future<bool> crateFlutterFfiMainSetPermanentPasswordWithResult(
       {required String password, dynamic hint}) {
     throw UnimplementedError("mainSetPermanentPasswordWithResult");
   }
 
-  Future<bool> mainCheckSuperUserPermission({dynamic hint}) {
+  Future<bool> crateFlutterFfiMainCheckSuperUserPermission({dynamic hint}) {
     throw UnimplementedError("mainCheckSuperUserPermission");
   }
 
-  Future<void> mainCheckMouseTime({dynamic hint}) {
+  Future<void> crateFlutterFfiMainCheckMouseTime({dynamic hint}) {
     throw UnimplementedError("mainCheckMouseTime");
   }
 
-  Future<double> mainGetMouseTime({dynamic hint}) {
+  Future<double> crateFlutterFfiMainGetMouseTime({dynamic hint}) {
     throw UnimplementedError("mainGetMouseTime");
   }
 
-  Future<void> mainWol({required String id, dynamic hint}) {
+  Future<void> crateFlutterFfiMainWol({required String id, dynamic hint}) {
     throw UnimplementedError("mainWol");
   }
 
-  Future<void> mainCreateShortcut({required String id, dynamic hint}) {
+  Future<void> crateFlutterFfiMainCreateShortcut({required String id, dynamic hint}) {
     throw UnimplementedError("mainCreateShortcut");
   }
 
-  Future<void> cmSendChat(
+  Future<void> crateFlutterFfiCmSendChat(
       {required int connId, required String msg, dynamic hint}) {
     throw UnimplementedError("cmSendChat");
   }
 
-  Future<void> cmLoginRes(
+  Future<void> crateFlutterFfiCmLoginRes(
       {required int connId, required bool res, dynamic hint}) {
     throw UnimplementedError("cmLoginRes");
   }
 
-  Future<void> cmCloseConnectionWindow({required int connId, dynamic hint}) {
+  Future<void> crateFlutterFfiCmCloseConnectionWindow({required int connId, dynamic hint}) {
     throw UnimplementedError("cmCloseConnectionWindow");
   }
 
-  Future<void> cmCloseConnection({required int connId, dynamic hint}) {
+  Future<void> crateFlutterFfiCmCloseConnection({required int connId, dynamic hint}) {
     throw UnimplementedError("cmCloseConnection");
   }
 
-  Future<void> cmRemoveDisconnectedConnection(
+  Future<void> crateFlutterFfiCmRemoveDisconnectedConnection(
       {required int connId, dynamic hint}) {
     throw UnimplementedError("cmRemoveDisconnectedConnection");
   }
 
-  Future<void> cmCheckClickTime({required int connId, dynamic hint}) {
+  Future<void> crateFlutterFfiCmCheckClickTime({required int connId, dynamic hint}) {
     throw UnimplementedError("cmCheckClickTime");
   }
 
-  Future<double> cmGetClickTime({dynamic hint}) {
+  Future<double> crateFlutterFfiCmGetClickTime({dynamic hint}) {
     throw UnimplementedError("cmGetClickTime");
   }
 
-  Future<void> cmSwitchPermission(
+  Future<void> crateFlutterFfiCmSwitchPermission(
       {required int connId,
       required String name,
       required bool enabled,
@@ -1406,27 +1406,27 @@ class RustdeskImpl {
     throw UnimplementedError("cmSwitchPermission");
   }
 
-  bool cmCanElevate({dynamic hint}) {
+  bool crateFlutterFfiCmCanElevate({dynamic hint}) {
     throw UnimplementedError("cmCanElevate");
   }
 
-  Future<void> cmElevatePortable({required int connId, dynamic hint}) {
+  Future<void> crateFlutterFfiCmElevatePortable({required int connId, dynamic hint}) {
     throw UnimplementedError("cmElevatePortable");
   }
 
-  Future<void> cmSwitchBack({required int connId, dynamic hint}) {
+  Future<void> crateFlutterFfiCmSwitchBack({required int connId, dynamic hint}) {
     throw UnimplementedError("cmSwitchBack");
   }
 
-  Future<String> cmGetConfig({required String name, dynamic hint}) {
+  Future<String> crateFlutterFfiCmGetConfig({required String name, dynamic hint}) {
     throw UnimplementedError("cmGetConfig");
   }
 
-  Future<String> mainGetBuildDate({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetBuildDate({dynamic hint}) {
     return Future(() => js.context.callMethod('getByName', ['build_date']));
   }
 
-  String translate(
+  String crateFlutterFfiTranslate(
       {required String name, required String locale, dynamic hint}) {
     return js.context.callMethod('getByName', [
       'translate',
@@ -1434,113 +1434,113 @@ class RustdeskImpl {
     ]);
   }
 
-  int sessionGetRgbaSize(
+  int crateFlutterFfiSessionGetRgbaSize(
       {required UuidValue sessionId, required int display, dynamic hint}) {
     return 0;
   }
 
-  void sessionNextRgba(
+  void crateFlutterFfiSessionNextRgba(
       {required UuidValue sessionId, required int display, dynamic hint}) {}
 
-  void sessionRegisterPixelbufferTexture(
+  void crateFlutterFfiSessionRegisterPixelbufferTexture(
       {required UuidValue sessionId,
       required int display,
       required int ptr,
       dynamic hint}) {}
 
-  void sessionRegisterGpuTexture(
+  void crateFlutterFfiSessionRegisterGpuTexture(
       {required UuidValue sessionId,
       required int display,
       required int ptr,
       dynamic hint}) {}
 
-  Future<void> queryOnlines({required List<String> ids, dynamic hint}) {
+  Future<void> crateFlutterFfiQueryOnlines({required List<String> ids, dynamic hint}) {
     return Future(() =>
         js.context.callMethod('setByName', ['query_onlines', jsonEncode(ids)]));
   }
 
   // Dup to the function in hbb_common, lib.rs
   // Maybe we need to move this function to js part.
-  int versionToNumber({required String v, dynamic hint}) {
+  int crateFlutterFfiVersionToNumber({required String v, dynamic hint}) {
     return int.tryParse(
             js.context.callMethod('getByName', ['get_version_number', v])) ??
         0;
   }
 
-  Future<bool> optionSynced({dynamic hint}) {
+  Future<bool> crateFlutterFfiOptionSynced({dynamic hint}) {
     return Future.value(true);
   }
 
-  bool mainIsInstalled({dynamic hint}) {
+  bool crateFlutterFfiMainIsInstalled({dynamic hint}) {
     throw UnimplementedError("mainIsInstalled");
   }
 
-  void mainInitInputSource({dynamic hint}) {
+  void crateFlutterFfiMainInitInputSource({dynamic hint}) {
     throw UnimplementedError("mainIsInstalled");
   }
 
-  bool mainIsInstalledLowerVersion({dynamic hint}) {
+  bool crateFlutterFfiMainIsInstalledLowerVersion({dynamic hint}) {
     throw UnimplementedError("mainIsInstalledLowerVersion");
   }
 
-  bool mainIsInstalledDaemon({required bool prompt, dynamic hint}) {
+  bool crateFlutterFfiMainIsInstalledDaemon({required bool prompt, dynamic hint}) {
     throw UnimplementedError("mainIsInstalledDaemon");
   }
 
-  bool mainIsProcessTrusted({required bool prompt, dynamic hint}) {
+  bool crateFlutterFfiMainIsProcessTrusted({required bool prompt, dynamic hint}) {
     throw UnimplementedError("mainIsProcessTrusted");
   }
 
-  bool mainIsCanScreenRecording({required bool prompt, dynamic hint}) {
+  bool crateFlutterFfiMainIsCanScreenRecording({required bool prompt, dynamic hint}) {
     throw UnimplementedError("mainIsCanScreenRecording");
   }
 
-  bool mainIsCanInputMonitoring({required bool prompt, dynamic hint}) {
+  bool crateFlutterFfiMainIsCanInputMonitoring({required bool prompt, dynamic hint}) {
     throw UnimplementedError("mainIsCanInputMonitoring");
   }
 
-  bool mainIsShareRdp({dynamic hint}) {
+  bool crateFlutterFfiMainIsShareRdp({dynamic hint}) {
     throw UnimplementedError("mainIsShareRdp");
   }
 
-  Future<void> mainSetShareRdp({required bool enable, dynamic hint}) {
+  Future<void> crateFlutterFfiMainSetShareRdp({required bool enable, dynamic hint}) {
     throw UnimplementedError("mainSetShareRdp");
   }
 
-  bool mainGotoInstall({dynamic hint}) {
+  bool crateFlutterFfiMainGotoInstall({dynamic hint}) {
     throw UnimplementedError("mainGotoInstall");
   }
 
-  String mainGetNewVersion({dynamic hint}) {
+  String crateFlutterFfiMainGetNewVersion({dynamic hint}) {
     throw UnimplementedError("mainGetNewVersion");
   }
 
-  bool mainUpdateMe({dynamic hint}) {
+  bool crateFlutterFfiMainUpdateMe({dynamic hint}) {
     throw UnimplementedError("mainUpdateMe");
   }
 
-  Future<void> setCurSessionId({required UuidValue sessionId, dynamic hint}) {
+  Future<void> crateFlutterFfiSetCurSessionId({required UuidValue sessionId, dynamic hint}) {
     throw UnimplementedError("setCurSessionId");
   }
 
-  bool installShowRunWithoutInstall({dynamic hint}) {
+  bool crateFlutterFfiInstallShowRunWithoutInstall({dynamic hint}) {
     throw UnimplementedError("installShowRunWithoutInstall");
   }
 
-  Future<void> installRunWithoutInstall({dynamic hint}) {
+  Future<void> crateFlutterFfiInstallRunWithoutInstall({dynamic hint}) {
     throw UnimplementedError("installRunWithoutInstall");
   }
 
-  Future<void> installInstallMe(
+  Future<void> crateFlutterFfiInstallInstallMe(
       {required String options, required String path, dynamic hint}) {
     throw UnimplementedError("installInstallMe");
   }
 
-  String installInstallPath({dynamic hint}) {
+  String crateFlutterFfiInstallInstallPath({dynamic hint}) {
     throw UnimplementedError("installInstallPath");
   }
 
-  Future<void> mainAccountAuth(
+  Future<void> crateFlutterFfiMainAccountAuth(
       {required String op, required bool rememberMe, dynamic hint}) {
     // Safari only allows auth popups while handling the original user gesture.
     // Use Future.sync so the JS call runs synchronously (pre-opening the OIDC
@@ -1551,228 +1551,228 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> mainAccountAuthCancel({dynamic hint}) {
+  Future<void> crateFlutterFfiMainAccountAuthCancel({dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['account_auth_cancel']));
   }
 
-  Future<String> mainAccountAuthResult({dynamic hint}) {
+  Future<String> crateFlutterFfiMainAccountAuthResult({dynamic hint}) {
     return Future(
         () => js.context.callMethod('getByName', ['account_auth_result']));
   }
 
-  Future<void> mainOnMainWindowClose({dynamic hint}) {
+  Future<void> crateFlutterFfiMainOnMainWindowClose({dynamic hint}) {
     throw UnimplementedError("mainOnMainWindowClose");
   }
 
-  bool mainCurrentIsWayland({dynamic hint}) {
+  bool crateFlutterFfiMainCurrentIsWayland({dynamic hint}) {
     return false;
   }
 
-  bool mainIsLoginWayland({dynamic hint}) {
+  bool crateFlutterFfiMainIsLoginWayland({dynamic hint}) {
     return false;
   }
 
-  bool mainHideDock({dynamic hint}) {
+  bool crateFlutterFfiMainHideDock({dynamic hint}) {
     throw UnimplementedError("mainHideDock");
   }
 
-  bool mainHasFileClipboard({dynamic hint}) {
+  bool crateFlutterFfiMainHasFileClipboard({dynamic hint}) {
     return false;
   }
 
-  bool mainHasGpuTextureRender({dynamic hint}) {
+  bool crateFlutterFfiMainHasGpuTextureRender({dynamic hint}) {
     return false;
   }
 
-  Future<void> cmInit({dynamic hint}) {
+  Future<void> crateFlutterFfiCmInit({dynamic hint}) {
     throw UnimplementedError("cmInit");
   }
 
-  Future<void> mainStartIpcUrlServer({dynamic hint}) {
+  Future<void> crateFlutterFfiMainStartIpcUrlServer({dynamic hint}) {
     throw UnimplementedError("mainStartIpcUrlServer");
   }
 
-  Future<void> mainTestWallpaper({required int second, dynamic hint}) {
+  Future<void> crateFlutterFfiMainTestWallpaper({required int second, dynamic hint}) {
     // TODO: implement mainTestWallpaper
     return Future.value();
   }
 
-  Future<bool> mainSupportRemoveWallpaper({dynamic hint}) {
+  Future<bool> crateFlutterFfiMainSupportRemoveWallpaper({dynamic hint}) {
     // TODO: implement mainSupportRemoveWallpaper
     return Future.value(false);
   }
 
-  bool isIncomingOnly({dynamic hint}) {
+  bool crateFlutterFfiIsIncomingOnly({dynamic hint}) {
     return false;
   }
 
-  bool isOutgoingOnly({dynamic hint}) {
+  bool crateFlutterFfiIsOutgoingOnly({dynamic hint}) {
     return false;
   }
 
-  bool isCustomClient({dynamic hint}) {
+  bool crateFlutterFfiIsCustomClient({dynamic hint}) {
     // is_custom_client() checks if app name is not "RustDesk"
     return mainGetAppNameSync(hint: hint) != "RustDesk";
   }
 
-  bool isDisableSettings({dynamic hint}) {
+  bool crateFlutterFfiIsDisableSettings({dynamic hint}) {
     // Checks HARD_SETTINGS["disable-settings"] == "Y"
     return mainGetHardOption(key: "disable-settings", hint: hint) == "Y";
   }
 
-  bool isDisableAb({dynamic hint}) {
+  bool crateFlutterFfiIsDisableAb({dynamic hint}) {
     // Checks HARD_SETTINGS["disable-ab"] == "Y"
     return mainGetHardOption(key: "disable-ab", hint: hint) == "Y";
   }
 
-  bool isDisableGroupPanel({dynamic hint}) {
+  bool crateFlutterFfiIsDisableGroupPanel({dynamic hint}) {
     // Checks LocalConfig::get_option("disable-group-panel") == "Y"
     return mainGetLocalOption(key: "disable-group-panel", hint: hint) == "Y";
   }
 
-  bool isDisableAccount({dynamic hint}) {
+  bool crateFlutterFfiIsDisableAccount({dynamic hint}) {
     // Checks HARD_SETTINGS["disable-account"] == "Y"
     return mainGetHardOption(key: "disable-account", hint: hint) == "Y";
   }
 
-  bool isDisableInstallation({dynamic hint}) {
+  bool crateFlutterFfiIsDisableInstallation({dynamic hint}) {
     return false;
   }
 
-  Future<bool> isPresetPassword({dynamic hint}) {
+  Future<bool> crateFlutterFfiIsPresetPassword({dynamic hint}) {
     return Future.value(false);
   }
 
-  Future<void> sendUrlScheme({required String url, dynamic hint}) {
+  Future<void> crateFlutterFfiSendUrlScheme({required String url, dynamic hint}) {
     throw UnimplementedError("sendUrlScheme");
   }
 
-  bool isSupportMultiUiSession({required String version, dynamic hint}) {
+  bool crateFlutterFfiIsSupportMultiUiSession({required String version, dynamic hint}) {
     return versionToNumber(v: version) > versionToNumber(v: '1.2.4');
   }
 
-  bool isSelinuxEnforcing({dynamic hint}) {
+  bool crateFlutterFfiIsSelinuxEnforcing({dynamic hint}) {
     return false;
   }
 
-  String mainDefaultPrivacyModeImpl({dynamic hint}) {
+  String crateFlutterFfiMainDefaultPrivacyModeImpl({dynamic hint}) {
     throw UnimplementedError("mainDefaultPrivacyModeImpl");
   }
 
-  String mainSupportedPrivacyModeImpls({dynamic hint}) {
+  String crateFlutterFfiMainSupportedPrivacyModeImpls({dynamic hint}) {
     return '[]';
   }
 
-  String mainSupportedInputSource({dynamic hint}) {
+  String crateFlutterFfiMainSupportedInputSource({dynamic hint}) {
     return jsonEncode([
       ['Input source 1', 'input_source_1_tip'],
       ['Input source 2', 'input_source_2_tip']
     ]);
   }
 
-  Future<String> mainGenerate2Fa({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGenerate2Fa({dynamic hint}) {
     throw UnimplementedError("mainGenerate2Fa");
   }
 
-  Future<bool> mainVerify2Fa({required String code, dynamic hint}) {
+  Future<bool> crateFlutterFfiMainVerify2Fa({required String code, dynamic hint}) {
     throw UnimplementedError("mainVerify2Fa");
   }
 
-  bool mainHasValid2FaSync({dynamic hint}) {
+  bool crateFlutterFfiMainHasValid2FaSync({dynamic hint}) {
     throw UnimplementedError("mainHasValid2FaSync");
   }
 
-  String mainGetHardOption({required String key, dynamic hint}) {
+  String crateFlutterFfiMainGetHardOption({required String key, dynamic hint}) {
     return mainGetLocalOption(key: key, hint: hint);
   }
 
-  Future<void> mainCheckHwcodec({dynamic hint}) {
+  Future<void> crateFlutterFfiMainCheckHwcodec({dynamic hint}) {
     throw UnimplementedError("mainCheckHwcodec");
   }
 
-  Future<void> sessionRequestNewDisplayInitMsgs(
+  Future<void> crateFlutterFfiSessionRequestNewDisplayInitMsgs(
       {required UuidValue sessionId, required int display, dynamic hint}) {
     throw UnimplementedError("sessionRequestNewDisplayInitMsgs");
   }
 
-  Future<String> mainHandleWaylandScreencastRestoreToken(
+  Future<String> crateFlutterFfiMainHandleWaylandScreencastRestoreToken(
       {required String key, required String value, dynamic hint}) {
     throw UnimplementedError("mainHandleWaylandScreencastRestoreToken");
   }
 
-  bool mainIsOptionFixed({required String key, dynamic hint}) {
+  bool crateFlutterFfiMainIsOptionFixed({required String key, dynamic hint}) {
     return false;
   }
 
-  bool mainGetUseTextureRender({dynamic hint}) {
+  bool crateFlutterFfiMainGetUseTextureRender({dynamic hint}) {
     throw UnimplementedError("mainGetUseTextureRender");
   }
 
-  bool mainHasValidBotSync({dynamic hint}) {
+  bool crateFlutterFfiMainHasValidBotSync({dynamic hint}) {
     throw UnimplementedError("mainHasValidBotSync");
   }
 
-  Future<String> mainVerifyBot({required String token, dynamic hint}) {
+  Future<String> crateFlutterFfiMainVerifyBot({required String token, dynamic hint}) {
     throw UnimplementedError("mainVerifyBot");
   }
 
-  String mainGetUnlockPin({dynamic hint}) {
+  String crateFlutterFfiMainGetUnlockPin({dynamic hint}) {
     throw UnimplementedError("mainGetUnlockPin");
   }
 
-  String mainSetUnlockPin({required String pin, dynamic hint}) {
+  String crateFlutterFfiMainSetUnlockPin({required String pin, dynamic hint}) {
     throw UnimplementedError("mainSetUnlockPin");
   }
 
-  bool sessionGetEnableTrustedDevices(
+  bool crateFlutterFfiSessionGetEnableTrustedDevices(
       {required UuidValue sessionId, dynamic hint}) {
     return js.context.callMethod('getByName', ['enable_trusted_devices']) ==
         'Y';
   }
 
-  Future<String> mainGetTrustedDevices({dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetTrustedDevices({dynamic hint}) {
     throw UnimplementedError("mainGetTrustedDevices");
   }
 
-  Future<void> mainRemoveTrustedDevices({required String json, dynamic hint}) {
+  Future<void> crateFlutterFfiMainRemoveTrustedDevices({required String json, dynamic hint}) {
     throw UnimplementedError("mainRemoveTrustedDevices");
   }
 
-  Future<void> mainClearTrustedDevices({dynamic hint}) {
+  Future<void> crateFlutterFfiMainClearTrustedDevices({dynamic hint}) {
     throw UnimplementedError("mainClearTrustedDevices");
   }
 
-  Future<String> getVoiceCallInputDevice({required bool isCm, dynamic hint}) {
+  Future<String> crateFlutterFfiGetVoiceCallInputDevice({required bool isCm, dynamic hint}) {
     throw UnimplementedError("getVoiceCallInputDevice");
   }
 
-  Future<void> setVoiceCallInputDevice(
+  Future<void> crateFlutterFfiSetVoiceCallInputDevice(
       {required bool isCm, required String device, dynamic hint}) {
     throw UnimplementedError("setVoiceCallInputDevice");
   }
 
-  bool isPresetPasswordMobileOnly({dynamic hint}) {
+  bool crateFlutterFfiIsPresetPasswordMobileOnly({dynamic hint}) {
     throw UnimplementedError("isPresetPasswordMobileOnly");
   }
 
-  String mainGetBuildinOption({required String key, dynamic hint}) {
+  String crateFlutterFfiMainGetBuildinOption({required String key, dynamic hint}) {
     return mainGetLocalOption(key: key, hint: hint);
   }
 
-  String installInstallOptions({dynamic hint}) {
+  String crateFlutterFfiInstallInstallOptions({dynamic hint}) {
     throw UnimplementedError("installInstallOptions");
   }
 
-  int mainMaxEncryptLen({dynamic hint}) {
+  int crateFlutterFfiMainMaxEncryptLen({dynamic hint}) {
     throw UnimplementedError("mainMaxEncryptLen");
   }
 
-  bool mainAudioSupportLoopback({dynamic hint}) {
+  bool crateFlutterFfiMainAudioSupportLoopback({dynamic hint}) {
     return false;
   }
 
-  Future<String> sessionReadLocalEmptyDirsRecursiveSync(
+  Future<String> crateFlutterFfiSessionReadLocalEmptyDirsRecursiveSync(
       {required UuidValue sessionId,
       required String path,
       required bool includeHidden,
@@ -1780,7 +1780,7 @@ class RustdeskImpl {
     throw UnimplementedError("sessionReadLocalEmptyDirsRecursiveSync");
   }
 
-  Future<void> sessionReadRemoteEmptyDirsRecursiveSync(
+  Future<void> crateFlutterFfiSessionReadRemoteEmptyDirsRecursiveSync(
       {required UuidValue sessionId,
       required String path,
       required bool includeHidden,
@@ -1788,7 +1788,7 @@ class RustdeskImpl {
     throw UnimplementedError("sessionReadRemoteEmptyDirsRecursiveSync");
   }
 
-  Future<void> sessionRenameFile(
+  Future<void> crateFlutterFfiSessionRenameFile(
       {required UuidValue sessionId,
       required int actId,
       required String path,
@@ -1811,15 +1811,15 @@ class RustdeskImpl {
     return Future(() => js.context.callMethod('setByName', ['select_files']));
   }
 
-  String? sessionGetConnToken({required UuidValue sessionId, dynamic hint}) {
+  String? crateFlutterFfiSessionGetConnToken({required UuidValue sessionId, dynamic hint}) {
     throw UnimplementedError("sessionGetConnToken");
   }
 
-  String mainGetPrinterNames({dynamic hint}) {
+  String crateFlutterFfiMainGetPrinterNames({dynamic hint}) {
     return '';
   }
 
-  Future<void> sessionPrinterResponse(
+  Future<void> crateFlutterFfiSessionPrinterResponse(
       {required UuidValue sessionId,
       required int id,
       required String path,
@@ -1828,25 +1828,25 @@ class RustdeskImpl {
     throw UnimplementedError("sessionPrinterResponse");
   }
 
-  Future<String> mainGetCommon({required String key, dynamic hint}) {
+  Future<String> crateFlutterFfiMainGetCommon({required String key, dynamic hint}) {
     throw UnimplementedError("mainGetCommon");
   }
 
-  String mainGetCommonSync({required String key, dynamic hint}) {
+  String crateFlutterFfiMainGetCommonSync({required String key, dynamic hint}) {
     throw UnimplementedError("mainGetCommonSync");
   }
 
-  Future<void> mainSetCommon(
+  Future<void> crateFlutterFfiMainSetCommon(
       {required String key, required String value, dynamic hint}) {
     throw UnimplementedError("mainSetCommon");
   }
 
-  Future<String> sessionHandleScreenshot(
+  Future<String> crateFlutterFfiSessionHandleScreenshot(
       {required UuidValue sessionId, required String action, dynamic hint}) {
     throw UnimplementedError("sessionHandleScreenshot");
   }
 
-  Future<void> sessionSetCommon(
+  Future<void> crateFlutterFfiSessionSetCommon(
       {required UuidValue sessionId, required String key, required String value, dynamic hint}) {
       js.context.callMethod('setByName', [
         'common',
@@ -1855,7 +1855,7 @@ class RustdeskImpl {
       return Future.value();
   }
 
-  String? sessionGetCommonSync(
+  String? crateFlutterFfiSessionGetCommonSync(
       {required UuidValue sessionId,
       required String key,
       required String param,
@@ -1863,12 +1863,12 @@ class RustdeskImpl {
     throw UnimplementedError("sessionGetCommonSync");
   }
 
-  Future<void> sessionTakeScreenshot(
+  Future<void> crateFlutterFfiSessionTakeScreenshot(
       {required UuidValue sessionId, required int display, dynamic hint}) {
     throw UnimplementedError("sessionTakeScreenshot");
   }
 
-  Future<void> sessionOpenTerminal(
+  Future<void> crateFlutterFfiSessionOpenTerminal(
       {required UuidValue sessionId,
       required int terminalId,
       required int rows,
@@ -1884,7 +1884,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionSendTerminalInput(
+  Future<void> crateFlutterFfiSessionSendTerminalInput(
       {required UuidValue sessionId,
       required int terminalId,
       required String data,
@@ -1898,7 +1898,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionResizeTerminal(
+  Future<void> crateFlutterFfiSessionResizeTerminal(
       {required UuidValue sessionId,
       required int terminalId,
       required int rows,
@@ -1914,7 +1914,7 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<void> sessionCloseTerminal(
+  Future<void> crateFlutterFfiSessionCloseTerminal(
       {required UuidValue sessionId, required int terminalId, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'close_terminal',
@@ -1924,47 +1924,47 @@ class RustdeskImpl {
         ]));
   }
 
-  Future<int?> sessionGetEdgeScrollEdgeThickness(
+  Future<int?> crateFlutterFfiSessionGetEdgeScrollEdgeThickness(
       {required UuidValue sessionId, dynamic hint}) {
     final thickness = js.context.callMethod(
         'getByName', ['option:session', 'edge-scroll-edge-thickness']);
     return Future(() => int.tryParse(thickness) ?? 100);
   }
 
-  Future<void> sessionSetEdgeScrollEdgeThickness(
+  Future<void> crateFlutterFfiSessionSetEdgeScrollEdgeThickness(
       {required UuidValue sessionId, required int value, dynamic hint}) {
     return Future(() => js.context.callMethod('setByName',
         ['option:session', 'edge-scroll-edge-thickness', value.toString()]));
   }
 
-  String sessionGetConnSessionId({required UuidValue sessionId, dynamic hint}) {
+  String crateFlutterFfiSessionGetConnSessionId({required UuidValue sessionId, dynamic hint}) {
     return js.context.callMethod('getByName', ['conn_session_id']);
   }
 
-  bool willSessionCloseCloseSession(
+  bool crateFlutterFfiWillSessionCloseCloseSession(
       {required UuidValue sessionId, dynamic hint}) {
     return true;
   }
 
-  String sessionGetLastAuditNote({required UuidValue sessionId, dynamic hint}) {
+  String crateFlutterFfiSessionGetLastAuditNote({required UuidValue sessionId, dynamic hint}) {
     return js.context.callMethod('getByName', ['last_audit_note']);
   }
 
-  Future<void> sessionSetAuditGuid(
+  Future<void> crateFlutterFfiSessionSetAuditGuid(
       {required UuidValue sessionId, required String guid, dynamic hint}) {
     return Future(
         () => js.context.callMethod('setByName', ['audit_guid', guid]));
   }
 
-  String sessionGetAuditGuid({required UuidValue sessionId, dynamic hint}) {
+  String crateFlutterFfiSessionGetAuditGuid({required UuidValue sessionId, dynamic hint}) {
     return js.context.callMethod('getByName', ['audit_guid']);
   }
 
-  bool mainSetCursorPosition({required int x, required int y, dynamic hint}) {
+  bool crateFlutterFfiMainSetCursorPosition({required int x, required int y, dynamic hint}) {
     return false;
   }
 
-  bool mainClipCursor(
+  bool crateFlutterFfiMainClipCursor(
       {required int left,
       required int top,
       required int right,
@@ -1974,13 +1974,13 @@ class RustdeskImpl {
     return false;
   }
 
-  String mainResolveAvatarUrl({required String avatar, dynamic hint}) {
+  String crateFlutterFfiMainResolveAvatarUrl({required String avatar, dynamic hint}) {
     return js.context.callMethod(
             'getByName', ['resolve_avatar_url', avatar])?.toString() ??
         avatar;
   }
 
-  Future<String> mainDeployDevice(
+  Future<String> crateFlutterFfiMainDeployDevice(
       {required String token, required String id, dynamic hint}) {
     throw UnimplementedError("mainDeployDevice");
   }

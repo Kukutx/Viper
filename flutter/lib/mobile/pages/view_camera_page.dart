@@ -108,7 +108,7 @@ class _ViewCameraPageState extends State<ViewCameraPage>
     _blockableOverlayState.applyFfi(gFFI);
     gFFI.imageModel.addCallbackOnFirstImage((String peerId) {
       gFFI.recordingModel
-          .updateStatus(bind.sessionGetIsRecording(sessionId: gFFI.sessionId));
+          .updateStatus(bind.crateFlutterFfiSessionGetIsRecording(sessionId: gFFI.sessionId));
       if (gFFI.recordingModel.start) {
         showToast(translate('Automatically record outgoing sessions'));
       }
@@ -493,8 +493,8 @@ class _ViewCameraPageState extends State<ViewCameraPage>
   }
 
   showChatOptions(String id) async {
-    onPressVoiceCall() => bind.sessionRequestVoiceCall(sessionId: sessionId);
-    onPressEndVoiceCall() => bind.sessionCloseVoiceCall(sessionId: sessionId);
+    onPressVoiceCall() => bind.crateFlutterFfiSessionRequestVoiceCall(sessionId: sessionId);
+    onPressEndVoiceCall() => bind.crateFlutterFfiSessionCloseVoiceCall(sessionId: sessionId);
 
     makeTextMenu(String label, Widget icon, VoidCallback onPressed,
             {TextStyle? labelStyle}) =>

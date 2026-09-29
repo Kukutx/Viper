@@ -106,7 +106,7 @@ class _ViewCameraPageState extends State<ViewCameraPage>
       showKBLayoutTypeChooserIfNeeded(
           _ffi.ffiModel.pi.platform, _ffi.dialogManager);
       _ffi.recordingModel
-          .updateStatus(bind.sessionGetIsRecording(sessionId: _ffi.sessionId));
+          .updateStatus(bind.crateFlutterFfiSessionGetIsRecording(sessionId: _ffi.sessionId));
     });
     _ffi.start(
       widget.id,
@@ -443,9 +443,9 @@ class _ViewCameraPageState extends State<ViewCameraPage>
   Widget getBodyForDesktop(BuildContext context) {
     var paints = <Widget>[
       MouseRegion(onEnter: (evt) {
-        if (!isWeb) bind.hostStopSystemKeyPropagate(stopped: false);
+        if (!isWeb) bind.crateFlutterFfiHostStopSystemKeyPropagate(stopped: false);
       }, onExit: (evt) {
-        if (!isWeb) bind.hostStopSystemKeyPropagate(stopped: true);
+        if (!isWeb) bind.crateFlutterFfiHostStopSystemKeyPropagate(stopped: true);
       }, child: LayoutBuilder(builder: (context, constraints) {
         final c = Provider.of<CanvasModel>(context, listen: false);
         Future.delayed(Duration.zero, () => c.updateViewStyle());

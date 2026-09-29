@@ -344,7 +344,7 @@ class ConnectionManagerState extends State<ConnectionManager>
     } else {
       final bool res;
       if (!option2bool(kOptionEnableConfirmClosingTabs,
-          bind.mainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
+          bind.crateFlutterFfiMainGetLocalOption(key: kOptionEnableConfirmClosingTabs))) {
         res = true;
       } else {
         res = await closeConfirmDialog();
@@ -664,7 +664,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
     final crossAxisCount = 4;
     final spacing = 10.0;
     final canModifyPermission =
-        bind.mainGetBuildinOption(key: kOptionEnablePermChangeInAcceptWindow) !=
+        bind.crateFlutterFfiMainGetBuildinOption(key: kOptionEnablePermChangeInAcceptWindow) !=
             'N';
     return Container(
       width: double.infinity,
@@ -703,7 +703,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                         client.audio,
                         Icons.volume_up_rounded,
                         (enabled) {
-                          bind.cmSwitchPermission(
+                          bind.crateFlutterFfiCmSwitchPermission(
                               connId: client.id,
                               name: "audio",
                               enabled: enabled);
@@ -718,7 +718,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                         client.recording,
                         Icons.videocam_rounded,
                         (enabled) {
-                          bind.cmSwitchPermission(
+                          bind.crateFlutterFfiCmSwitchPermission(
                               connId: client.id,
                               name: "recording",
                               enabled: enabled);
@@ -735,7 +735,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                         client.keyboard,
                         Icons.keyboard,
                         (enabled) {
-                          bind.cmSwitchPermission(
+                          bind.crateFlutterFfiCmSwitchPermission(
                               connId: client.id,
                               name: "keyboard",
                               enabled: enabled);
@@ -750,7 +750,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                         client.clipboard,
                         Icons.assignment_rounded,
                         (enabled) {
-                          bind.cmSwitchPermission(
+                          bind.crateFlutterFfiCmSwitchPermission(
                               connId: client.id,
                               name: "clipboard",
                               enabled: enabled);
@@ -765,7 +765,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                         client.audio,
                         Icons.volume_up_rounded,
                         (enabled) {
-                          bind.cmSwitchPermission(
+                          bind.crateFlutterFfiCmSwitchPermission(
                               connId: client.id,
                               name: "audio",
                               enabled: enabled);
@@ -780,7 +780,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                         client.file,
                         Icons.upload_file_rounded,
                         (enabled) {
-                          bind.cmSwitchPermission(
+                          bind.crateFlutterFfiCmSwitchPermission(
                               connId: client.id,
                               name: "file",
                               enabled: enabled);
@@ -795,7 +795,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                         client.restart,
                         Icons.restart_alt_rounded,
                         (enabled) {
-                          bind.cmSwitchPermission(
+                          bind.crateFlutterFfiCmSwitchPermission(
                               connId: client.id,
                               name: "restart",
                               enabled: enabled);
@@ -810,7 +810,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                         client.recording,
                         Icons.videocam_rounded,
                         (enabled) {
-                          bind.cmSwitchPermission(
+                          bind.crateFlutterFfiCmSwitchPermission(
                               connId: client.id,
                               name: "recording",
                               enabled: enabled);
@@ -827,7 +827,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                           client.blockInput,
                           Icons.block,
                           (enabled) {
-                            bind.cmSwitchPermission(
+                            bind.crateFlutterFfiCmSwitchPermission(
                                 connId: client.id,
                                 name: "block_input",
                                 enabled: enabled);
@@ -838,12 +838,12 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
                           translate('Enable blocking user input'),
                           canModify: canModifyPermission,
                         ),
-                      if (bind.mainSupportedPrivacyModeImpls() != '[]')
+                      if (bind.crateFlutterFfiMainSupportedPrivacyModeImpls() != '[]')
                         buildPermissionIcon(
                           client.privacyMode,
                           Icons.visibility_off,
                           (enabled) {
-                            bind.cmSwitchPermission(
+                            bind.crateFlutterFfiCmSwitchPermission(
                                 connId: client.id,
                                 name: "privacy_mode",
                                 enabled: enabled);
@@ -880,7 +880,7 @@ class _CmControlPanel extends StatelessWidget {
   }
 
   buildAuthorized(BuildContext context) {
-    final bool canElevate = bind.cmCanElevate();
+    final bool canElevate = bind.crateFlutterFfiCmCanElevate();
     final model = Provider.of<ServerModel>(context);
     final showElevation = canElevate &&
         model.showElevation &&
@@ -1069,12 +1069,12 @@ class _CmControlPanel extends StatelessWidget {
   }
 
   buildUnAuthorized(BuildContext context) {
-    final bool canElevate = bind.cmCanElevate();
+    final bool canElevate = bind.crateFlutterFfiCmCanElevate();
     final model = Provider.of<ServerModel>(context);
     final showElevation = canElevate &&
         model.showElevation &&
         client.type_() == ClientType.remote &&
-        bind.mainGetBuildinOption(
+        bind.crateFlutterFfiMainGetBuildinOption(
                 key: kOptionHideElevateButtonInAcceptWindow) !=
             'Y';
     final showAccept = model.approveMode != 'password';
@@ -1195,7 +1195,7 @@ class _CmControlPanel extends StatelessWidget {
   }
 
   void handleDisconnect() {
-    bind.cmCloseConnection(connId: client.id);
+    bind.crateFlutterFfiCmCloseConnection(connId: client.id);
   }
 
   void handleAccept(BuildContext context) {
@@ -1206,26 +1206,26 @@ class _CmControlPanel extends StatelessWidget {
   void handleElevate(BuildContext context) {
     final model = Provider.of<ServerModel>(context, listen: false);
     model.setShowElevation(false);
-    bind.cmElevatePortable(connId: client.id);
+    bind.crateFlutterFfiCmElevatePortable(connId: client.id);
   }
 
   void handleClose() async {
-    await bind.cmRemoveDisconnectedConnection(connId: client.id);
-    if (await bind.cmGetClientsLength() == 0) {
+    await bind.crateFlutterFfiCmRemoveDisconnectedConnection(connId: client.id);
+    if (await bind.crateFlutterFfiCmGetClientsLength() == 0) {
       windowManager.close();
     }
   }
 
   void handleSwitchBack(BuildContext context) {
-    bind.cmSwitchBack(connId: client.id);
+    bind.crateFlutterFfiCmSwitchBack(connId: client.id);
   }
 
   void handleVoiceCall(bool accept) {
-    bind.cmHandleIncomingVoiceCall(id: client.id, accept: accept);
+    bind.crateFlutterFfiCmHandleIncomingVoiceCall(id: client.id, accept: accept);
   }
 
   void closeVoiceCall() {
-    bind.cmCloseVoiceCall(id: client.id);
+    bind.crateFlutterFfiCmCloseVoiceCall(id: client.id);
   }
 }
 
@@ -1235,16 +1235,16 @@ void checkClickTime(int id, Function() callback) async {
     return;
   }
   var clickCallbackTime = DateTime.now().millisecondsSinceEpoch;
-  await bind.cmCheckClickTime(connId: id);
+  await bind.crateFlutterFfiCmCheckClickTime(connId: id);
   Timer(const Duration(milliseconds: 120), () async {
-    var d = clickCallbackTime - await bind.cmGetClickTime();
+    var d = clickCallbackTime - await bind.crateFlutterFfiCmGetClickTime();
     if (d > 120) callback();
   });
 }
 
 bool allowRemoteCMModification() {
   return option2bool(kOptionAllowRemoteCmModification,
-      bind.mainGetLocalOption(key: kOptionAllowRemoteCmModification));
+      bind.crateFlutterFfiMainGetLocalOption(key: kOptionAllowRemoteCmModification));
 }
 
 class _FileTransferLogPage extends StatefulWidget {

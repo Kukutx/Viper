@@ -66,7 +66,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
     _idFocusNode.addListener(onFocusChanged);
     if (_idController.text.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final lastRemoteId = await bind.mainGetLastRemoteId();
+        final lastRemoteId = await bind.crateFlutterFfiMainGetLastRemoteId();
         if (lastRemoteId != _idController.id) {
           setState(() {
             _idController.id = lastRemoteId;
@@ -84,7 +84,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
       slivers: [
         SliverList(
             delegate: SliverChildListDelegate([
-          if (!bind.isCustomClient() && !isIOS)
+          if (!bind.crateFlutterFfiIsCustomClient() && !isIOS)
             Obx(() => _buildUpdateUI(stateGlobal.updateUrl.value)),
           _buildRemoteIDTextField(),
         ])),

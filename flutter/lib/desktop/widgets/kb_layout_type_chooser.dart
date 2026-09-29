@@ -192,7 +192,7 @@ showKBLayoutTypeChooserIfNeeded(
   if (localPlatform == '') {
     return;
   }
-  KBLayoutType.value = bind.getLocalKbLayoutType();
+  KBLayoutType.value = bind.crateFlutterFfiGetLocalKbLayoutType();
   if (KBLayoutType.value == _kKBLayoutTypeISO ||
       KBLayoutType.value == _kKBLayoutTypeNotISO) {
     return;
@@ -214,8 +214,8 @@ showKBLayoutTypeChooser(
           height: 200,
           dividerWidth: 4.0,
           cb: (String v) async {
-            await bind.setLocalKbLayoutType(kbLayoutType: v);
-            KBLayoutType.value = bind.getLocalKbLayoutType();
+            await bind.crateFlutterFfiSetLocalKbLayoutType(kbLayoutType: v);
+            KBLayoutType.value = bind.crateFlutterFfiGetLocalKbLayoutType();
             return v == KBLayoutType.value;
           }),
       actions: [dialogButton('Close', onPressed: close)],

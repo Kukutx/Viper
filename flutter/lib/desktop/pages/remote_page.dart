@@ -161,7 +161,7 @@ class _RemotePageState extends State<RemotePage>
       showKBLayoutTypeChooserIfNeeded(
           _ffi.ffiModel.pi.platform, _ffi.dialogManager);
       _ffi.recordingModel
-          .updateStatus(bind.sessionGetIsRecording(sessionId: _ffi.sessionId));
+          .updateStatus(bind.crateFlutterFfiSessionGetIsRecording(sessionId: _ffi.sessionId));
     });
     _ffi.canvasModel.initializeEdgeScrollFallback(this);
     _ffi.start(
@@ -186,9 +186,9 @@ class _RemotePageState extends State<RemotePage>
     _ffi.dialogManager.loadMobileActionsOverlayVisible();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Session option should be set after models.dart/FFI.start
-      _showRemoteCursor.value = bind.sessionGetToggleOptionSync(
+      _showRemoteCursor.value = bind.crateFlutterFfiSessionGetToggleOptionSync(
           sessionId: sessionId, arg: 'show-remote-cursor');
-      _zoomCursor.value = bind.sessionGetToggleOptionSync(
+      _zoomCursor.value = bind.crateFlutterFfiSessionGetToggleOptionSync(
           sessionId: sessionId, arg: kOptionZoomCursor);
     });
     DesktopMultiWindow.addListener(this);
@@ -234,16 +234,16 @@ class _RemotePageState extends State<RemotePage>
     try {
       final pi = _ffi.ffiModel.pi;
       if (pi.platform != kPeerPlatformLinux || !pi.isWayland) return;
-      final mapSupported = bind.sessionIsKeyboardModeSupported(
+      final mapSupported = bind.crateFlutterFfiSessionIsKeyboardModeSupported(
           sessionId: sessionId, mode: kKeyMapMode);
       if (!mapSupported) return;
-      final current = await bind.sessionGetKeyboardMode(sessionId: sessionId);
+      final current = await bind.crateFlutterFfiSessionGetKeyboardMode(sessionId: sessionId);
       if (!mounted) return;
       if (current == kKeyMapMode) {
         _waylandKeyboardModeNormalized = true;
         return;
       }
-      await bind.sessionSetKeyboardMode(
+      await bind.crateFlutterFfiSessionSetKeyboardMode(
           sessionId: sessionId, value: kKeyMapMode);
       if (!mounted) return;
       await _ffi.inputModel.updateKeyboardMode();
@@ -652,7 +652,7 @@ class _RemotePageState extends State<RemotePage>
 
     // Defensive cleanup: ensure host system-key propagation is reset even if
     // MouseRegion.onExit never fired (e.g., tab closed while cursor inside).
-    if (!isWeb) bind.hostStopSystemKeyPropagate(stopped: true);
+    if (!isWeb) bind.crateFlutterFfiHostStopSystemKeyPropagate(stopped: true);
 
     _pointerLockCenterDebounceTimer?.cancel();
     _pointerLockCenterDebounceTimer = null;
@@ -946,10 +946,10 @@ class _RemotePageState extends State<RemotePage>
     var paints = <Widget>[
       MouseRegion(
         onEnter: (evt) {
-          if (!isWeb) bind.hostStopSystemKeyPropagate(stopped: false);
+          if (!isWeb) bind.crateFlutterFfiHostStopSystemKeyPropagate(stopped: false);
         },
         onExit: (evt) {
-          if (!isWeb) bind.hostStopSystemKeyPropagate(stopped: true);
+          if (!isWeb) bind.crateFlutterFfiHostStopSystemKeyPropagate(stopped: true);
         },
         child: _ViewStyleUpdater(
           canvasModel: _ffi.canvasModel,

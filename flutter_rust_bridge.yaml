@@ -1,0 +1,17 @@
+rust_input: crate::flutter_ffi
+rust_root: .
+rust_output: src/bridge_generated.rs
+dart_root: flutter
+dart_output: flutter/lib/generated
+dart_entrypoint_class_name: RustLib
+c_output: flutter/macos/Runner/bridge_generated.h
+duplicated_c_output:
+  - flutter/ios/Runner/bridge_generated.h
+rust_features:
+  - flutter
+  - linux-pkg-config
+add_mod_to_lib: false
+web: true
+type_64bit_int: true
+auto_upgrade_dependency: false
+stop_on_error: true

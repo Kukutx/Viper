@@ -444,7 +444,7 @@ class _FileManagerViewState extends State<FileManagerView> {
 
   /// [_lastClickTime], [_lastClickEntry] help to handle double click
   var _lastClickTime =
-      DateTime.now().millisecondsSinceEpoch - bind.getDoubleClickTime() - 1000;
+      DateTime.now().millisecondsSinceEpoch - bind.crateFlutterFfiGetDoubleClickTime() - 1000;
   Entry? _lastClickEntry;
 
   double? _windowWidthPrev;
@@ -543,7 +543,7 @@ class _FileManagerViewState extends State<FileManagerView> {
   Widget headTools() {
     var uploadButtonTapPosition = RelativeRect.fill;
     RxBool isUploadFolder =
-        (bind.mainGetLocalOption(key: 'upload-folder-button') == 'Y').obs;
+        (bind.crateFlutterFfiMainGetLocalOption(key: 'upload-folder-button') == 'Y').obs;
     return Container(
       child: Column(
         children: [
@@ -561,7 +561,7 @@ class _FileManagerViewState extends State<FileManagerView> {
                           ),
                           padding: EdgeInsets.all(8.0),
                           child: FutureBuilder<String>(
-                              future: bind.sessionGetPlatform(
+                              future: bind.crateFlutterFfiSessionGetPlatform(
                                   sessionId: _ffi.sessionId,
                                   isRemote: !isLocal),
                               builder: (context, snapshot) {
@@ -908,7 +908,7 @@ class _FileManagerViewState extends State<FileManagerView> {
                               ]);
                           if (value != null) {
                             isUploadFolder.value = value;
-                            bind.mainSetLocalOption(
+                            bind.crateFlutterFfiMainSetLocalOption(
                                 key: 'upload-folder-button',
                                 value: value ? 'Y' : '');
                             webselectFiles(is_folder: value);
@@ -1404,7 +1404,7 @@ class _FileManagerViewState extends State<FileManagerView> {
     final elapsed = current - _lastClickTime;
     _lastClickTime = current;
     if (_lastClickEntry == entry) {
-      if (elapsed < bind.getDoubleClickTime()) {
+      if (elapsed < bind.crateFlutterFfiGetDoubleClickTime()) {
         return true;
       }
     } else {

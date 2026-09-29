@@ -57,7 +57,7 @@ final peerSearchText = "".obs;
 /// for peer sort, global obs value
 RxString? _peerSort;
 RxString get peerSort {
-  _peerSort ??= bind.getLocalFlutterOption(k: kOptionPeerSorting).obs;
+  _peerSort ??= bind.crateFlutterFfiGetLocalFlutterOption(k: kOptionPeerSorting).obs;
   return _peerSort!;
 }
 
@@ -314,7 +314,7 @@ class _PeersViewState extends State<_PeersView>
 
   void _startCheckOnlines() {
     () async {
-      final p = await bind.mainIsUsingPublicServer();
+      final p = await bind.crateFlutterFfiMainIsUsingPublicServer();
       if (!p) {
         _queryInterval = const Duration(seconds: 6);
       }
@@ -333,7 +333,7 @@ class _PeersViewState extends State<_PeersView>
           if (!skipIfNotActive && (_queryCount < _maxQueryCount || !p)) {
             if (now.difference(_lastQueryTime) >= _queryInterval) {
               if (_curPeers.isNotEmpty) {
-                bind.queryOnlines(ids: _curPeers.toList(growable: false));
+                bind.crateFlutterFfiQueryOnlines(ids: _curPeers.toList(growable: false));
                 _lastQueryTime = DateTime.now();
                 _queryCount += 1;
               }
@@ -347,7 +347,7 @@ class _PeersViewState extends State<_PeersView>
 
   _queryOnlines(bool isLoadEvent) {
     if (_curPeers.isNotEmpty) {
-      bind.queryOnlines(ids: _curPeers.toList(growable: false));
+      bind.crateFlutterFfiQueryOnlines(ids: _curPeers.toList(growable: false));
       _queryCount = 0;
     }
     _lastQueryPeers = {..._curPeers};
@@ -367,7 +367,7 @@ class _PeersViewState extends State<_PeersView>
     // fallback to id sorting
     if (!PeerSortType.values.contains(sortedBy)) {
       sortedBy = PeerSortType.remoteId;
-      bind.setLocalFlutterOption(
+      bind.crateFlutterFfiSetLocalFlutterOption(
         k: kOptionPeerSorting,
         v: sortedBy,
       );
@@ -465,7 +465,7 @@ class RecentPeersView extends BasePeersView {
   @override
   Widget build(BuildContext context) {
     final widget = super.build(context);
-    bind.mainLoadRecentPeers();
+    bind.crateFlutterFfiMainLoadRecentPeers();
     return widget;
   }
 }
@@ -485,7 +485,7 @@ class FavoritePeersView extends BasePeersView {
   @override
   Widget build(BuildContext context) {
     final widget = super.build(context);
-    bind.mainLoadFavPeers();
+    bind.crateFlutterFfiMainLoadFavPeers();
     return widget;
   }
 }
@@ -505,8 +505,8 @@ class DiscoveredPeersView extends BasePeersView {
   @override
   Widget build(BuildContext context) {
     final widget = super.build(context);
-    bind.mainLoadLanPeers();
-    bind.mainDiscover();
+    bind.crateFlutterFfiMainLoadLanPeers();
+    bind.crateFlutterFfiMainDiscover();
     return widget;
   }
 }

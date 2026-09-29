@@ -37,7 +37,7 @@ class GroupModel {
   }
 
   Future<void> pull({force = true, quiet = false}) async {
-    if (bind.isDisableGroupPanel()) return;
+    if (bind.crateFlutterFfiIsDisableGroupPanel()) return;
     if (!gFFI.userModel.isLogin || groupLoading.value) return;
     if (gFFI.userModel.networkError.isNotEmpty) return;
     if (!force && initialized) return;
@@ -102,7 +102,7 @@ class GroupModel {
 
   Future<bool> _getDeviceGroups(
       List<DeviceGroupPayload> tmpDeviceGroups) async {
-    final api = "${await bind.mainGetApiServer()}/api/device-group/accessible";
+    final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/device-group/accessible";
     try {
       var uri0 = Uri.parse(api);
       final pageSize = 100;
@@ -158,7 +158,7 @@ class GroupModel {
   }
 
   Future<bool> _getUsers(List<UserPayload> tmpUsers) async {
-    final api = "${await bind.mainGetApiServer()}/api/users";
+    final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/users";
     try {
       var uri0 = Uri.parse(api);
       final pageSize = 100;
@@ -223,7 +223,7 @@ class GroupModel {
 
   Future<bool> _getPeers(List<Peer> tmpPeers) async {
     try {
-      final api = "${await bind.mainGetApiServer()}/api/peers";
+      final api = "${await bind.crateFlutterFfiMainGetApiServer()}/api/peers";
       var uri0 = Uri.parse(api);
       final pageSize = 100;
       var total = 0;
@@ -297,12 +297,12 @@ class GroupModel {
   void _saveCache() {
     try {
       final map = (<String, dynamic>{
-        "access_token": bind.mainGetLocalOption(key: 'access_token'),
+        "access_token": bind.crateFlutterFfiMainGetLocalOption(key: 'access_token'),
         "device_groups": deviceGroups.map((e) => e.toGroupCacheJson()).toList(),
         "users": users.map((e) => e.toGroupCacheJson()).toList(),
         'peers': peers.map((e) => e.toGroupCacheJson()).toList()
       });
-      bind.mainSaveGroup(json: jsonEncode(map));
+      bind.crateFlutterFfiMainSaveGroup(json: jsonEncode(map));
     } catch (e) {
       debugPrint('group save:$e');
     }
@@ -312,9 +312,9 @@ class GroupModel {
     try {
       if (_cacheLoadOnceFlag || groupLoading.value || initialized) return;
       _cacheLoadOnceFlag = true;
-      final access_token = bind.mainGetLocalOption(key: 'access_token');
+      final access_token = bind.crateFlutterFfiMainGetLocalOption(key: 'access_token');
       if (access_token.isEmpty) return;
-      final cache = await bind.mainLoadGroup();
+      final cache = await bind.crateFlutterFfiMainLoadGroup();
       if (groupLoading.value) return;
       final data = jsonDecode(cache);
       if (data == null || data['access_token'] != access_token) return;
@@ -349,7 +349,7 @@ class GroupModel {
     users.clear();
     peers.clear();
     selectedAccessibleItemName.value = '';
-    await bind.mainClearGroup();
+    await bind.crateFlutterFfiMainClearGroup();
   }
 
   void _callbackPeerUpdate() {
