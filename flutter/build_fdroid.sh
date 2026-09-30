@@ -22,28 +22,9 @@
 
 # Start of functions
 
-# Install Flutter of version `VERSION` from Github repository
-# into directory `FLUTTER_DIR` and apply patches if needed
-
+# Reuse the immutable SDK installer; preserve existing SDK worktrees.
 prepare_flutter() {
-	VERSION="${1}"
-	FLUTTER_DIR="${2}"
-
-	if [ ! -f "${FLUTTER_DIR}/bin/flutter" ]; then
-		git clone https://github.com/flutter/flutter "${FLUTTER_DIR}"
-	fi
-
-	pushd "${FLUTTER_DIR}"
-
-	git restore .
-	git checkout "${VERSION}"
-
-	# Do not apply old SDK patches to the current stable checkout.
-	test "$(git rev-parse HEAD)" = "$(python3 "${ROOTDIR}/tools/build_toolchain.py" --value flutter_revision)"
-
-	"${FLUTTER_DIR}/bin/flutter" config --no-analytics
-
-	popd # ${FLUTTER_DIR}
+	bash "${ROOTDIR}/tools/native/prepare-fdroid-flutter.sh" "${1}" "${2}"
 }
 
 # Start of script
