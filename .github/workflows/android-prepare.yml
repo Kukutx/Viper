@@ -70,8 +70,7 @@ jobs:
           cp "$RUNNER_TEMP/wrapper/gradle/wrapper/gradle-wrapper.jar" flutter/android/gradle/wrapper/
           chmod +x flutter/android/gradlew
       - name: Install the exact Android SDK
-        run: |
-          sdkmanager 'platforms;android-37' 'build-tools;37.0.0' 'ndk;30.0.16248370' > tools/.reports/android-sdk.log 2>&1 || { tail -100 tools/.reports/android-sdk.log; exit 1; }
+        run: bash tools/native/install-android-sdk.sh
       - name: Analyze and test Flutter
         run: |
           python tools/analyze_flutter.py
