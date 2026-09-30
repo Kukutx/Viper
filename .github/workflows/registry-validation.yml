@@ -1,0 +1,25 @@
+name: Verify compatible registry refresh
+on:
+  push:
+    branches: [codex/viper-registry-upgrade-validation]
+    paths: [Cargo.lock, '**/Cargo.toml', 'src/**', 'libs/**', 'tools/**', .github/workflows/registry-validation.yml]
+permissions:
+  contents: read
+jobs:
+  foundation:
+    uses: ./.github/workflows/foundation.yml
+  linux:
+    needs: foundation
+    uses: ./.github/workflows/flutter-validate.yml
+  android:
+    needs: foundation
+    uses: ./.github/workflows/android-native.yml
+  windows:
+    needs: foundation
+    uses: ./.github/workflows/windows-native.yml
+  macos:
+    needs: foundation
+    uses: ./.github/workflows/apple-native.yml
+  ios:
+    needs: foundation
+    uses: ./.github/workflows/ios-native.yml
