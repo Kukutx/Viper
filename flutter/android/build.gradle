@@ -16,6 +16,11 @@ plugins {
     id "com.google.protobuf" apply false
 }
 
+println('ANDROID_TOOLING_KGP_CLASS=' + org.jetbrains.kotlin.gradle.plugin.KotlinBaseApiPlugin.protectionDomain.codeSource.location)
+println('ANDROID_TOOLING_KGP_METHODS=' + org.jetbrains.kotlin.gradle.plugin.KotlinBaseApiPlugin.methods.findAll { it.name.contains('createKotlin') })
+println('ANDROID_TOOLING_AGP_CLASS=' + com.android.build.gradle.AppPlugin.protectionDomain.codeSource.location)
+println('ANDROID_TOOLING_CLASSPATH=' + buildscript.configurations.classpath.resolvedConfiguration.resolvedArtifacts.collect { it.moduleVersion.id })
+
 allprojects {
     repositories {
         google()
