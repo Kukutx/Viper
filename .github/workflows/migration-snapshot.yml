@@ -1,33 +1,54 @@
-name: Capture exact migration source
+name: Prepare exact Windows printer return fix
 on:
   push:
     branches: [codex/viper-platform-source-snapshot]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  snapshot:
+  prepare:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: d9380680ccb9cf562ad76803984446a26f892af3
-          submodules: recursive
           persist-credentials: false
-      - name: Archive only tracked source
+      - name: Apply the reviewed single-function correction
         shell: bash
         run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          path = Path('src/flutter_ffi.rs')
+          def blob(data):
+              return hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
+          assert blob(path.read_bytes()) == '77decfd6a016f43089288684fa1bf33bc86df98b'
+          old = '    return (\n        serde_json::to_string(&crate::platform::windows::get_printer_names().unwrap_or_default())\n            .unwrap_or_default(),\n    );'
+          new = '    return serde_json::to_string(&crate::platform::windows::get_printer_names().unwrap_or_default())\n        .unwrap_or_default();'
+          text = path.read_text()
+          assert text.count(old) == 1
+          path.write_text(text.replace(old, new))
+          assert blob(path.read_bytes()) == '64c881cb9316230c3870c96fccc374ca36095dd2'
+          PY
+          git diff --check
+          git diff -- src/flutter_ffi.rs
+      - name: Store only the exact reviewed Git blob
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/snapshot"
-          git rev-parse HEAD > "$RUNNER_TEMP/snapshot/revision.txt"
-          git ls-files -s > "$RUNNER_TEMP/snapshot/index.txt"
-          git archive --format=tar.gz HEAD > "$RUNNER_TEMP/snapshot/source.tar.gz"
-          git -C libs/hbb_common archive --format=tar.gz HEAD > "$RUNNER_TEMP/snapshot/hbb_common.tar.gz"
-          cd "$RUNNER_TEMP/snapshot"
-          sha256sum *.tar.gz > SHA256SUMS
+          mkdir -p "$RUNNER_TEMP/reviewed"
+          python3 - <<'PY' > "$RUNNER_TEMP/blob.json"
+          import json
+          from pathlib import Path
+          print(json.dumps({'content': Path('src/flutter_ffi.rs').read_text(), 'encoding': 'utf-8'}))
+          PY
+          gh api --method POST repos/Kukutx/Viper/git/blobs --input "$RUNNER_TEMP/blob.json" --jq .sha > "$RUNNER_TEMP/reviewed/blob.txt"
+          test "$(cat "$RUNNER_TEMP/reviewed/blob.txt")" = 64c881cb9316230c3870c96fccc374ca36095dd2
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: viper-platform-source-d938068
-          path: ${{ runner.temp }}/snapshot/
+          name: reviewed-printer-fix
+          path: ${{ runner.temp }}/reviewed/
           retention-days: 3
           if-no-files-found: error
