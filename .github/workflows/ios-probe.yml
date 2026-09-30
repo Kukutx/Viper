@@ -9,7 +9,6 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 60
     env:
-      IPHONEOS_DEPLOYMENT_TARGET: '15.0'
       FLUTTER_XCODE_IPHONEOS_DEPLOYMENT_TARGET: '15.0'
       FLUTTER_XCODE_CODE_SIGNING_ALLOWED: 'NO'
     steps:
@@ -20,81 +19,39 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version-file: .python-version
-      - name: Prepare explicit lifecycle and deployment settings
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          repository: Kukutx/Viper
+          run-id: 36752863644
+          artifact-ids: 11115203738
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/ios-reviewed
+          merge-multiple: true
+      - name: Apply only the reviewed immutable iOS candidate
+        env:
+          REVIEWED_DIR: ${{ runner.temp }}/ios-reviewed
         run: |
+          python - <<'PY'
+          from pathlib import Path, PurePosixPath
+          import hashlib, os, zipfile
+          file=Path(os.environ['REVIEWED_DIR'])/'ios-native-source.zip'
+          assert hashlib.sha256(file.read_bytes()).hexdigest()=='89c5934ac455d8c94df15e49d5a79f06129a7a89841d1d75f37bc69f11766524'
+          with zipfile.ZipFile(file) as z:
+              assert len(z.namelist())==26 and len(set(z.namelist()))==26
+              for item in z.infolist():
+                  path=PurePosixPath(item.filename)
+                  assert '..' not in path.parts and not path.is_absolute() and item.file_size<500000
+                  assert item.filename.startswith('flutter/ios/') or item.filename=='res/vcpkg-triplets/arm64-ios.cmake'
+                  dest=Path(item.filename)
+                  assert not dest.is_symlink()
+                  dest.parent.mkdir(parents=True,exist_ok=True)
+                  dest.write_bytes(z.read(item))
+          PY
           python -m pip install -r tools/requirements-dev.txt
           python tools/viper.py env >> "$GITHUB_ENV"
           python tools/apple_sdk.py --github-env
           mkdir -p tools/.reports
-          python - <<'PY'
-          from pathlib import Path
-          def edit(name, old, new, count=1):
-              p=Path(name); text=p.read_text()
-              assert text.count(old)==count,(name,old,text.count(old))
-              p.write_text(text.replace(old,new))
-          edit('flutter/ios/Podfile', "platform :ios, '13.0'", "platform :ios, '15.0'")
-          edit('flutter/ios/Podfile', "    target.build_configurations.each do |config|\n      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '11.0'\n    end\n", '')
-          edit('flutter/ios/Runner.xcodeproj/project.pbxproj','IPHONEOS_DEPLOYMENT_TARGET = 13.0;', 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;',3)
-          edit('flutter/ios/Flutter/AppFrameworkInfo.plist','  <key>MinimumOSVersion</key>\n  <string>13.0</string>\n','')
-          edit('flutter/ios/Runner/AppDelegate.swift','@objc class AppDelegate: FlutterAppDelegate {','@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {')
-          edit('flutter/ios/Runner/AppDelegate.swift','    GeneratedPluginRegistrant.register(with: self)\n','')
-          edit('flutter/ios/Runner/AppDelegate.swift','    return super.application(application, didFinishLaunchingWithOptions: launchOptions)\n  }\n}', '    return super.application(application, didFinishLaunchingWithOptions: launchOptions)\n  }\n\n  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {\n    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)\n  }\n}')
-          manifest='''
-          	<key>UIApplicationSceneManifest</key>
-          	<dict>
-          		<key>UIApplicationSupportsMultipleScenes</key>
-          		<false/>
-          		<key>UISceneConfigurations</key>
-          		<dict>
-          			<key>UIWindowSceneSessionRoleApplication</key>
-          			<array>
-          				<dict>
-          					<key>UISceneClassName</key>
-          					<string>UIWindowScene</string>
-          					<key>UISceneDelegateClassName</key>
-          					<string>FlutterSceneDelegate</string>
-          					<key>UISceneConfigurationName</key>
-          					<string>flutter</string>
-          					<key>UISceneStoryboardFile</key>
-          					<string>Main</string>
-          				</dict>
-          			</array>
-          		</dict>
-          	</dict>
-          '''
-          edit('flutter/ios/Runner/Info.plist','<dict>\n', '<dict>\n'+manifest, 2) if False else None
-          p=Path('flutter/ios/Runner/Info.plist'); text=p.read_text()
-          assert 'UIApplicationSceneManifest' not in text
-          p.write_text(text.replace('<dict>\n','<dict>\n'+manifest,1))
-          Path('res/vcpkg-triplets/arm64-ios.cmake').write_text('set(VCPKG_TARGET_ARCHITECTURE arm64)\nset(VCPKG_CRT_LINKAGE dynamic)\nset(VCPKG_LIBRARY_LINKAGE static)\nset(VCPKG_CMAKE_SYSTEM_NAME iOS)\nset(VCPKG_OSX_DEPLOYMENT_TARGET 15.0)\nset(VCPKG_CMAKE_SYSTEM_VERSION 15.0)\n')
-          PY
-      - name: Restore immutable upstream image assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import base64, hashlib, json, os, urllib.request
-          roots={'AppIcon.appiconset':'cbde719c65daefdaeb2b95ade76130828b9ae772','LaunchImage.imageset':'fc352403270a2b22d030aaa76fabdce37c30c49a'}
-          def get(url):
-              r=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
-              with urllib.request.urlopen(r,timeout=30) as response: return json.load(response)
-          hashes={}
-          for folder,sha in roots.items():
-              tree=get('https://api.github.com/repos/rustdesk/rustdesk/git/trees/'+sha)
-              assert tree['sha']==sha and not tree['truncated']
-              for entry in tree['tree']:
-                  name=entry['path']
-                  if not name.endswith('.png'): continue
-                  assert '/' not in name and entry['type']=='blob' and entry['mode']=='100644' and entry['size']<1000000
-                  blob=get('https://api.github.com/repos/rustdesk/rustdesk/git/blobs/'+entry['sha'])
-                  data=base64.b64decode(blob['content'])
-                  assert hashlib.sha1(f'blob {len(data)}\0'.encode()+data).hexdigest()==entry['sha']
-                  p=Path('flutter/ios/Runner/Assets.xcassets')/folder/name
-                  assert not p.exists()
-                  p.write_bytes(data); hashes[str(p)]=entry['sha']
-          Path('tools/.reports/ios-resource-hashes.json').write_text(json.dumps(hashes,indent=2)+'\n')
-          PY
+          cp "$REVIEWED_DIR/ios-resource-hashes.json" tools/.reports/
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -127,9 +84,11 @@ jobs:
           git -C "$VCPKG_ROOT" checkout -q --detach FETCH_HEAD
           test "$(git -C "$VCPKG_ROOT" rev-parse HEAD)" = "$VCPKG_COMMIT_ID"
           "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics > tools/.reports/ios-vcpkg-bootstrap.log 2>&1
-          "$VCPKG_ROOT/vcpkg" install --triplet arm64-ios --x-install-root="$VCPKG_ROOT/installed" > tools/.reports/ios-vcpkg.log 2>&1 || { tail -120 tools/.reports/ios-vcpkg.log; exit 1; }
+          env -u IPHONEOS_DEPLOYMENT_TARGET "$VCPKG_ROOT/vcpkg" install --triplet arm64-ios --x-install-root="$VCPKG_ROOT/installed" > tools/.reports/ios-vcpkg.log 2>&1 || { tail -120 tools/.reports/ios-vcpkg.log; exit 1; }
           echo "VCPKG_ROOT=$VCPKG_ROOT" >> "$GITHUB_ENV"
       - name: Compile the actual Rust static library
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: '15.0'
         run: |
           rustup target add aarch64-apple-ios
           cargo build --locked --release --target aarch64-apple-ios --lib --features flutter,hwcodec > tools/.reports/ios-cargo.log 2>&1 || { tail -150 tools/.reports/ios-cargo.log; exit 1; }
