@@ -1,0 +1,31 @@
+name: Current upstream dependency inventory
+on:
+  push:
+    branches: [codex/viper-android-diagnostic]
+    paths: ['.github/workflows/dependency-inventory-diagnostic.yml']
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Query registry stable versions without modifying declarations
+        run: |
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py inventory --latest
+          git diff --exit-code
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: current-dependency-inventory-${{ github.sha }}
+          path: tools/.reports/inventory.json
+          if-no-files-found: error
+          retention-days: 7

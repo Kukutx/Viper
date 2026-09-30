@@ -1,0 +1,46 @@
+name: Prepare pinned Gradle wrapper
+on:
+  push:
+    branches: [codex/viper-android-diagnostic]
+    paths: ['.github/workflows/android-wrapper-prepare.yml']
+permissions:
+  contents: read
+jobs:
+  wrapper:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '27.0.0+35'
+      - name: Generate the wrapper from the checksum-verified distribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python tools/build_toolchain.py --value android.gradle)
+          checksum=$(python tools/build_toolchain.py --value android.gradle_sha256)
+          curl -fSL --retry 3 "https://services.gradle.org/distributions/gradle-$version-bin.zip" -o "$RUNNER_TEMP/gradle.zip"
+          echo "$checksum  $RUNNER_TEMP/gradle.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP/gradle-tool"
+          mkdir -p "$RUNNER_TEMP/wrapper-project"
+          printf "rootProject.name = 'viper-wrapper'\n" > "$RUNNER_TEMP/wrapper-project/settings.gradle"
+          "$RUNNER_TEMP/gradle-tool/gradle-$version/bin/gradle" -p "$RUNNER_TEMP/wrapper-project" wrapper --gradle-version "$version" --distribution-type bin --gradle-distribution-sha256-sum "$checksum"
+          mkdir -p tools/.reports/wrapper
+          cp "$RUNNER_TEMP/wrapper-project/gradlew" "$RUNNER_TEMP/wrapper-project/gradlew.bat" "$RUNNER_TEMP/wrapper-project/gradle/wrapper/gradle-wrapper.jar" tools/.reports/wrapper/
+          expected=$(python tools/build_toolchain.py --value android.gradle_wrapper_sha256)
+          echo "$expected  tools/.reports/wrapper/gradle-wrapper.jar" | sha256sum -c -
+          sha256sum tools/.reports/wrapper/* > tools/.reports/wrapper.sha256
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: reviewed-gradle-wrapper-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
