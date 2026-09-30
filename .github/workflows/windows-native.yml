@@ -1,0 +1,68 @@
+name: Windows native validation
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, codex/viper-native-platform-completion]
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+concurrency:
+  group: windows-native-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  windows:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Read and validate shared configuration
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          python tools/bridge.py check
+          python tools/check_bridge_outputs.py
+          New-Item tools/.reports -ItemType Directory -Force | Out-Null
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: x64
+          cache: true
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: windows-native-vs2026
+          cache-on-failure: true
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/viper-vcpkg-windows
+          key: windows-native-${{ hashFiles('configs/windows-toolchain.json', 'configs/toolchain.json', 'res/vcpkg/**', 'tools/native/setup-windows.ps1') }}
+      - name: Prepare pinned compiler and native dependencies
+        run: ./tools/native/setup-windows.ps1
+      - name: Build actual Release bundle and exercise bundled FFI
+        run: ./tools/native/build-windows-bundle.ps1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: windows-native-diagnostics-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-x64-unsigned-${{ github.sha }}
+          path: dist/windows-x64-unsigned/
+          retention-days: 3
+          if-no-files-found: error
