@@ -7,7 +7,7 @@ permissions:
 jobs:
   android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
@@ -28,15 +28,18 @@ jobs:
           git ls-tree -r HEAD > tools/.reports/tree.txt
           python -m pip install -r tools/requirements-dev.txt
           python tools/viper.py env >> "$GITHUB_ENV"
-          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '27.0.0+35'
       - name: Resolve locked inputs and capture Android plugin sources
         run: |
           python tools/flutter_sdk.py
-          (cd flutter && flutter pub get --enforce-lockfile)
+          (cd flutter && flutter pub get)
           python - <<'PY'
           import json, pathlib, tarfile
           data = json.loads(pathlib.Path('flutter/.flutter-plugins-dependencies').read_text())
@@ -49,10 +52,23 @@ jobs:
                           archive.add(path, arcname=plugin['name'] + '/' + relative)
           pathlib.Path('tools/.reports/plugins.json').write_text(json.dumps(data, indent=2))
           PY
+      - name: Verify migrated Dart source
+        run: |
+          python tools/analyze_flutter.py
+          (cd flutter && flutter test --no-pub test)
       - name: Compile the existing Android application
         working-directory: flutter
         run: |
           flutter build apk --debug --target-platform android-arm64 --no-pub > ../tools/.reports/android-build.log 2>&1 || { tail -160 ../tools/.reports/android-build.log; exit 1; }
+      - name: Capture proposed lock and native project changes
+        if: always()
+        run: |
+          mkdir -p tools/.reports/proposed
+          cp flutter/pubspec.lock tools/.reports/proposed/pubspec.lock
+          git diff > tools/.reports/proposed/changes.patch
+          if test -f flutter/android/gradle/wrapper/gradle-wrapper.jar; then
+            cp flutter/android/gradle/wrapper/gradle-wrapper.jar tools/.reports/proposed/
+          fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
