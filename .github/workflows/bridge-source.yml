@@ -1,0 +1,78 @@
+name: Source-built bridge validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/bridge-source.yml'
+      - 'configs/toolchain.json'
+      - 'tools/bridge*.py'
+      - 'tools/cargo_tools.py'
+      - 'tools/flutter_sdk.py'
+      - 'tools/native/**'
+      - 'flutter/build_fdroid.sh'
+      - 'flutter_rust_bridge.yaml'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'flutter/pubspec.*'
+      - 'src/flutter_ffi.rs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: bridge-source-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  source:
+    name: Source generator and binding parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Read the reviewed toolchain
+        run: |
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          python tools/bridge.py check
+          mkdir -p tools/.reports
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /opt/hostedtoolcache/flutter
+          key: viper-flutter-${{ runner.os }}-${{ env.FLUTTER_VERSION }}
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: false
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: source-bridge-v2
+          cache-on-failure: true
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/viper-vcpkg
+          key: viper-yuv-${{ runner.os }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**') }}
+      - name: Prepare native headers for macro expansion
+        run: bash tools/native/setup-linux.sh
+      - name: Compile the pinned generator from source and generate bindings
+        run: |
+          python tools/bridge.py generate --from-source > tools/.reports/source-codegen.log 2>&1 || { tail -120 tools/.reports/source-codegen.log; exit 1; }
+      - name: Require parity with the committed bindings and lockfiles
+        run: |
+          python tools/check_bridge_outputs.py
+          git diff --exit-code HEAD -- Cargo.lock flutter/pubspec.yaml flutter/pubspec.lock
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: source-bridge-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
