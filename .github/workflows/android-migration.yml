@@ -1,0 +1,111 @@
+name: Android build migration candidate
+on:
+  push:
+    branches: [codex/viper-android-modernization-candidate]
+permissions:
+  contents: read
+concurrency:
+  group: android-migration-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Apply the exact reviewed migration candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'a03a0c0f1d7ef6bab9c3a5ded7ff5ce85a63ec9763bf9cc4a3e8048a4070ce75  tools/.migration/android.patch.gz' | sha256sum -c -
+          gzip -dc tools/.migration/android.patch.gz > "$RUNNER_TEMP/android.patch"
+          git apply --check "$RUNNER_TEMP/android.patch"
+          git apply "$RUNNER_TEMP/android.patch"
+          mkdir -p tools/.reports
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          from pathlib import Path
+          spec = json.loads(Path('configs/toolchain.json').read_text())['android']
+          print('ANDROID_JAVA_VERSION=27.0.0+35')
+          print('ANDROID_NDK_VERSION=' + spec['ndk'])
+          print('ANDROID_GRADLE_VERSION=' + spec['gradle'])
+          print('ANDROID_GRADLE_SHA256=' + spec['gradle_sha256'])
+          PY
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.ANDROID_JAVA_VERSION }}
+          overwrite-settings: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Verify SDK and resolve the explicitly changed scanner dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/flutter_sdk.py
+          java -XshowSettings:properties -version > tools/.reports/java.log 2>&1
+          flutter config --jdk-dir "$JAVA_HOME"
+          (cd flutter && flutter pub get && flutter pub get --enforce-lockfile) > tools/.reports/pub-resolution.log 2>&1 || { tail -100 tools/.reports/pub-resolution.log; exit 1; }
+          python tools/analyze_flutter.py
+          (cd flutter && flutter test --no-pub test) > tools/.reports/flutter-tests.log 2>&1 || { tail -100 tools/.reports/flutter-tests.log; exit 1; }
+      - name: Generate and verify the official Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/gradle.zip"
+          curl -fsSL --retry 3 "https://services.gradle.org/distributions/gradle-${ANDROID_GRADLE_VERSION}-bin.zip" -o "$archive"
+          echo "$ANDROID_GRADLE_SHA256  $archive" | sha256sum -c -
+          unzip -q "$archive" -d "$RUNNER_TEMP/gradle-bootstrap"
+          mkdir "$RUNNER_TEMP/empty-gradle"
+          touch "$RUNNER_TEMP/empty-gradle/settings.gradle"
+          "$RUNNER_TEMP/gradle-bootstrap/gradle-${ANDROID_GRADLE_VERSION}/bin/gradle" -p "$RUNNER_TEMP/empty-gradle" wrapper --gradle-version "$ANDROID_GRADLE_VERSION" --distribution-type bin --gradle-distribution-sha256-sum "$ANDROID_GRADLE_SHA256" > tools/.reports/wrapper.log 2>&1 || { cat tools/.reports/wrapper.log; exit 1; }
+          echo "238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5  $RUNNER_TEMP/empty-gradle/gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
+          cp "$RUNNER_TEMP/empty-gradle/gradlew" "$RUNNER_TEMP/empty-gradle/gradlew.bat" flutter/android/
+          cp "$RUNNER_TEMP/empty-gradle/gradle/wrapper/gradle-wrapper.jar" flutter/android/gradle/wrapper/
+          chmod +x flutter/android/gradlew
+          (cd flutter/android && ./gradlew --version) > tools/.reports/gradle-version.log 2>&1
+      - name: Prepare Android SDK and Rust dependency metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --list > tools/.reports/android-sdk-packages.log 2>&1
+          sdkmanager "platforms;android-37" "build-tools;37.0.0" "ndk;$ANDROID_NDK_VERSION" > tools/.reports/android-sdk-setup.log 2>&1 || { tail -100 tools/.reports/android-sdk-setup.log; exit 1; }
+          cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
+      - name: Compile actual Android application sources with the new Gradle stack
+        shell: bash
+        working-directory: flutter
+        run: |
+          set -euo pipefail
+          flutter build apk --debug --target-platform android-arm64 --no-pub > ../tools/.reports/android-gradle.log 2>&1 || { tail -140 ../tools/.reports/android-gradle.log; exit 1; }
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+      - name: Capture dependency and native project evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p tools/.reports/reviewed-source
+          git rev-parse HEAD > tools/.reports/revision.txt
+          git diff > tools/.reports/android-candidate.patch
+          for file in flutter/pubspec.yaml flutter/pubspec.lock flutter/android/gradle.properties flutter/android/gradle/wrapper/gradle-wrapper.properties flutter/android/gradle/wrapper/gradle-wrapper.jar flutter/android/gradlew flutter/android/gradlew.bat flutter/.flutter-plugins-dependencies; do
+            if test -f "$file"; then
+              mkdir -p "tools/.reports/reviewed-source/$(dirname "$file")"
+              cp "$file" "tools/.reports/reviewed-source/$file"
+            fi
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: android-migration-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
