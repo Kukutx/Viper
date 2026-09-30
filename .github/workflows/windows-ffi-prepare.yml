@@ -1,0 +1,55 @@
+name: Prepare exact Windows printer bridge repair
+
+on:
+  push:
+    branches: [codex/viper-windows-ffi-preparation]
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Apply only the reviewed printer return-type repair
+        run: |
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          path = Path('src/flutter_ffi.rs')
+          data = path.read_bytes()
+          def blob(data):
+              return hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
+          assert blob(data) == '77decfd6a016f43089288684fa1bf33bc86df98b'
+          old = '    return (\n        serde_json::to_string(&crate::platform::windows::get_printer_names().unwrap_or_default())\n            .unwrap_or_default(),\n    );'
+          new = '    return serde_json::to_string(&crate::platform::windows::get_printer_names().unwrap_or_default())\n        .unwrap_or_default();'
+          text = data.decode('utf-8')
+          assert text.count(old) == 1
+          result = text.replace(old, new).encode('utf-8')
+          assert blob(result) == '64c881cb9316230c3870c96fccc374ca36095dd2'
+          path.write_bytes(result)
+          PY
+          git diff --check
+          mkdir -p tools/.reports
+          git diff -- src/flutter_ffi.rs > tools/.reports/windows-printer.patch
+      - name: Store the reviewed blob without changing any ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST repos/Kukutx/Viper/git/blobs \
+            -F content=@src/flutter_ffi.rs -f encoding=utf-8 > tools/.reports/blob.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          assert json.loads(Path('tools/.reports/blob.json').read_text())['sha'] == '64c881cb9316230c3870c96fccc374ca36095dd2'
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reviewed-windows-printer-repair
+          path: tools/.reports/
+          retention-days: 3
+          if-no-files-found: error
