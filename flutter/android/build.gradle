@@ -1,3 +1,15 @@
+buildscript {
+    def androidTools = new groovy.json.JsonSlurper().parse(file('../../configs/android-toolchain.json'))
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // Supply the current compiler to AGP's built-in Kotlin without applying kotlin-android.
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${androidTools.kotlin}"
+    }
+}
+
 allprojects {
     repositories {
         google()

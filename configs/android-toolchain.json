@@ -6,6 +6,7 @@
   "wrapper_sha256": "238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5",
   "java": "27.0.0+35",
   "java_target": 17,
+  "kotlin": "2.4.20",
   "ndk": "30.0.16248370",
   "sdk_platform": "android-37.0",
   "compile_sdk": 37,
@@ -19,6 +20,7 @@
     "https://developer.android.com/build/releases/agp-9-4-0-release-notes",
     "https://gradle.org/release-checksums/",
     "https://github.com/adoptium/temurin27-binaries/releases/tag/jdk-27%2B35",
+    "https://github.com/JetBrains/kotlin/releases/tag/v2.4.20",
     "https://developer.android.com/ndk/downloads",
     "https://github.com/google/protobuf-gradle-plugin/releases/tag/v0.10.0",
     "https://github.com/protocolbuffers/protobuf/releases/tag/v36.2"
