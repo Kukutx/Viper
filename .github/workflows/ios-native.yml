@@ -9,11 +9,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ios-native-${{ github.ref }}
+  group: ios-native-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   ios:
-    name: iOS arm64 unsigned Release and static bridge
+    name: iOS arm64 unsigned Release, XCArchive and static bridge
     runs-on: xcode-27
     timeout-minutes: 60
     steps:
@@ -54,6 +54,12 @@ jobs:
           key: ios-xcode27-api15-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/arm64-ios.cmake') }}
       - name: Build and verify the unsigned iOS application
         run: bash tools/native/build-ios.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: liblibrustdesk.a
+          path: target/aarch64-apple-ios/release/liblibrustdesk.a
+          if-no-files-found: error
+          retention-days: 3
       - name: Record exact native source evidence
         if: always()
         run: |

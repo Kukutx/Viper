@@ -1,0 +1,12 @@
+name: Verify iOS archive convergence
+on:
+  push:
+    branches: [codex/viper-completion-validation]
+    paths: [.github/workflows/ios-completion-check.yml, .github/workflows/ios-native.yml, tools/**]
+permissions:
+  contents: read
+jobs:
+  foundation:
+    uses: ./.github/workflows/foundation.yml
+  ios:
+    uses: ./.github/workflows/ios-native.yml
