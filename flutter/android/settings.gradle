@@ -17,12 +17,18 @@ pluginManagement {
     }
     plugins {
         id "com.android.application" version androidToolchain.agp
+        id "org.jetbrains.kotlin.android" version androidToolchain.kotlin
         id "com.google.protobuf" version androidToolchain.protobuf_plugin
     }
 }
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    id "com.android.application" apply false
+    // Resolve the compiler beside Flutter's settings loader to avoid its KGP 2.0
+    // parent classloader. AGP supplies Kotlin; this plugin is never applied.
+    id "org.jetbrains.kotlin.android" apply false
+    id "com.google.protobuf" apply false
 }
 
 include ":app"

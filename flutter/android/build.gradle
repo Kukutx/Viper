@@ -1,26 +1,3 @@
-buildscript {
-    def androidToolchain = new groovy.json.JsonSlurper().parse(
-        new File(rootDir, "../../configs/toolchain.json")).android
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${androidToolchain.kotlin}"
-    }
-}
-
-// Resolve AGP and the reviewed Kotlin compiler together, before plugin subprojects.
-plugins {
-    id "com.android.application" apply false
-    id "com.google.protobuf" apply false
-}
-
-println('ANDROID_TOOLING_KGP_CLASS=' + org.jetbrains.kotlin.gradle.plugin.KotlinBaseApiPlugin.protectionDomain.codeSource.location)
-println('ANDROID_TOOLING_KGP_METHODS=' + org.jetbrains.kotlin.gradle.plugin.KotlinBaseApiPlugin.methods.findAll { it.name.contains('createKotlin') })
-println('ANDROID_TOOLING_AGP_CLASS=' + com.android.build.gradle.AppPlugin.protectionDomain.codeSource.location)
-println('ANDROID_TOOLING_CLASSPATH=' + buildscript.configurations.classpath.resolvedConfiguration.resolvedArtifacts.collect { it.moduleVersion.id })
-
 allprojects {
     repositories {
         google()
