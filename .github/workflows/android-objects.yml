@@ -1,0 +1,72 @@
+name: Preserve reviewed Android source objects
+on:
+  push:
+    branches: [codex/viper-android-preparation]
+permissions:
+  contents: read
+jobs:
+  objects:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14.7'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          repository: Kukutx/Viper
+          run-id: 36747372262
+          artifact-ids: 11112548741
+          github-token: ${{ github.token }}
+          path: reviewed
+          merge-multiple: true
+      - name: Store checksum-verified blobs without updating refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, hashlib, json, os, urllib.request
+          expected = {
+            'configs/actions-lock.json': '01d3548db8751cc50c69089067845bbe89630a589ae584bb75d4353c2428ec31',
+            'configs/toolchain.json': '032db2b8c7da4f0ba6e30f0cd86fbf2359830b08d2fc0a7e7547188709492b2e',
+            'flutter/android/app/build.gradle': '203eb7418205f8191ad0a46a4cc0e70ff184ec5d254efbba9603cfecbed3a046',
+            'flutter/android/app/src/main/AndroidManifest.xml': '296dd8fef37861a0d0dbe4cf08cf6f349c65cdcdeb50b87ffd2669ffbfd1ef3b',
+            'flutter/android/build.gradle': '9c51a704456638cd1c75c308643a1fa3791f4a54debbe7a6bb8ca367962be3e1',
+            'flutter/android/gradle/wrapper/gradle-wrapper.jar': '238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5',
+            'flutter/android/gradle/wrapper/gradle-wrapper.properties': 'b0ed3d628f9149a2ad3824409e5d95393c7463b622c40783a1ee83407f7602aa',
+            'flutter/android/gradle.properties': '022f2edac89c1aeeebec12838b661e0f89a356f1d8ac115a15594e0973dacce9',
+            'flutter/android/gradlew': 'a5a5c199ba02189ae8c46a334223371a20599d9c298ef65e7540ede4a3f72d59',
+            'flutter/android/gradlew.bat': 'f17917f8dbe61182b149273ee78090fec1197442c3f38276af907bfa5190db16',
+            'flutter/android/settings.gradle': 'cd93adb49c9c8b7cb01e2de28256a533aff3018b884d8bb0e7ddad309ac72c63',
+            'flutter/lib/mobile/pages/scan_page.dart': '68dadbced64a8ec35eefbb5a9c9d562e3490f8f624070e691052edc77650310b',
+            'flutter/pubspec.lock': '3a2a6c7124c2acad6444d1a77e1861942397dc5fa1ca394cd79a9e8cbb08015f',
+            'flutter/pubspec.yaml': '62fa908eec4043fa80650210107dd354c4070baf52a0451f4e3f6b588d4ae286',
+          }
+          contents = {}
+          for name, digest in expected.items():
+              path = Path('reviewed/reviewed-source') / name
+              assert path.is_file() and not path.is_symlink() and path.stat().st_size < 500000
+              data = path.read_bytes()
+              assert hashlib.sha256(data).hexdigest() == digest, name
+              contents[name] = data
+          tree = []
+          for name, data in contents.items():
+              req = urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs',
+                  data=json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode(),
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'}, method='POST')
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  sha = json.load(response)['sha']
+              assert sha == hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest(), name
+              tree.append({'path': name, 'mode': '100755' if name.endswith('/gradlew') else '100644', 'type': 'blob', 'sha': sha})
+          Path('objects.json').write_text(json.dumps(tree, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reviewed-android-git-objects
+          path: objects.json
+          retention-days: 1
+          if-no-files-found: error
