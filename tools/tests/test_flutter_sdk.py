@@ -38,6 +38,17 @@ class FlutterSdkTests(unittest.TestCase):
         self.assertEqual(json.loads((reports / 'flutter-version.json').read_text()), self.sdk)
         self.assertEqual((reports / 'flutter-version.json.stderr.log').read_text(), 'version details')
 
+    def test_reviewed_framework_revision_is_checked(self):
+        path = self.root / 'configs/toolchain.json'
+        data = json.loads(path.read_text())
+        data['flutter_revision'] = 'a' * 40
+        path.write_text(json.dumps(data))
+        self.sdk['frameworkRevision'] = 'a' * 40
+        self.verify()
+        self.sdk['frameworkRevision'] = 'b' * 40
+        with self.assertRaisesRegex(ValueError, 'revision'):
+            self.verify()
+
     def test_flutter_version_mismatch(self):
         self.sdk['frameworkVersion'] = '3.24.5'
         with self.assertRaises(ValueError): self.verify()

@@ -21,16 +21,32 @@
     "sources": [
       "https://apps.apple.com/us/app/xcode/id497799835",
       "https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md"
-    ]
+    ],
+    "deployment_target": "12.3"
   },
   "flutter_rust_bridge": {
     "version": "2.13.0",
     "assets": {
-      "linux-x86_64": {"target": "x86_64-unknown-linux-musl", "sha256": "58de00e9a9cc60fce98a052917f68ac61889825f90ce25eb185cc9d32dc1ff48"},
-      "linux-aarch64": {"target": "aarch64-unknown-linux-musl", "sha256": "8833f7c59baf5ad097852f12764a5f0fdb31a1b9b3687310c5e159d04ce1e68d"},
-      "darwin-aarch64": {"target": "aarch64-apple-darwin", "sha256": "6971a50a83dccb035688c3938982707b58ca41cf243bea3df06101f3af42be96"},
-      "darwin-x86_64": {"target": "x86_64-apple-darwin", "sha256": "fe0440000e0f0d94a28d20c1328e94635b9d2e3826ce761d0ab9e5cfa4939e16"},
-      "windows-x86_64": {"target": "x86_64-pc-windows-msvc", "sha256": "58b949ac436440015fbae0372f35564e88c4b5eef119ee7b69fe80245f74d495"}
+      "linux-x86_64": {
+        "target": "x86_64-unknown-linux-musl",
+        "sha256": "58de00e9a9cc60fce98a052917f68ac61889825f90ce25eb185cc9d32dc1ff48"
+      },
+      "linux-aarch64": {
+        "target": "aarch64-unknown-linux-musl",
+        "sha256": "8833f7c59baf5ad097852f12764a5f0fdb31a1b9b3687310c5e159d04ce1e68d"
+      },
+      "darwin-aarch64": {
+        "target": "aarch64-apple-darwin",
+        "sha256": "6971a50a83dccb035688c3938982707b58ca41cf243bea3df06101f3af42be96"
+      },
+      "darwin-x86_64": {
+        "target": "x86_64-apple-darwin",
+        "sha256": "fe0440000e0f0d94a28d20c1328e94635b9d2e3826ce761d0ab9e5cfa4939e16"
+      },
+      "windows-x86_64": {
+        "target": "x86_64-pc-windows-msvc",
+        "sha256": "58b949ac436440015fbae0372f35564e88c4b5eef119ee7b69fe80245f74d495"
+      }
     }
   },
   "vcpkg": {
@@ -58,5 +74,6 @@
     "cargo_expand": "https://github.com/dtolnay/cargo-expand/releases/tag/1.0.126",
     "vcpkg": "https://github.com/microsoft/vcpkg/releases/tag/2026.07.29",
     "flutter_rust_bridge": "https://github.com/fzyzcjy/flutter_rust_bridge/releases/tag/v2.13.0"
-  }
+  },
+  "flutter_revision": "6a19cca56475dbfba1478ee68d7bd0c2ef891da1"
 }

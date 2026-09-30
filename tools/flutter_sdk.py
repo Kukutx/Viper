@@ -40,6 +40,8 @@ def verify(root: Path = ROOT) -> str:
         raise ValueError('Flutter version report has no Dart SDK version')
     if sdk.get('frameworkVersion') != expected['flutter'] or dart.split()[0] != expected['dart']:
         raise ValueError(f"Expected Flutter {expected['flutter']} / Dart {expected['dart']}; got {sdk}")
+    if 'flutter_revision' in expected and sdk.get('frameworkRevision') != expected['flutter_revision']:
+        raise ValueError('Flutter framework revision differs from the reviewed commit')
     if sdk.get('channel') != 'stable':
         raise ValueError('The pinned Flutter SDK must use the stable channel')
     print(f"Verified Flutter {expected['flutter']} / Dart {expected['dart']}: {executable}")

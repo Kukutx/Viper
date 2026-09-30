@@ -19,7 +19,7 @@ class FlutterWorkflowTests(unittest.TestCase):
     def test_existing_consumers_receive_the_same_current_files(self):
         export = self.workflow('bridge.yml')['jobs']['export']
         self.assertEqual(set(export['strategy']['matrix']['artifact']),
-                         {'bridge-artifact', 'bridge-artifact-flutter-3.44'})
+                         {'bridge-artifact'})
         upload = export['steps'][-1]['with']
         self.assertEqual(upload['path'].splitlines(),
                          ['src/bridge_generated.rs', 'flutter/lib/generated/*.dart'])

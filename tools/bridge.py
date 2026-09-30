@@ -107,11 +107,15 @@ def check(root: Path = ROOT) -> None:
     print(f'Rust, Dart and generator versions agree: {version}')
 
 
-def generate(root: Path = ROOT) -> None:
+def generate(root: Path = ROOT, from_source: bool = False) -> None:
     check(root)
     from flutter_sdk import verify
     flutter = verify(root)
-    executable = install(root)
+    if from_source:
+        from bridge_source import install as install_from_source
+        executable = install_from_source(root)
+    else:
+        executable = install(root)
     from cargo_tools import expand_environment
     environment = expand_environment(root)
     subprocess.run(['cargo', 'metadata', '--locked', '--no-deps', '--format-version', '1'], cwd=root, check=True, stdout=subprocess.DEVNULL)
@@ -125,9 +129,15 @@ def generate(root: Path = ROOT) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('check', 'install', 'generate'))
+    parser.add_argument('--from-source', action='store_true', help='Build the exact generator from locked source for distribution builds')
     args = parser.parse_args()
+    if args.from_source and args.command != 'generate':
+        parser.error('--from-source requires generate')
     try:
-        {'check': check, 'install': install, 'generate': generate}[args.command]()
+        if args.command == 'generate':
+            generate(from_source=args.from_source)
+        else:
+            {'check': check, 'install': install}[args.command]()
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         print(f'ERROR: {error}', file=sys.stderr)
         return 1

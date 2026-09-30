@@ -38,20 +38,17 @@ prepare_flutter() {
 	git restore .
 	git checkout "${VERSION}"
 
-	# Patch flutter
+	# Do not apply old SDK patches to the current stable checkout.
+	test "$(git rev-parse HEAD)" = "$(python3 "${ROOTDIR}/tools/build_toolchain.py" --value flutter_revision)"
 
-	if dpkg --compare-versions "${VERSION}" ge "3.24.4"; then
-		git apply "${ROOTDIR}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
-	fi
-
-	flutter config --no-analytics
+	"${FLUTTER_DIR}/bin/flutter" config --no-analytics
 
 	popd # ${FLUTTER_DIR}
 }
 
 # Start of script
 
-set -x
+set -ex
 
 # Note current working directory as root dir for patches
 
@@ -135,46 +132,20 @@ prebuild)
 		.env.CARGO_NDK_VERSION \
 		.github/workflows/flutter-build.yml)"
 
-	# Flutter used to compile main Rustdesk library
-
-	FLUTTER_VERSION="$(yq -r \
-		.env.ANDROID_FLUTTER_VERSION \
-		.github/workflows/flutter-build.yml)"
-
-	if [ -z "${FLUTTER_VERSION}" ]; then
-		FLUTTER_VERSION="$(yq -r \
-			.env.FLUTTER_VERSION \
-			.github/workflows/flutter-build.yml)"
-	fi
-
-	# Flutter used to compile Flutter<->Rust bridge files
-
-	CARGO_EXPAND_VERSION="$(yq -r \
-		.env.CARGO_EXPAND_VERSION \
-		.github/workflows/bridge.yml)"
-
-	FLUTTER_BRIDGE_VERSION="$(yq -r \
-		.env.FLUTTER_VERSION \
-		.github/workflows/bridge.yml)"
-
-	FLUTTER_RUST_BRIDGE_VERSION="$(yq -r \
-		.env.FLUTTER_RUST_BRIDGE_VERSION \
-		.github/workflows/bridge.yml)"
+	# One SDK and generator from the central configuration, not workflow internals.
+	FLUTTER_VERSION="$(python3 tools/build_toolchain.py --value flutter)"
+	CARGO_EXPAND_VERSION="$(python3 tools/build_toolchain.py --value cargo_expand)"
+	FLUTTER_RUST_BRIDGE_VERSION="$(python3 tools/build_toolchain.py --value flutter_rust_bridge.version)"
 
 	NDK_VERSION="$(yq -r \
 		.env.NDK_VERSION \
 		.github/workflows/flutter-build.yml)"
 
-	RUST_VERSION="$(yq -r \
-		.env.RUST_VERSION \
-		.github/workflows/flutter-build.yml)"
+	RUST_VERSION="$(python3 tools/build_toolchain.py --value rust)"
 
-	VCPKG_COMMIT_ID="$(yq -r \
-		.env.VCPKG_COMMIT_ID \
-		.github/workflows/flutter-build.yml)"
+	VCPKG_COMMIT_ID="$(python3 tools/build_toolchain.py --value vcpkg.revision)"
 
 	if [ -z "${CARGO_NDK_VERSION}" ] || [ -z "${FLUTTER_VERSION}" ] ||
-		[ -z "${FLUTTER_BRIDGE_VERSION}" ] ||
 		[ -z "${FLUTTER_RUST_BRIDGE_VERSION}" ] ||
 		[ -z "${NDK_VERSION}" ] || [ -z "${RUST_VERSION}" ] ||
 		[ -z "${VCPKG_COMMIT_ID}" ]; then
@@ -232,17 +203,6 @@ prebuild)
 	cargo install \
 		cargo-ndk \
 		--version "${CARGO_NDK_VERSION}" \
-		--locked
-
-	# Install rust bridge generator
-
-	cargo install \
-		cargo-expand \
-		--version "${CARGO_EXPAND_VERSION}" \
-		--locked
-	cargo install flutter_rust_bridge_codegen \
-		--version "${FLUTTER_RUST_BRIDGE_VERSION}" \
-		--features "uuid" \
 		--locked
 
 	# Populate native vcpkg dependencies
@@ -306,70 +266,10 @@ prebuild)
 
 	git apply res/fdroid/patches/*.patch
 
-	# If Flutter version used to generate bridge files differs from Flutter
-	# version used to compile Rustdesk library, generate bridge using the
-	# `FLUTTER_BRIDGE_VERSION` an restore the pubspec later
-
-	if [ "${FLUTTER_VERSION}" != "${FLUTTER_BRIDGE_VERSION}" ]; then
-		# Find first libclang.so and set BRIDGE_LLVM_PATH
-
-		BRIDGE_LLVM_PATH="$(find /usr/lib/ -name libclang.so | head -n1)"
-
-		if [ -z "${BRIDGE_LLVM_PATH}" ]; then
-			echo 'ERROR: Can not find libclang.so for bridge generator!' >&2
-			exit 1
-		fi
-
-		BRIDGE_LLVM_PATH="$(dirname "${BRIDGE_LLVM_PATH}")"
-		BRIDGE_LLVM_PATH="$(dirname "${BRIDGE_LLVM_PATH}")"
-
-		# Install Flutter bridge version
-
-		prepare_flutter "${FLUTTER_BRIDGE_VERSION}" "${HOME}/flutter"
-
-		# Save changes
-
-		git add .
-
-		# Edit pubspec to make flutter bridge version work
-
-		sed \
-			-i \
-			-e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' \
-			flutter/pubspec.yaml
-
-		# Download Flutter dependencies
-
-		pushd flutter
-
-		flutter clean
-		flutter packages pub get
-
-		popd # flutter
-
-		# Generate FFI bindings
-
-		flutter_rust_bridge_codegen \
-			--rust-input ./src/flutter_ffi.rs \
-			--dart-output ./flutter/lib/generated_bridge.dart \
-			--llvm-path "${BRIDGE_LLVM_PATH}"
-
-		# Add bridge files to save-list
-
-		git add -f ./flutter/lib/generated_bridge.* ./src/bridge_generated.*
-
-		# Restore everything
-
-		git checkout '*'
-		git clean -dffx
-		git reset
-
-		unset BRIDGE_LLVM_PATH
-	fi
-
-	# Install Flutter version for RustDesk library build
-
+	# Regenerate FRB 2 from locked source with the same SDK used to build the app.
 	prepare_flutter "${FLUTTER_VERSION}" "${HOME}/flutter"
+	export PATH="${HOME}/flutter/bin:${PATH}"
+	python3 tools/bridge.py generate --from-source
 
 	# gms is not in these files now, but we still keep the following line for future reference(maybe).
 
@@ -409,15 +309,7 @@ build)
 
 	# Flutter used to compile main Rustdesk library
 
-	FLUTTER_VERSION="$(yq -r \
-		.env.ANDROID_FLUTTER_VERSION \
-		.github/workflows/flutter-build.yml)"
-
-	if [ -z "${FLUTTER_VERSION}" ]; then
-		FLUTTER_VERSION="$(yq -r \
-			.env.FLUTTER_VERSION \
-			.github/workflows/flutter-build.yml)"
-	fi
+	FLUTTER_VERSION="$(python3 tools/build_toolchain.py --value flutter)"
 
 	NDK_VERSION="$(yq -r \
 		.env.NDK_VERSION \
@@ -445,7 +337,7 @@ build)
 	pushd flutter
 
 	flutter clean
-	flutter packages pub get
+	flutter pub get --enforce-lockfile
 
 	popd # flutter
 
@@ -596,7 +488,7 @@ build)
 	pushd flutter
 
 	if [ "${ANDROID_ABI}" = "x86" ]; then
-		flutter build apk \
+		flutter build apk --no-pub \
 			--local-engine-src-path="$(readlink -mf "../flutter-sdk/src")" \
 			--local-engine=android_jit_release_x86 \
 			--debug \
@@ -604,7 +496,7 @@ build)
 			--build-name="${VERNAME}" \
 			--target-platform "${FLUTTER_TARGET}"
 	else
-		flutter build apk \
+		flutter build apk --no-pub \
 			--release \
 			--build-number="${VERCODE}" \
 			--build-name="${VERNAME}" \
