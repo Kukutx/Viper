@@ -1,0 +1,68 @@
+name: Android native migration diagnostics
+on:
+  push:
+    branches: [codex/viper-android-diagnostic]
+    paths: ['.github/workflows/android-native-diagnostic.yml', 'tools/native/setup-android.sh', 'Cargo.toml', 'Cargo.lock', 'res/vcpkg-triplets/**']
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Read pinned native toolchain
+        run: |
+          mkdir -p tools/.reports
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          data=json.load(open('configs/toolchain.json'))['android']
+          print('CARGO_NDK_VERSION='+data['cargo_ndk'])
+          print('ANDROID_MIN_SDK='+str(data['min_sdk']))
+          PY
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          prefix-key: android-ndk30-arm64
+          cache-on-failure: true
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.cache/viper-vcpkg-android
+          key: android-native-r30-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/**') }}
+      - name: Prepare pinned NDK and full hardware-codec dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y nasm autoconf automake libtool pkg-config libclang-dev libasound2-dev libpulse-dev libudev-dev libva-dev libx11-dev libxfixes-dev libxrandr-dev libxtst-dev libxdo-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+          bash tools/native/setup-android.sh arm64-v8a
+      - name: Compile the actual Android Rust library with hardware codecs
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-linux-android
+          cargo install cargo-ndk --locked --version "=$CARGO_NDK_VERSION" --root "$GITHUB_WORKSPACE/.tools/android-cargo" > tools/.reports/cargo-ndk-install.log 2>&1
+          .tools/android-cargo/bin/cargo-ndk --version
+          .tools/android-cargo/bin/cargo-ndk ndk --platform "$ANDROID_MIN_SDK" --target aarch64-linux-android build --locked --release --lib --features flutter,hwcodec > tools/.reports/android-cargo.log 2>&1 || { tail -160 tools/.reports/android-cargo.log; exit 1; }
+          test -s target/aarch64-linux-android/release/liblibrustdesk.so
+          mkdir -p tools/.reports/native
+          cp target/aarch64-linux-android/release/liblibrustdesk.so tools/.reports/native/
+          cp "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" tools/.reports/native/
+          "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -l -d tools/.reports/native/liblibrustdesk.so > tools/.reports/android-elf.log
+          sha256sum tools/.reports/native/*.so > tools/.reports/native/SHA256SUMS
+          git diff --exit-code -- Cargo.lock
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: android-native-diagnostics-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
