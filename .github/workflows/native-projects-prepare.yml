@@ -1,0 +1,88 @@
+name: Prepare reviewed native project objects
+
+on:
+  push:
+    branches: [codex/viper-native-project-preparation]
+    paths: [.github/workflows/native-projects-prepare.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: github.repository == 'Kukutx/Viper' && github.ref == 'refs/heads/codex/viper-native-project-preparation'
+    runs-on: macos-15
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Apply exact reviewed project migrations
+        run: |
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          expected = {
+              'flutter/macos/Runner.xcodeproj/project.pbxproj': 'c41bfa117443c5edc4d777d6a574bb9a3e9fdcd1',
+              'flutter/ios/Runner.xcodeproj/project.pbxproj': '36dc89ea8a968e86028e3616cb0960a87a358416',
+          }
+          for name, sha in expected.items():
+              data = Path(name).read_bytes()
+              assert hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest() == sha, name
+          p = Path('flutter/macos/Runner.xcodeproj/project.pbxproj')
+          text = p.read_text()
+          line = next(line for line in text.splitlines(True) if '/* liblibrustdesk.dylib in Frameworks */ = ' in line)
+          assert 'settings = {ATTRIBUTES = (Weak, ); };' in line
+          text = text.replace(line, line.replace(' settings = {ATTRIBUTES = (Weak, ); };', ''))
+          old = 'name = bridge_generated.h; path = Runner/bridge_generated.h;'
+          assert text.count(old) == 1
+          text = text.replace(old, 'name = "Runner-Bridging-Header.h"; path = "Runner/Runner-Bridging-Header.h";')
+          text = text.replace('/* bridge_generated.h */', '/* Runner-Bridging-Header.h */')
+          old = '\t\t\t\t"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = Runner/bridge_generated.h;\n'
+          assert text.count(old) == 2
+          text = text.replace(old, '')
+          assert 'bridge_generated.h' not in text
+          p.write_text(text)
+          p = Path('flutter/ios/Runner.xcodeproj/project.pbxproj')
+          text = p.read_text()
+          old = '\t\t\t\t\t"$(PROJECT_DIR)/../../target/aarch64-apple-ios/release/liblibrustdesk.a",'
+          assert text.count(old) == 3
+          text = text.replace(old, '\t\t\t\t\t"-force_load",\n' + old)
+          assert text.count('DEAD_CODE_STRIPPING = NO;') == 3
+          p.write_text(text)
+          PY
+          plutil -lint flutter/macos/Runner.xcodeproj/project.pbxproj
+          plutil -lint flutter/ios/Runner.xcodeproj/project.pbxproj
+          git diff --check
+          mkdir -p tools/.reports
+          git diff -- flutter/macos/Runner.xcodeproj/project.pbxproj flutter/ios/Runner.xcodeproj/project.pbxproj > tools/.reports/native-projects.patch
+      - name: Preserve only reviewed blobs, without moving any branch
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const paths = ['flutter/macos/Runner.xcodeproj/project.pbxproj', 'flutter/ios/Runner.xcodeproj/project.pbxproj'];
+            const objects = [];
+            for (const path of paths) {
+              const content = fs.readFileSync(path, 'utf8');
+              const bytes = Buffer.from(content, 'utf8');
+              const expected = crypto.createHash('sha1').update(Buffer.from(`blob ${bytes.length}\0`)).update(bytes).digest('hex');
+              const { data } = await github.rest.git.createBlob({...context.repo, content, encoding: 'utf-8'});
+              if (data.sha !== expected) throw new Error(`Blob checksum mismatch: ${path}`);
+              objects.push({path, mode: '100644', type: 'blob', sha: data.sha});
+            }
+            fs.writeFileSync('tools/.reports/native-projects.json', JSON.stringify({source: context.sha, objects}, null, 2));
+            core.info(JSON.stringify(objects));
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reviewed-native-projects-${{ github.sha }}
+          path: tools/.reports/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
