@@ -51,6 +51,10 @@ jobs:
         with:
           prefix-key: flutter-v2-migration
           cache-on-failure: true
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/cargo
+          key: viper-cargo-tools-${{ runner.os }}-${{ hashFiles('configs/toolchain.json', 'tools/cargo_tools.py', 'rust-toolchain.toml') }}
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: native-cache
         with:
@@ -66,6 +70,7 @@ jobs:
       - name: Verify reproducible bindings and locked dependencies
         run: |
           python tools/bridge.py generate > tools/.reports/codegen.log 2>&1 || { tail -100 tools/.reports/codegen.log; exit 1; }
+          python tools/check_bridge_outputs.py
           git diff --exit-code -- Cargo.lock flutter/pubspec.yaml flutter/pubspec.lock src/bridge_generated.rs flutter/lib/generated
           test -z "$(git ls-files --others -- src/bridge_generated.rs flutter/lib/generated)"
       - name: Analyze Flutter without suppressing diagnostics

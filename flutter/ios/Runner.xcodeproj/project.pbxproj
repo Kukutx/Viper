@@ -381,6 +381,7 @@
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
+					"-force_load",
 					"$(PROJECT_DIR)/../../target/aarch64-apple-ios/release/liblibrustdesk.a",
 					"-ObjC",
 					"-l\"c++\"",
@@ -577,6 +578,7 @@
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
+					"-force_load",
 					"$(PROJECT_DIR)/../../target/aarch64-apple-ios/release/liblibrustdesk.a",
 					"-ObjC",
 					"-l\"c++\"",
@@ -665,6 +667,7 @@
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
+					"-force_load",
 					"$(PROJECT_DIR)/../../target/aarch64-apple-ios/release/liblibrustdesk.a",
 					"-ObjC",
 					"-l\"c++\"",
