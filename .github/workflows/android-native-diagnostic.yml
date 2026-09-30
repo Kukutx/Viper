@@ -5,6 +5,9 @@ on:
     paths: ['.github/workflows/android-native-diagnostic.yml', 'tools/native/setup-android.sh', 'Cargo.toml', 'Cargo.lock', 'res/vcpkg-triplets/**']
 permissions:
   contents: read
+concurrency:
+  group: android-native-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   native:
     runs-on: ubuntu-24.04
@@ -35,7 +38,8 @@ jobs:
         with:
           prefix-key: android-ndk30-arm64
           cache-on-failure: true
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        id: native-cache
         with:
           path: ~/.cache/viper-vcpkg-android
           key: android-native-r30-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/**') }}
@@ -44,13 +48,19 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y nasm autoconf automake libtool pkg-config libclang-dev libasound2-dev libpulse-dev libudev-dev libva-dev libx11-dev libxfixes-dev libxrandr-dev libxtst-dev libxdo-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev
           bash tools/native/setup-android.sh arm64-v8a
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/viper-vcpkg-android
+          key: android-native-r30-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/**') }}
       - name: Compile the actual Android Rust library with hardware codecs
         run: |
           set -euo pipefail
           rustup target add aarch64-linux-android
           cargo install cargo-ndk --locked --version "=$CARGO_NDK_VERSION" --root "$GITHUB_WORKSPACE/.tools/android-cargo" > tools/.reports/cargo-ndk-install.log 2>&1
-          .tools/android-cargo/bin/cargo-ndk --version
-          .tools/android-cargo/bin/cargo-ndk ndk --platform "$ANDROID_MIN_SDK" --target aarch64-linux-android build --locked --release --lib --features flutter,hwcodec > tools/.reports/android-cargo.log 2>&1 || { tail -160 tools/.reports/android-cargo.log; exit 1; }
+          export PATH="$GITHUB_WORKSPACE/.tools/android-cargo/bin:$PATH"
+          test "$(cargo ndk --version)" = "cargo-ndk $CARGO_NDK_VERSION"
+          cargo ndk --platform "$ANDROID_MIN_SDK" --target aarch64-linux-android build --locked --release --lib --features flutter,hwcodec > tools/.reports/android-cargo.log 2>&1 || { tail -160 tools/.reports/android-cargo.log; exit 1; }
           test -s target/aarch64-linux-android/release/liblibrustdesk.so
           mkdir -p tools/.reports/native
           cp target/aarch64-linux-android/release/liblibrustdesk.so tools/.reports/native/
