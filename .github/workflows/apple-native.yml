@@ -76,6 +76,11 @@ jobs:
           flutter pub get --enforce-lockfile
           flutter build macos --debug --no-pub > ../tools/.reports/macos-flutter.log 2>&1 || { tail -120 ../tools/.reports/macos-flutter.log; exit 1; }
           git diff --exit-code -- pubspec.yaml pubspec.lock
+      - name: Verify the native dependency lock in deployment mode
+        working-directory: flutter/macos
+        run: |
+          pod install --deployment > ../../tools/.reports/macos-pods-deployment.log 2>&1 || { tail -100 ../../tools/.reports/macos-pods-deployment.log; exit 1; }
+          git diff --exit-code -- Podfile Podfile.lock
       - name: Exercise the bundled native library
         working-directory: flutter
         env:
@@ -87,7 +92,7 @@ jobs:
           otool -L "$VIPER_NATIVE_LIBRARY" > ../tools/.reports/macos-linked-libraries.log
           flutter test --no-pub test_native/bridge_ffi_test.dart > ../tools/.reports/macos-ffi.log 2>&1 || { tail -100 ../tools/.reports/macos-ffi.log; exit 1; }
       - name: Require unchanged native project settings
-        run: git diff --exit-code -- flutter/macos/Runner.xcodeproj/project.pbxproj flutter/macos/Podfile flutter/macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme
+        run: git diff --exit-code -- flutter/macos/Runner.xcodeproj/project.pbxproj flutter/macos/Podfile flutter/macos/Podfile.lock flutter/macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme
       - name: Capture native dependency and project evidence
         if: always()
         run: |
