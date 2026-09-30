@@ -12,7 +12,7 @@ permissions:
   contents: read
 concurrency:
   group: windows-native-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   windows:
@@ -42,11 +42,10 @@ jobs:
           python -m pip install -r tools/requirements-dev.txt
           python tools/viper.py env >> "$GITHUB_ENV"
           python tools/bridge.py check
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          architecture: ${{ matrix.arch }}
-          cache: true
+          mkdir -p tools/.reports
+          git rev-parse HEAD > tools/.reports/revision.txt
+      - name: Bootstrap the immutable native Flutter SDK
+        run: python tools/install_windows_flutter.py --github-env
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           prefix-key: windows-native-vs18-${{ matrix.arch }}
