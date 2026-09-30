@@ -22,8 +22,8 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           repository: Kukutx/Viper
-          run-id: 36754376925
-          artifact-ids: 11116713460
+          run-id: 36758272955
+          artifact-ids: 11118726325
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/ios-reviewed
           merge-multiple: true
@@ -35,9 +35,9 @@ jobs:
           from pathlib import Path, PurePosixPath
           import hashlib, json, os, zipfile
           file=Path(os.environ['REVIEWED_DIR'])/'ios-native-source.zip'
-          assert hashlib.sha256(file.read_bytes()).hexdigest()=='2386198809f1f206b4b6c9729781754955abd008b6356ae741f05ce33f13ece6'
+          assert hashlib.sha256(file.read_bytes()).hexdigest()=='c9eae0689f28d5c72624397f2d407160ae36d2caae83f8119d1cbd5a78fc8942'
           with zipfile.ZipFile(file) as z:
-              assert len(z.namelist())==26 and len(set(z.namelist()))==26
+              assert len(z.namelist())==27 and len(set(z.namelist()))==27
               for item in z.infolist():
                   path=PurePosixPath(item.filename)
                   assert '..' not in path.parts and not path.is_absolute() and item.file_size<500000
@@ -46,40 +46,26 @@ jobs:
                   assert not dest.is_symlink()
                   dest.parent.mkdir(parents=True,exist_ok=True)
                   dest.write_bytes(z.read(item))
+          for name in ['Podfile','Podfile.lock']:
+              Path('flutter/ios',name).unlink()
           p=Path('configs/toolchain.json'); data=json.loads(p.read_text())
           data['ios']={'minimum':'15.0','sdk':'27.0','verified_at':'2026-09-30'}
           p.write_text(json.dumps(data,indent=2)+'\n')
+          p=Path('flutter/ios/Runner.xcodeproj/project.pbxproj'); text=p.read_text()
+          anchor='\t\t\t\t\t"\\"Foundation\\"",\n'
+          assert text.count(anchor)==3
+          text=text.replace(anchor,anchor+'\t\t\t\t\t"-framework",\n\t\t\t\t\t"\\"SystemConfiguration\\"",\n')
+          p.write_text(text)
+          p=Path('libs/scrap/build.rs'); text=p.read_text()
+          anchor='    if target_os == "ios" {\n        // nothing\n'
+          assert text.count(anchor)==1
+          p.write_text(text.replace(anchor,'    if target_os == "ios" {\n        // Bundle the JPEG implementation required by the static libyuv archive.\n        find_package("jpeg");\n'))
           PY
           python -m pip install -r tools/requirements-dev.txt
           python tools/viper.py env >> "$GITHUB_ENV"
           python tools/apple_sdk.py --github-env
           mkdir -p tools/.reports
           cp "$REVIEWED_DIR/ios-resource-hashes.json" tools/.reports/
-      - name: Remove retired CocoaPods integration and manual plugin framework flags
-        run: |
-          (cd flutter/ios && pod deintegrate) > tools/.reports/ios-deintegrate.log 2>&1
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('flutter/ios/Runner.xcodeproj/project.pbxproj'); text=p.read_text()
-          retired=['DKImagePickerController','DKPhotoGallery','MTBBarcodeScanner','SDWebImage','SwiftyGif','device_info_plus','file_picker','flutter_keyboard_visibility','image_picker_ios','package_info_plus','path_provider_foundation','qr_code_scanner','sqflite','uni_links','url_launcher_ios','video_player_avfoundation','wakelock_plus']
-          for name in retired:
-              block='\t\t\t\t\t"-framework",\n\t\t\t\t\t"\\"'+name+'\\"",\n'
-              assert text.count(block)==3,(name,text.count(block))
-              text=text.replace(block,'')
-          p.write_text(text)
-          for name in ['Podfile','Podfile.lock']:
-              Path('flutter/ios',name).unlink()
-          for mode in ['Debug','Release']:
-              p=Path('flutter/ios/Flutter',mode+'.xcconfig'); text=p.read_text()
-              lines=text.splitlines(keepends=True)
-              removed=[line for line in lines if line.startswith('#include? "Pods/')]
-              assert len(removed)==1
-              p.write_text(''.join(line for line in lines if line not in removed))
-          p=Path('flutter/ios/Runner.xcworkspace/contents.xcworkspacedata'); text=p.read_text()
-          block='   <FileRef\n      location = "group:Pods/Pods.xcodeproj">\n   </FileRef>\n'
-          assert text.count(block)==1
-          p.write_text(text.replace(block,''))
-          PY
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -143,8 +129,8 @@ jobs:
           import subprocess, zipfile
           out=Path('tools/.reports'); out.mkdir(parents=True,exist_ok=True)
           (out/'ios-revision.txt').write_bytes(subprocess.check_output(['git','rev-parse','HEAD']))
-          (out/'ios-changes.patch').write_bytes(subprocess.check_output(['git','diff','--binary','--','flutter/ios','res/vcpkg-triplets/arm64-ios.cmake']))
-          names=['flutter/ios/Runner/AppDelegate.swift','flutter/ios/Runner/Info.plist','flutter/ios/Flutter/AppFrameworkInfo.plist','flutter/ios/Flutter/Debug.xcconfig','flutter/ios/Flutter/Release.xcconfig','flutter/ios/Runner.xcodeproj/project.pbxproj','flutter/ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme','flutter/ios/Runner.xcworkspace/contents.xcworkspacedata','res/vcpkg-triplets/arm64-ios.cmake']
+          (out/'ios-changes.patch').write_bytes(subprocess.check_output(['git','diff','--binary','--','flutter/ios','res/vcpkg-triplets/arm64-ios.cmake','libs/scrap/build.rs','configs/toolchain.json']))
+          names=['flutter/ios/Runner/AppDelegate.swift','flutter/ios/Runner/Info.plist','flutter/ios/Flutter/AppFrameworkInfo.plist','flutter/ios/Flutter/Debug.xcconfig','flutter/ios/Flutter/Release.xcconfig','flutter/ios/Runner.xcodeproj/project.pbxproj','flutter/ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme','flutter/ios/Runner.xcworkspace/contents.xcworkspacedata','res/vcpkg-triplets/arm64-ios.cmake','libs/scrap/build.rs','configs/toolchain.json','tools/verify_ios_bundle.py']
           names += [str(p) for p in Path('flutter/ios/Runner/Assets.xcassets').rglob('*.png')]
           names += [str(p) for base in ('flutter/ios/Runner.xcodeproj','flutter/ios/Runner.xcworkspace') for p in Path(base).rglob('Package.resolved')]
           with zipfile.ZipFile(out/'ios-native-source.zip','w',zipfile.ZIP_DEFLATED) as archive:
