@@ -1,12 +1,12 @@
 {
   "verified_at": "2026-09-30",
   "runner": "windows-2025-vs2026",
-  "visual_studio": "18.10.12210.168",
+  "visual_studio": "18.10.12217.157",
   "llvm": "23.1.2",
   "llvm_url": "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.2/clang%2Bllvm-23.1.2-x86_64-pc-windows-msvc.tar.xz",
   "llvm_sha256": "8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095",
   "sources": [
-    "https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-VS2026-Readme.md",
+    "https://github.com/actions/runner-images/blob/win25-vs2026/20260925.250/images/windows/Windows2025-VS2026-Readme.md",
     "https://github.com/llvm/llvm-project/releases/tag/llvmorg-23.1.2"
   ]
 }

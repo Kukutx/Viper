@@ -4,6 +4,7 @@ on:
     branches: [main]
   push:
     branches: [main, codex/viper-native-platform-completion]
+    paths: ['.github/workflows/windows-native.yml', 'tools/native/*windows*', 'configs/windows-toolchain.json', 'Cargo.toml', 'Cargo.lock', 'flutter/windows/**']
   workflow_dispatch:
   workflow_call:
 permissions:
@@ -30,11 +31,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
+          New-Item tools/.reports -ItemType Directory -Force | Out-Null
+          git rev-parse HEAD | Set-Content tools/.reports/revision.txt -Encoding utf8
           python -m pip install -r tools/requirements-dev.txt
           python tools/viper.py env | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           python tools/bridge.py check
           python tools/check_bridge_outputs.py
-          New-Item tools/.reports -ItemType Directory -Force | Out-Null
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -49,9 +51,9 @@ jobs:
           path: ~/.cache/viper-vcpkg-windows
           key: windows-native-${{ hashFiles('configs/windows-toolchain.json', 'configs/toolchain.json', 'res/vcpkg/**', 'tools/native/setup-windows.ps1') }}
       - name: Prepare pinned compiler and native dependencies
-        run: ./tools/native/setup-windows.ps1
+        run: ./tools/native/setup-windows.ps1 *> tools/.reports/windows-setup.log
       - name: Build actual Release bundle and exercise bundled FFI
-        run: ./tools/native/build-windows-bundle.ps1
+        run: ./tools/native/build-windows-bundle.ps1 *> tools/.reports/windows-build.log
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
