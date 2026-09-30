@@ -1,0 +1,76 @@
+name: iOS native validation
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, codex/viper-platform-completion-check]
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+concurrency:
+  group: ios-native-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  ios:
+    name: iOS arm64 unsigned Release and static bridge
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Validate committed sources and select the exact Apple SDK
+        run: |
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          python tools/apple_sdk.py --ios --github-env
+          python -m unittest discover -s tools/tests -p 'test_ios*.py' -v
+          plutil -lint flutter/ios/Runner.xcodeproj/project.pbxproj
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: arm64
+          cache: true
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          prefix-key: ios-xcode27-api15
+          cache-on-failure: true
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        id: native-cache
+        with:
+          path: ~/.cache/viper-vcpkg-ios
+          key: ios-xcode27-api15-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/arm64-ios.cmake') }}
+      - name: Set up complete pinned iOS native dependencies
+        run: bash tools/native/setup-ios.sh
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/viper-vcpkg-ios
+          key: ios-xcode27-api15-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/arm64-ios.cmake') }}
+      - name: Build and verify the unsigned iOS application
+        run: bash tools/native/build-ios.sh
+      - name: Record exact native source evidence
+        if: always()
+        run: |
+          mkdir -p tools/.reports
+          git rev-parse HEAD > tools/.reports/ios-revision.txt
+          git diff -- flutter/ios Cargo.toml Cargo.lock src/lan.rs libs/scrap/build.rs > tools/.reports/ios-changes.patch
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: ios-native-diagnostics-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ios-arm64-unsigned-${{ github.sha }}
+          path: dist/ios-arm64-unsigned/
+          if-no-files-found: error
+          retention-days: 3

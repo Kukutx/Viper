@@ -84,7 +84,7 @@ pub async fn discover() -> ResultType<()> {
 }
 
 pub fn send_wol(id: String) {
-    let interfaces = default_net::get_interfaces();
+    let interfaces = netdev::get_interfaces();
     for peer in &config::LanPeers::load().peers {
         if peer.id == id {
             for (_, mac) in peer.ip_mac.iter() {
@@ -92,9 +92,9 @@ pub fn send_wol(id: String) {
                     for interface in &interfaces {
                         for ipv4 in &interface.ipv4 {
                             // remove below mask check to avoid unexpected bug
-                            // if (u32::from(ipv4.addr) & u32::from(ipv4.netmask)) == (u32::from(peer_ip) & u32::from(ipv4.netmask))
-                            log::info!("Send wol to {mac_addr} of {}", ipv4.addr);
-                            allow_err!(wol::send_wol(mac_addr, None, Some(IpAddr::V4(ipv4.addr))));
+                            // if (u32::from(ipv4.addr()) & u32::from(ipv4.netmask)) == (u32::from(peer_ip) & u32::from(ipv4.netmask))
+                            log::info!("Send wol to {mac_addr} of {}", ipv4.addr());
+                            allow_err!(wol::send_wol(mac_addr, None, Some(IpAddr::V4(ipv4.addr()))));
                         }
                     }
                 }
@@ -122,17 +122,17 @@ fn get_mac(_ip: &IpAddr) -> String {
 
 #[cfg(not(target_os = "ios"))]
 fn get_mac_by_ip(ip: &IpAddr) -> ResultType<String> {
-    for interface in default_net::get_interfaces() {
+    for interface in netdev::get_interfaces() {
         match ip {
             IpAddr::V4(local_ipv4) => {
-                if interface.ipv4.iter().any(|x| x.addr == *local_ipv4) {
+                if interface.ipv4.iter().any(|x| x.addr() == *local_ipv4) {
                     if let Some(mac_addr) = interface.mac_addr {
                         return Ok(mac_addr.address());
                     }
                 }
             }
             IpAddr::V6(local_ipv6) => {
-                if interface.ipv6.iter().any(|x| x.addr == *local_ipv6) {
+                if interface.ipv6.iter().any(|x| x.addr() == *local_ipv6) {
                     if let Some(mac_addr) = interface.mac_addr {
                         return Ok(mac_addr.address());
                     }
@@ -163,13 +163,11 @@ fn get_ipaddr_by_peer<A: ToSocketAddrs>(peer: A) -> Option<IpAddr> {
 
 fn create_broadcast_sockets() -> Vec<UdpSocket> {
     let mut ipv4s = Vec::new();
-    // TODO: maybe we should use a better way to get ipv4 addresses.
-    // But currently, it's ok to use `[Ipv4Addr::UNSPECIFIED]` for discovery.
-    // `default_net::get_interfaces()` causes undefined symbols error when `flutter build` on iOS simulator x86_64
+    // Preserve OS-selected broadcast routing on iOS; other platforms enumerate addresses.
     #[cfg(not(any(target_os = "ios")))]
-    for interface in default_net::get_interfaces() {
+    for interface in netdev::get_interfaces() {
         for ipv4 in &interface.ipv4 {
-            ipv4s.push(ipv4.addr.clone());
+            ipv4s.push(ipv4.addr());
         }
     }
     ipv4s.push(Ipv4Addr::UNSPECIFIED); // for robustness

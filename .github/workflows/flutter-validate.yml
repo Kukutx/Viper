@@ -87,6 +87,9 @@ jobs:
           cargo check --locked --lib --features flutter,linux-pkg-config > tools/.reports/cargo-check.log 2>&1 || { tail -100 tools/.reports/cargo-check.log; exit 1; }
           cargo build --locked --lib --features flutter,linux-pkg-config > tools/.reports/cargo-build.log 2>&1 || { tail -100 tools/.reports/cargo-build.log; exit 1; }
           test -f target/debug/liblibrustdesk.so
+      - name: Verify migrated network interface contracts
+        run: |
+          cargo test --locked --test network_interfaces --features flutter,linux-pkg-config > tools/.reports/network-interfaces.log 2>&1 || { tail -100 tools/.reports/network-interfaces.log; exit 1; }
       - name: Exercise actual synchronous and asynchronous FFI
         working-directory: flutter
         env:

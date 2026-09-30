@@ -251,7 +251,8 @@ fn main() {
     // ffmpeg();
 
     if target_os == "ios" {
-        // nothing
+        // Bundle the JPEG implementation required by the static libyuv archive.
+        find_package("jpeg");
     } else if target_os == "android" {
         println!("cargo:rustc-cfg=android");
     } else if cfg!(windows) {
