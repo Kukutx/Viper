@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           test -x "$sdkmanager"
-          "$sdkmanager" "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;${ANDROID_NDK}" > tools/.reports/android-sdk.log 2>&1
+          "$sdkmanager" "platforms;${ANDROID_SDK_PLATFORM}" "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;${ANDROID_NDK}" > tools/.reports/android-sdk.log 2>&1
           curl -fL --retry 3 "https://services.gradle.org/distributions/gradle-${ANDROID_GRADLE}-bin.zip" -o "$RUNNER_TEMP/gradle.zip"
           printf '%s  %s\n' "$ANDROID_GRADLE_SHA256" "$RUNNER_TEMP/gradle.zip" | sha256sum -c -
           unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
@@ -68,7 +68,9 @@ jobs:
           path = Path('flutter/lib/mobile/pages/scan_page.dart')
           text = path.read_text()
           assert text.count('package:qr_code_scanner/qr_code_scanner.dart') == 1
-          path.write_text(text.replace('package:qr_code_scanner/qr_code_scanner.dart', 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart'))
+          assert text.count('    controller?.dispose();\n') == 1
+          text = text.replace('package:qr_code_scanner/qr_code_scanner.dart', 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart')
+          path.write_text(text.replace('    controller?.dispose();\n', ''))
           PY
           python tools/flutter_sdk.py
           (cd flutter && flutter pub get)
