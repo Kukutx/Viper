@@ -6,6 +6,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -16,7 +17,7 @@ concurrency:
 jobs:
   macos:
     name: macOS native library and desktop bundle
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 60
     env:
       MACOSX_DEPLOYMENT_TARGET: '12.3'
@@ -42,6 +43,8 @@ jobs:
           plutil -lint flutter/macos/Runner.xcodeproj/project.pbxproj
           plutil -lint flutter/ios/Runner.xcodeproj/project.pbxproj
           mkdir -p tools/.reports
+      - name: Select and verify the pinned Apple SDK
+        run: python tools/apple_sdk.py --github-env
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -51,20 +54,20 @@ jobs:
         run: python tools/flutter_sdk.py
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          prefix-key: apple-native-v2
+          prefix-key: apple-native-xcode27-v1
           cache-on-failure: true
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: native-cache
         with:
           path: ~/.cache/viper-vcpkg-macos
-          key: viper-apple-${{ runner.arch }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**', 'tools/native/setup-macos.sh') }}
+          key: viper-apple-xcode27-${{ runner.arch }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**', 'tools/native/setup-macos.sh') }}
       - name: Set up pinned native dependencies
         run: bash tools/native/setup-macos.sh
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: steps.native-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.cache/viper-vcpkg-macos
-          key: viper-apple-${{ runner.arch }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**', 'tools/native/setup-macos.sh') }}
+          key: viper-apple-xcode27-${{ runner.arch }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**', 'tools/native/setup-macos.sh') }}
       - name: Build actual macOS Rust library
         run: |
           cargo build --locked --release --lib --features flutter > tools/.reports/macos-cargo.log 2>&1 || { tail -120 tools/.reports/macos-cargo.log; exit 1; }
@@ -91,6 +94,8 @@ jobs:
           test "$(lipo -archs "$VIPER_NATIVE_LIBRARY")" = arm64
           otool -L "$VIPER_NATIVE_LIBRARY" > ../tools/.reports/macos-linked-libraries.log
           flutter test --no-pub test_native/bridge_ffi_test.dart > ../tools/.reports/macos-ffi.log 2>&1 || { tail -100 ../tools/.reports/macos-ffi.log; exit 1; }
+      - name: Build and verify the unsigned Release bundle
+        run: bash tools/native/build-macos-release.sh
       - name: Require unchanged native project settings
         run: git diff --exit-code -- flutter/macos/Runner.xcodeproj/project.pbxproj flutter/macos/Podfile flutter/macos/Podfile.lock flutter/macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme
       - name: Capture native dependency and project evidence
@@ -113,4 +118,11 @@ jobs:
           path: tools/.reports/
           include-hidden-files: true
           retention-days: 7
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-arm64-unsigned-${{ github.sha }}
+          path: dist/macos-arm64-unsigned/
+          retention-days: 3
           if-no-files-found: error

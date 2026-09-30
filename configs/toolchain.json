@@ -9,6 +9,20 @@
   "cmake": "4.4.3",
   "actionlint": "1.7.12",
   "cargo_expand": "1.0.126",
+  "apple": {
+    "verified_at": "2026-09-30",
+    "xcode": "27.0",
+    "build": "27A266a",
+    "developer_dir": "/Applications/Xcode_27.app/Contents/Developer",
+    "macos_sdk": "27.0",
+    "cocoapods": "1.17.0",
+    "runner": "xcode-27",
+    "runner_preview": true,
+    "sources": [
+      "https://apps.apple.com/us/app/xcode/id497799835",
+      "https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md"
+    ]
+  },
   "flutter_rust_bridge": {
     "version": "2.13.0",
     "assets": {
