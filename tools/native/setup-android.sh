@@ -18,10 +18,18 @@ revision=$(python tools/build_toolchain.py --value vcpkg.revision)
 cmake_version=$(python tools/build_toolchain.py --value cmake)
 [[ "$ndk" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$revision" =~ ^[a-f0-9]{40}$ ]]
 python -m pip install "cmake==$cmake_version"
-sdkmanager "ndk;$ndk" > tools/.reports/ndk-setup.log 2>&1 || { tail -100 tools/.reports/ndk-setup.log; exit 1; }
+sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+test -x "$sdkmanager"
+"$sdkmanager" "ndk;$ndk" > tools/.reports/ndk-setup.log 2>&1 || { tail -100 tools/.reports/ndk-setup.log; exit 1; }
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$ndk"
 export ANDROID_NDK_ROOT="$ANDROID_NDK_HOME"
-grep -Eq "^Pkg.Revision[[:space:]]*=[[:space:]]*$ndk[[:space:]]*$" "$ANDROID_NDK_HOME/source.properties"
+python - <<'PY'
+import json, os
+from pathlib import Path
+expected = json.loads(Path('configs/toolchain.json').read_text())['android']['ndk']
+properties = dict(line.split('=', 1) for line in (Path(os.environ['ANDROID_NDK_HOME']) / 'source.properties').read_text().splitlines() if '=' in line)
+assert properties['Pkg.Revision '].strip() == expected if 'Pkg.Revision ' in properties else {k.strip(): v.strip() for k, v in properties.items()}['Pkg.Revision'] == expected
+PY
 export VCPKG_ROOT="${RUNNER_TEMP:-$root/.tools}/viper-vcpkg-android"
 export VCPKG_DEFAULT_BINARY_CACHE="$HOME/.cache/viper-vcpkg-android"
 if [[ -L "$VCPKG_ROOT" ]]; then
