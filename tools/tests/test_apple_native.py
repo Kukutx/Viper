@@ -1,5 +1,7 @@
 """Regression checks for the explicit Apple native ABI and FRB 2 linking."""
 from pathlib import Path
+import hashlib
+import struct
 import re
 import shutil
 import subprocess
@@ -62,6 +64,25 @@ class AppleNativeTests(unittest.TestCase):
         self.assertEqual(project.count('SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";'), 3)
         link = next(line for line in project.splitlines() if '/* liblibrustdesk.dylib in Frameworks */ =' in line)
         self.assertNotIn('Weak', link)
+
+    def test_macos_minimum_matches_the_native_validation_target(self):
+        podfile = self.text('flutter/macos/Podfile')
+        project = self.text('flutter/macos/Runner.xcodeproj/project.pbxproj')
+        workflow = yaml.safe_load(self.text('.github/workflows/apple-native.yml'))
+        minimum = re.search(r"platform :osx, '([0-9.]+)'", podfile).group(1)
+        self.assertEqual(minimum, '12.3')
+        self.assertEqual(re.findall(r'MACOSX_DEPLOYMENT_TARGET = ([0-9.]+);', project), [minimum] * 6)
+        env = workflow['jobs']['macos']['env']
+        self.assertEqual(env['MACOSX_DEPLOYMENT_TARGET'], minimum)
+        self.assertEqual(env['FLUTTER_XCODE_MACOSX_DEPLOYMENT_TARGET'], minimum)
+
+    def test_original_macos_tray_resource_is_available(self):
+        data = (ROOT / 'res/mac-tray-dark-x2.png').read_bytes()
+        self.assertEqual(data[:8], b'\x89PNG\r\n\x1a\n')
+        self.assertEqual(struct.unpack('>II', data[16:24]), (60, 60))
+        # Preserve the upstream resource referenced by the native tray implementation.
+        self.assertEqual(hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest(),
+                         '8b838cb5ea16f38e4d788589a33fe72570f4c394')
 
     def test_ios_force_loads_the_archive_in_all_configurations(self):
         project = self.text('flutter/ios/Runner.xcodeproj/project.pbxproj')

@@ -82,8 +82,25 @@ jobs:
           VIPER_NATIVE_LIBRARY: ${{ github.workspace }}/flutter/build/macos/Build/Products/Debug/RustDesk.app/Contents/Frameworks/liblibrustdesk.dylib
         run: |
           test -s "$VIPER_NATIVE_LIBRARY"
+          cmp ../target/release/liblibrustdesk.dylib "$VIPER_NATIVE_LIBRARY"
+          test "$(lipo -archs "$VIPER_NATIVE_LIBRARY")" = arm64
           otool -L "$VIPER_NATIVE_LIBRARY" > ../tools/.reports/macos-linked-libraries.log
           flutter test --no-pub test_native/bridge_ffi_test.dart > ../tools/.reports/macos-ffi.log 2>&1 || { tail -100 ../tools/.reports/macos-ffi.log; exit 1; }
+      - name: Require unchanged native project settings
+        run: git diff --exit-code -- flutter/macos/Runner.xcodeproj/project.pbxproj flutter/macos/Podfile flutter/macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme
+      - name: Capture native dependency and project evidence
+        if: always()
+        run: |
+          mkdir -p tools/.reports/native-project
+          git rev-parse HEAD > tools/.reports/native-project/revision.txt
+          git diff -- flutter/macos > tools/.reports/native-project/changes.patch
+          for path in flutter/macos/Podfile flutter/macos/Podfile.lock flutter/macos/Runner.xcodeproj/project.pbxproj flutter/macos/Flutter/GeneratedPluginRegistrant.swift flutter/macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme; do
+            if test -f "$path"; then
+              cp "$path" tools/.reports/native-project/
+            fi
+          done
+          xcodebuild -version > tools/.reports/native-project/xcode-version.txt
+          pod --version > tools/.reports/native-project/cocoapods-version.txt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

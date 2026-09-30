@@ -8,7 +8,6 @@ import desktop_drop
 import device_info_plus
 import flutter_custom_cursor
 import package_info_plus
-import path_provider_foundation
 import screen_retriever
 import sqflite_darwin
 // import tray_manager
@@ -22,7 +21,7 @@ import texture_rgba_renderer
 // Global state for relative mouse mode
 // All properties and methods must be accessed on the main thread since they
 // interact with NSEvent monitors, CoreGraphics APIs, and Flutter channels.
-// Note: We avoid @MainActor to maintain macOS 10.14 compatibility.
+// Thread ownership is checked at the native event entrypoints.
 class RelativeMouseState {
     static let shared = RelativeMouseState()
 
@@ -77,7 +76,6 @@ class MainFlutterWindow: NSWindow {
             DeviceInfoPlusMacosPlugin.register(with: controller.registrar(forPlugin: "DeviceInfoPlusMacosPlugin"))
             FlutterCustomCursorPlugin.register(with: controller.registrar(forPlugin: "FlutterCustomCursorPlugin"))
             FPPPackageInfoPlusPlugin.register(with: controller.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))
-            PathProviderPlugin.register(with: controller.registrar(forPlugin: "PathProviderPlugin"))
             SqflitePlugin.register(with: controller.registrar(forPlugin: "SqflitePlugin"))
             // TrayManagerPlugin.register(with: controller.registrar(forPlugin: "TrayManagerPlugin"))
             AppLinksMacosPlugin.register(with: controller.registrar(forPlugin: "AppLinksMacosPlugin"))
