@@ -17,9 +17,8 @@ jobs:
     timeout-minutes: 5
     strategy:
       matrix:
-        # Existing consumers use these labels. Both contain the same FRB 2 files;
-        # the historical label does not select an older SDK or generator.
-        artifact: [bridge-artifact, bridge-artifact-flutter-3.44]
+        # Every platform consumes the same committed FRB 2 outputs.
+        artifact: [bridge-artifact]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -73,6 +73,8 @@ jobs:
           python tools/check_bridge_outputs.py
           git diff --exit-code -- Cargo.lock flutter/pubspec.yaml flutter/pubspec.lock src/bridge_generated.rs flutter/lib/generated
           test -z "$(git ls-files --others -- src/bridge_generated.rs flutter/lib/generated)"
+      - name: Validate the shared packaging entry
+        run: python tools/prepare_flutter.py
       - name: Analyze Flutter without suppressing diagnostics
         run: python tools/analyze_flutter.py
       - name: Run Flutter regression tests

@@ -57,6 +57,9 @@ def versions(root: Path = ROOT, write: bool = False) -> None:
             raise ValueError(f"Version drift: {path}; run versions --write")
         file.write_text(expected, encoding="utf-8")
 
+    from build_toolchain import sync
+    sync(root, write)
+
 
 def action_text(text: str, lock: dict, write: bool = False) -> str:
     def replace(match: re.Match) -> str:

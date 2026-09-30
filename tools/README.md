@@ -58,7 +58,7 @@ macOS Apple Silicon 的原生环境入口为 `bash tools/native/setup-macos.sh`�
 
 - `foundation.yml`：配置、工具测试、工作流检查及 Rust `base` / `hbb_common` 核心测试。
 - `flutter-validate.yml`：Draft PR 也执行，检查可复现绑定（包括未跟踪的新增生成文件）、Flutter 分析和测试、Linux Rust 库、真实 FFI 和 Debug 桌面包；没有仓库写入或发布权限。
-- `bridge.yml`：复用上述唯一验证链，成功后从同一提交导出已跟踪的 FRB 2 绑定。不再安装 FRB 1、降级依赖或补丁修改源码。为保持现有下载接口，两个历史 artifact 标签暂时保留，但内容完全相同，均不代表旧 SDK 兼容性；不导出旧 C header。
+- `bridge.yml`：复用唯一验证链，成功后导出同一提交的 FRB 2 绑定；所有消费者使用唯一 `bridge-artifact`，没有旧 SDK 专用产物、FRB 1 生成器或源码补丁。
 - `flutter-platform-tests.yml`：Windows x64 和 macOS runner 使用相同中央 SDK、同一 pub 锁文件和全部 `flutter/test` 测试；没有 Rust 原生库构建或签名步骤，不能当作平台安装包验证。
 - `apple-native.yml`：只读、无签名凭据，单独验证 macOS arm64 Rust Release 库、Flutter Debug 桌面包、包内真实 FFI 和项目无隐式改写。原生项目和依赖解析证据保存在报告中；iOS 只检查链接配置与 C ABI，不冒充完整 iOS 构建。
 - `ci.yml` / `flutter-ci.yml` / `flutter-build.yml`：历史完整平台矩阵的 SDK、Apple 旧 C header 消费和兼容补丁仍需继续迁移。共用桥接流程更新不等于整个发布矩阵已可用；Draft 阶段跳过的任务不能算作通过。
@@ -93,3 +93,13 @@ python tools/viper.py verify dist
 产物清单拒绝空目录、符号链接、路径穿越、重复、缺失或额外文件；SHA-256 校验不等于签名验证。应用发布必须另外完成平台签名、来源证明、安装回归与回退演练。
 
 `tools/.reports/` 是可丢弃证据目录，不存放凭据或唯一配置。此次迁移没有执行应用签名、商店发布或生产部署。
+
+## 打包入口与版本收敛
+
+`python tools/prepare_flutter.py` 在打包前检查真实 SDK 版本/提交、FRB 版本、已提交生成文件和严格锁文件。`build.py` 的四个 Flutter 打包入口（含 `--skip-cargo`）均调用它，随后使用 `--no-pub`；不再 sed 修改旧生成文件。
+
+`python tools/viper.py versions --write` 同步 `.github/workflows/flutter-build.yml` 的 Rust、Flutter、CMake 与 vcpkg 镜像值；`check` 会拒绝漂移。`tools/native/install-flutter.sh` 只在不存在的绝对路径安装官方固定提交，原生支持 Linux x64/arm64；不覆盖已有 SDK。
+
+F-Droid 使用同一 SDK 和 `python tools/bridge.py generate --from-source` 从固定 Cargo 版本、锁文件编译生成器；失败不会回退到预编译文件。该入口迁移不是 F-Droid 全构建验收，Android Gradle/NDK 等仍待迁移。
+
+Apple 验证显式选择中央配置的 Xcode 版本、build ID、SDK 和 CocoaPods，分别验证 Debug 与 Release 包内 FFI；Release 归档及清单是未签名 CI 产物，不是可直接发布的安装包。GitHub `xcode-27` runner 目前标为预览，独立记录，不能把 runner 标签当成 SDK 版本验证。范围见 `docs/engineering/build-entry-convergence.md`。

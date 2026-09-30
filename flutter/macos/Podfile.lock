@@ -39,13 +39,13 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/window_size/macos
 
 SPEC CHECKSUMS:
-  desktop_multi_window: 566489c048b501134f9d7fb6a2354c60a9126486
-  flutter_custom_cursor: 629957115075c672287bd0fa979d863ccf6024f7
+  desktop_multi_window: 93667594ccc4b88d91a97972fd3b1b89667fa80a
+  flutter_custom_cursor: 37e588711a2746f5cf48adb58b582cacff11c0c6
   FlutterMacOS: c232990155153907050900a2e175c7773903ba4e
-  screen_retriever: 59634572a57080243dd1bf715e55b6c54f241a38
-  texture_rgba_renderer: cbed959a3c127122194a364e14b8577bd62dc8f2
-  window_manager: 3a1844359a6295ab1e47659b1a777e36773cd6e8
-  window_size: 339dafa0b27a95a62a843042038fa6c3c48de195
+  screen_retriever: 4f97c103641aab8ce183fa5af3b87029df167936
+  texture_rgba_renderer: 6661f577ea5d4990e964c7e3840e544ac798e6da
+  window_manager: 1d01fa7ac65a6e6f83b965471b1a7fdd3f06166c
+  window_size: 4bd15034e6e3d0720fd77928a7c42e5492cfece9
 
 PODFILE CHECKSUM: 9c287df83456b84329f6ecc46f20e235558c2010
 

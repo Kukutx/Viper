@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import json
 import glob
 import contextlib
 import pathlib
@@ -15,9 +16,7 @@ import argparse
 import sys
 from pathlib import Path
 
-# Captured at import, while cwd is still the repo root: before Python 3.9 the main script's __file__
-# stays relative (bpo-20443), so abspath() re-resolves it against the cwd -- and the ubuntu18.04
-# packaging container runs 3.6 and chdir's into flutter/ before it reaches the libdrmtap code.
+# Resolve repository paths before platform packagers change the working directory.
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 windows = platform.platform().startswith('Windows')
@@ -31,7 +30,8 @@ if windows:
 elif osx:
     flutter_build_dir = 'build/macos/Build/Products/Release/'
 else:
-    flutter_build_dir = 'build/linux/x64/release/bundle/'
+    linux_arch = 'arm64' if platform.machine().lower() in ('arm64', 'aarch64') else 'x64'
+    flutter_build_dir = f'build/linux/{linux_arch}/release/bundle/'
 flutter_build_dir_2 = f'flutter/{flutter_build_dir}'
 skip_cargo = False
 
@@ -181,35 +181,8 @@ def make_parser():
 # it assumes all build dependencies are installed in environments
 # Note: do not use it in bare metal, or may break build environments
 def generate_build_script_for_docker():
-    with open("/tmp/build.sh", "w") as f:
-        f.write('''
-            #!/bin/bash
-            # environment
-            export CPATH="$(clang -v 2>&1 | grep "Selected GCC installation: " | cut -d' ' -f4-)/include"
-            # flutter
-            pushd /opt
-            wget https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.0.5-stable.tar.xz
-            tar -xvf flutter_linux_3.0.5-stable.tar.xz
-            export PATH=`pwd`/flutter/bin:$PATH
-            popd
-            # flutter_rust_bridge
-            dart pub global activate ffigen --version 5.0.1
-            pushd /tmp && git clone https://github.com/SoLongAndThanksForAllThePizza/flutter_rust_bridge --depth=1 && popd
-            pushd /tmp/flutter_rust_bridge/frb_codegen && cargo install --path . --locked && popd
-            pushd flutter && flutter pub get && popd
-            ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart
-            # install vcpkg
-            pushd /opt
-            export VCPKG_ROOT=`pwd`/vcpkg
-            git clone https://github.com/microsoft/vcpkg
-            vcpkg/bootstrap-vcpkg.sh
-            popd
-            $VCPKG_ROOT/vcpkg install --x-install-root="$VCPKG_ROOT/installed"
-            # build rustdesk
-            ./build.py --flutter --hwcodec
-        ''')
-    system2("chmod +x /tmp/build.sh")
-    system2("bash /tmp/build.sh")
+    subprocess.run(['bash', str(Path(REPO_ROOT) / 'tools/native/build-container.sh')],
+                   cwd=REPO_ROOT, check=True)
 
 
 # Downloading third party resources is deprecated.
@@ -374,10 +347,10 @@ Description: A remote control software.
     file.close()
 
 
-def ffi_bindgen_function_refactor():
-    # workaround ffigen
-    system2(
-        'sed -i "s/ffi.NativeFunction<ffi.Bool Function(DartPort/ffi.NativeFunction<ffi.Uint8 Function(DartPort/g" flutter/lib/generated_bridge.dart')
+def prepare_flutter_build():
+    # SDK, generated outputs and locks are the same for every packaging entry.
+    subprocess.run([sys.executable, str(Path(REPO_ROOT) / 'tools/prepare_flutter.py')],
+                   cwd=REPO_ROOT, check=True)
 
 
 # libdrmtap is fetched at build time from the rustdesk-org fork at a pinned
@@ -735,11 +708,11 @@ def retarget_control_to_drm_variant():
 
 
 def build_flutter_deb(version, features):
+    prepare_flutter_build()
     if not skip_cargo:
         system2(f'cargo build --locked --features {features} --lib --release')
-        ffi_bindgen_function_refactor()
     os.chdir('flutter')
-    system2('flutter build linux --release')
+    system2('flutter build linux --release --no-pub')
     system2('mkdir -p tmpdeb/usr/bin/')
     system2('mkdir -p tmpdeb/usr/share/rustdesk')
     system2('mkdir -p tmpdeb/usr/share/rustdesk/files/systemd/')
@@ -932,10 +905,12 @@ def build_deb_from_folder(version, binary_folder, want_drm=False):
 
 
 def build_flutter_dmg(version, features):
+    prepare_flutter_build()
     if not skip_cargo:
-        # set minimum osx build target, now is 10.14, which is the same as the flutter xcode project
-        system2(
-            f'MACOSX_DEPLOYMENT_TARGET=10.14 cargo build --locked --features {features} --release')
+        minimum = json.loads((Path(REPO_ROOT) / 'configs/toolchain.json').read_text())['apple']['deployment_target']
+        subprocess.run(['cargo', 'build', '--locked', '--features', features, '--release'],
+                       cwd=REPO_ROOT, check=True,
+                       env={**os.environ, 'MACOSX_DEPLOYMENT_TARGET': minimum})
     # copy dylib
     system2(
         "cp target/release/liblibrustdesk.dylib target/release/librustdesk.dylib")
@@ -945,7 +920,7 @@ def build_flutter_dmg(version, features):
     # FLUTTER_XCODE_* env vars are forwarded to xcodebuild as build settings.
     mac_arch = 'arm64' if platform.machine().lower() in ('arm64', 'aarch64') else 'x86_64'
     system2(
-        f'FLUTTER_XCODE_ARCHS={mac_arch} FLUTTER_XCODE_ONLY_ACTIVE_ARCH=YES flutter build macos --release')
+        f'FLUTTER_XCODE_ARCHS={mac_arch} FLUTTER_XCODE_ONLY_ACTIVE_ARCH=YES flutter build macos --release --no-pub')
     system2('cp -rf ../target/release/service ./build/macos/Build/Products/Release/RustDesk.app/Contents/MacOS/')
     '''
     system2(
@@ -956,24 +931,25 @@ def build_flutter_dmg(version, features):
 
 
 def build_flutter_arch_manjaro(version, features):
+    prepare_flutter_build()
     if not skip_cargo:
         system2(f'cargo build --locked --features {features} --lib --release')
-    ffi_bindgen_function_refactor()
     os.chdir('flutter')
-    system2('flutter build linux --release')
+    system2('flutter build linux --release --no-pub')
     system2(f'strip {flutter_build_dir}/lib/librustdesk.so')
     os.chdir('../res')
     system2('HBB=`pwd`/.. FLUTTER=1 makepkg -f')
 
 
 def build_flutter_windows(version, features, skip_portable_pack):
+    prepare_flutter_build()
     if not skip_cargo:
         system2(f'cargo build --locked --features {features} --lib --release')
         if not os.path.exists("target/release/librustdesk.dll"):
             print("cargo build failed, please check rust source code.")
             exit(-1)
     os.chdir('flutter')
-    system2('flutter build windows --release')
+    system2('flutter build windows --release --no-pub')
     os.chdir('..')
     shutil.copy2('target/release/deps/dylib_virtual_display.dll',
                  flutter_build_dir_2)
