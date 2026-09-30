@@ -1,0 +1,32 @@
+name: Platform completion baseline
+on:
+  push:
+    branches: [codex/viper-platform-completion-check]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 139dd12ba5292749dcfa407ecabf1dc30d76c57e
+          submodules: recursive
+          persist-credentials: false
+      - name: Export exact tracked baseline
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/baseline"
+          git rev-parse HEAD > "$RUNNER_TEMP/baseline/revision.txt"
+          git ls-tree -r HEAD > "$RUNNER_TEMP/baseline/tree.txt"
+          git archive HEAD | gzip -n > "$RUNNER_TEMP/baseline/source.tar.gz"
+          git -C libs/hbb_common archive HEAD | gzip -n > "$RUNNER_TEMP/baseline/hbb_common.tar.gz"
+          cd "$RUNNER_TEMP/baseline"
+          sha256sum source.tar.gz hbb_common.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: platform-completion-baseline
+          path: ${{ runner.temp }}/baseline/
+          retention-days: 3
+          if-no-files-found: error
