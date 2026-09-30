@@ -58,6 +58,8 @@ jobs:
           bash tools/native/install-android-sdk.sh
           python tools/android_toolchain.py --runtime
           python tools/flutter_sdk.py
+      - name: Verify Gradle evaluation order
+        run: python tools/check_android_gradle_layout.py
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           prefix-key: android-${{ matrix.abi }}-${{ env.ANDROID_NDK_VERSION }}

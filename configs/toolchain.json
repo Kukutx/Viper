@@ -118,5 +118,10 @@
       "protobuf": "https://github.com/protocolbuffers/protobuf/releases/tag/v36.2"
     },
     "compatibility_note": "Flutter 3.47.5 requires the AGP legacy DSL and external Kotlin plugin. The two explicit opt-outs must be removed together with the upstream Flutter Gradle plugin migration, not hidden in build-time patches."
+  },
+  "ios": {
+    "minimum": "15.0",
+    "sdk": "27.0",
+    "verified_at": "2026-09-30"
   }
 }

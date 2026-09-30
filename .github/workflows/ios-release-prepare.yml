@@ -1,0 +1,100 @@
+name: Verify iOS distribution entry convergence
+on:
+  push:
+    branches: [codex/viper-ios-preparation]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Apply only the reviewed preimage to postimage transformations
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          def blob(data):
+              return hashlib.sha1(f'blob {len(data)}\0'.encode()+data).hexdigest()
+          p=Path('.github/workflows/flutter-build.yml')
+          assert blob(p.read_bytes())=='9c69e80487cc5ca1fb24c793a3584e4ce5dde321'
+          s=p.read_text(); start=s.index('  build-rustdesk-ios:\n'); end=s.index('  build-for-macOS:\n',start)
+          s=s[:start]+"  # Build-only iOS flow is identical to the Draft PR validation path.\n  # Signing/App Store export remains separately authorized, not inherited here.\n  build-rustdesk-ios:\n    name: iOS unsigned Release validation\n    needs: [generate-bridge]\n    permissions:\n      contents: read\n    uses: ./.github/workflows/ios-native.yml\n\n"+s[end:]
+          p.write_text(s)
+          p=Path('.github/workflows/ios-native.yml')
+          assert blob(p.read_bytes())=='402501233554b5d436f2c7ad5239732850d2d90b'
+          p.write_text(p.read_text().replace('branches: [main, codex/viper-platform-completion-check]','branches: [main]'))
+          p=Path('tools/README.md')
+          assert blob(p.read_bytes())=='76fb8caa1ac64f06badc4d99610f1ab56a567c0b'
+          p.write_text(p.read_text()+'''\n## iOS 原生设备包
+
+          `bash tools/native/setup-ios.sh` 准备中央固定的 iPhoneOS 工具链和完整原生依赖，
+          然后加载 `tools/.reports/ios-native.env` 并执行 `bash tools/native/build-ios.sh`。
+          要求 Apple Silicon；构建使用 SwiftPM，不执行 CocoaPods。该入口生成未签名 Release
+          设备包，并验证架构、FRB 静态符号、应用元数据、工程无改写及归档校验值；不代表真机运行通过。
+
+          完整 Flutter 矩阵的 `build-rustdesk-ios` 复用 `ios-native.yml`，不再另行使用浮动
+          `macos-latest` 或独立 IPA 命令，且不向该任务传递签名凭据。详细边界见
+          `docs/engineering/ios-native-migration.md`。
+          ''')
+          expected={'.github/workflows/flutter-build.yml':'38e81a1e177864ac60ad876931f4005fa468e657','.github/workflows/ios-native.yml':'bb7a09a59cdb91671fe63cf87cbbc5a1e1a2e2ae','tools/README.md':'a92c84f34c6203746d7f7b8827de92801c0cc39c','tools/tests/test_ios_release_entry.py':'4497737743d46259962a37949bb6a32bd4b9f33b'}
+          for name,sha in expected.items():
+              assert blob(Path(name).read_bytes())==sha,name
+          Path('tools/.reports').mkdir(parents=True,exist_ok=True)
+          Path('tools/.reports/expected-objects.json').write_text(json.dumps(expected))
+          PY
+      - name: Validate configuration and all repository tool regressions
+        run: |
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py check
+          python -m unittest discover -s tools/tests -v > tools/.reports/tests.log 2>&1 || { tail -100 tools/.reports/tests.log; exit 1; }
+          bash -n tools/native/setup-ios.sh tools/native/build-ios.sh
+      - name: Validate all workflows
+        run: |
+          set -euo pipefail
+          version=$(python tools/build_toolchain.py --value actionlint)
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 3 "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}" -o "$archive"
+          curl -fsSL --retry 3 "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_checksums.txt" -o checksums.txt
+          awk -v f="$archive" '$2 == f' checksums.txt > selected.sha256
+          test "$(wc -l < selected.sha256)" -eq 1
+          sha256sum -c selected.sha256
+          tar -xzf "$archive" actionlint
+          cd "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes= > tools/.reports/actionlint.log 2>&1 || { cat tools/.reports/actionlint.log; exit 1; }
+      - name: Store the four verified blobs without moving any ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64,hashlib,json,os,urllib.request
+          from pathlib import Path
+          expected=json.loads(Path('tools/.reports/expected-objects.json').read_text())
+          entries=[]
+          assert len(expected)==4
+          for name,sha in expected.items():
+              data=Path(name).read_bytes()
+              assert hashlib.sha1(f'blob {len(data)}\0'.encode()+data).hexdigest()==sha
+              request=urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs',data=json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Content-Type':'application/json'},method='POST')
+              with urllib.request.urlopen(request,timeout=60) as response: result=json.load(response)
+              assert result['sha']==sha
+              entries.append({'path':name,'mode':'100644','type':'blob','sha':sha})
+          Path('tools/.reports/objects.json').write_text(json.dumps(entries,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: ios-distribution-entry-evidence
+          path: tools/.reports/
+          if-no-files-found: error
+          retention-days: 3
