@@ -1,4 +1,4 @@
-name: Prepare explicit macOS deployment baseline
+name: Prepare native Dart plugin registration migration
 
 on:
   push:
@@ -21,47 +21,43 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version-file: .python-version
-      - name: Apply source-hash-checked deployment settings
+      - name: Remove only the retired Swift registration
         run: |
           python - <<'PY'
           import hashlib
           from pathlib import Path
-          changes = {
-              'flutter/macos/Runner.xcodeproj/project.pbxproj': ('84c529084447da03529cf5f11f0b65c4b25e98f4', 'MACOSX_DEPLOYMENT_TARGET = 10.14;', 'MACOSX_DEPLOYMENT_TARGET = 12.3;', 6),
-              'flutter/macos/Podfile': ('049abe2954279f0ed15c66d4c858fa4ae2a590bf', "platform :osx, '10.14'", "platform :osx, '12.3'", 1),
-          }
-          for name, (sha, old, new, count) in changes.items():
-              p = Path(name)
-              data = p.read_bytes()
-              assert hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest() == sha, name
-              text = data.decode('utf-8')
-              assert text.count(old) == count, name
-              p.write_text(text.replace(old, new), encoding='utf-8')
+          path = Path('flutter/macos/Runner/MainFlutterWindow.swift')
+          data = path.read_bytes()
+          assert hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest() == '7ac7568cca64cad9efca1a339496bc35d2afcf91'
+          text = data.decode('utf-8')
+          for line in ('import path_provider_foundation\n', '            PathProviderPlugin.register(with: controller.registrar(forPlugin: "PathProviderPlugin"))\n'):
+              assert text.count(line) == 1
+              text = text.replace(line, '')
+          old = '// Note: We avoid @MainActor to maintain macOS 10.14 compatibility.'
+          assert text.count(old) == 1
+          text = text.replace(old, '// Thread ownership is checked at the native event entrypoints.')
+          path.write_text(text, encoding='utf-8')
           PY
-          plutil -lint flutter/macos/Runner.xcodeproj/project.pbxproj
-          ruby -c flutter/macos/Podfile
+          swiftc -frontend -parse flutter/macos/Runner/MainFlutterWindow.swift
           git diff --check
           mkdir -p tools/.reports
-          git diff -- flutter/macos/Runner.xcodeproj/project.pbxproj flutter/macos/Podfile > tools/.reports/macos-baseline.patch
-      - name: Preserve reviewed blobs without updating refs
+          git diff -- flutter/macos/Runner/MainFlutterWindow.swift > tools/.reports/native-registration.patch
+      - name: Preserve the reviewed blob without updating refs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const fs = require('fs');
             const crypto = require('crypto');
-            const objects = [];
-            for (const path of ['flutter/macos/Runner.xcodeproj/project.pbxproj', 'flutter/macos/Podfile']) {
-              const content = fs.readFileSync(path, 'utf8');
-              const bytes = Buffer.from(content, 'utf8');
-              const expected = crypto.createHash('sha1').update(Buffer.from(`blob ${bytes.length}\0`)).update(bytes).digest('hex');
-              const {data} = await github.rest.git.createBlob({...context.repo, content, encoding: 'utf-8'});
-              if (data.sha !== expected) throw new Error(`Checksum mismatch: ${path}`);
-              objects.push({path, mode: '100644', type: 'blob', sha: data.sha});
-            }
-            fs.writeFileSync('tools/.reports/macos-baseline.json', JSON.stringify({source: context.sha, objects}, null, 2));
+            const path = 'flutter/macos/Runner/MainFlutterWindow.swift';
+            const content = fs.readFileSync(path, 'utf8');
+            const bytes = Buffer.from(content, 'utf8');
+            const expected = crypto.createHash('sha1').update(Buffer.from(`blob ${bytes.length}\0`)).update(bytes).digest('hex');
+            const {data} = await github.rest.git.createBlob({...context.repo, content, encoding: 'utf-8'});
+            if (data.sha !== expected) throw new Error('Checksum mismatch');
+            fs.writeFileSync('tools/.reports/native-registration.json', JSON.stringify({source: context.sha, objects: [{path, mode: '100644', type: 'blob', sha: data.sha}]}, null, 2));
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: reviewed-macos-baseline-${{ github.sha }}
+          name: reviewed-native-registration-${{ github.sha }}
           path: tools/.reports/
           include-hidden-files: true
           if-no-files-found: error
