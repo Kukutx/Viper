@@ -45,17 +45,7 @@ jobs:
           cache: true
       - name: Verify SDK and locked dependencies
         run: |
-          # Keep first-run SDK bootstrap output out of the strict JSON report.
-          flutter --version > tools/.reports/flutter-bootstrap.log 2>&1 || { cat tools/.reports/flutter-bootstrap.log; exit 1; }
-          flutter --version --machine > tools/.reports/flutter-version.json
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          expected = json.loads(Path('configs/toolchain.json').read_text(encoding='utf-8'))
-          actual = json.loads(Path('tools/.reports/flutter-version.json').read_text(encoding='utf-8'))
-          assert actual['frameworkVersion'] == expected['flutter'], actual
-          assert actual['dartSdkVersion'].split()[0] == expected['dart'], actual
-          PY
+          python tools/flutter_sdk.py
           (cd flutter && flutter pub get --enforce-lockfile)
           git diff --exit-code -- flutter/pubspec.yaml flutter/pubspec.lock
       - name: Analyze Flutter

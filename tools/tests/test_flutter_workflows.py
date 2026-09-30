@@ -33,7 +33,7 @@ class FlutterWorkflowTests(unittest.TestCase):
             self.assertNotIn(obsolete, text)
 
     def test_validation_remains_read_only_and_fail_closed(self):
-        for name in ('bridge.yml', 'flutter-validate.yml', 'flutter-platform-tests.yml'):
+        for name in ('bridge.yml', 'flutter-validate.yml', 'flutter-platform-tests.yml', 'apple-native.yml'):
             workflow = self.workflow(name)
             self.assertEqual(workflow['permissions'], {'contents': 'read'})
             for job in workflow['jobs'].values():
@@ -48,6 +48,7 @@ class FlutterWorkflowTests(unittest.TestCase):
                        'Verify reproducible bindings and locked dependencies')
         self.assertIn('git diff --exit-code', codegen)
         self.assertIn('git ls-files --others -- src/bridge_generated.rs flutter/lib/generated', codegen)
+        self.assertIn('python tools/check_bridge_outputs.py', codegen)
 
     def test_bundle_build_follows_native_compilation(self):
         steps = self.workflow('flutter-validate.yml')['jobs']['linux']['steps']
@@ -58,7 +59,6 @@ class FlutterWorkflowTests(unittest.TestCase):
                       'Build and validate the Linux desktop bundle')
         self.assertEqual(bundle['run'], 'bash tools/native/build-linux-bundle.sh')
         self.assertNotIn('if', bundle)
-
 
     def test_desktop_dart_checks_use_the_shared_sdk_and_lockfile(self):
         job = self.workflow('flutter-platform-tests.yml')['jobs']['dart']
@@ -71,17 +71,14 @@ class FlutterWorkflowTests(unittest.TestCase):
         self.assertNotIn('test_native/', commands)
         self.assertNotIn('pub upgrade', commands)
 
-
-    def test_sdk_bootstrap_does_not_pollute_the_strict_version_report(self):
+    def test_sdk_bootstrap_uses_the_shared_strict_version_verifier(self):
         steps = self.workflow('flutter-platform-tests.yml')['jobs']['dart']['steps']
         command = next(step['run'] for step in steps if step.get('name') ==
                        'Verify SDK and locked dependencies')
-        self.assertLess(command.index('flutter --version >'),
-                        command.index('flutter --version --machine >'))
-        self.assertIn('cat tools/.reports/flutter-bootstrap.log; exit 1;', command)
-        self.assertIn("json.loads(Path('tools/.reports/flutter-version.json').read_text(encoding='utf-8'))", command)
-        self.assertIn("assert actual['frameworkVersion'] == expected['flutter']", command)
-        self.assertIn("assert actual['dartSdkVersion'].split()[0] == expected['dart']", command)
+        self.assertIn('python tools/flutter_sdk.py', command)
+        self.assertNotIn('json.loads', command)
+        self.assertNotIn('|| true', command)
+        self.assertTrue((ROOT / 'tools/tests/test_flutter_sdk.py').is_file())
 
 
 if __name__ == '__main__':

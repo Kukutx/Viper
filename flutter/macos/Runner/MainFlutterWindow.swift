@@ -10,9 +10,9 @@ import flutter_custom_cursor
 import package_info_plus
 import path_provider_foundation
 import screen_retriever
-import sqflite
+import sqflite_darwin
 // import tray_manager
-import uni_links_desktop
+import app_links
 import url_launcher_macos
 import wakelock_plus
 import window_manager
@@ -80,7 +80,7 @@ class MainFlutterWindow: NSWindow {
             PathProviderPlugin.register(with: controller.registrar(forPlugin: "PathProviderPlugin"))
             SqflitePlugin.register(with: controller.registrar(forPlugin: "SqflitePlugin"))
             // TrayManagerPlugin.register(with: controller.registrar(forPlugin: "TrayManagerPlugin"))
-            UniLinksDesktopPlugin.register(with: controller.registrar(forPlugin: "UniLinksDesktopPlugin"))
+            AppLinksMacosPlugin.register(with: controller.registrar(forPlugin: "AppLinksMacosPlugin"))
             UrlLauncherPlugin.register(with: controller.registrar(forPlugin: "UrlLauncherPlugin"))
             WakelockPlusMacosPlugin.register(with: controller.registrar(forPlugin: "WakelockPlusMacosPlugin"))
             WindowSizePlugin.register(with: controller.registrar(forPlugin: "WindowSizePlugin"))

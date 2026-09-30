@@ -109,15 +109,15 @@ def check(root: Path = ROOT) -> None:
 
 def generate(root: Path = ROOT) -> None:
     check(root)
-    toolchain = json.loads((root / 'configs/toolchain.json').read_text())
-    sdk = json.loads(subprocess.check_output(['flutter', '--version', '--machine'], cwd=root, text=True))
-    if sdk['frameworkVersion'] != toolchain['flutter'] or sdk['dartSdkVersion'].split()[0] != toolchain['dart']:
-        raise ValueError('Use the pinned Flutter/Dart SDK')
+    from flutter_sdk import verify
+    flutter = verify(root)
     executable = install(root)
+    from cargo_tools import expand_environment
+    environment = expand_environment(root)
     subprocess.run(['cargo', 'metadata', '--locked', '--no-deps', '--format-version', '1'], cwd=root, check=True, stdout=subprocess.DEVNULL)
-    subprocess.run(['flutter', 'pub', 'get', '--enforce-lockfile'], cwd=root / 'flutter', check=True)
+    subprocess.run([flutter, 'pub', 'get', '--enforce-lockfile'], cwd=root / 'flutter', check=True)
     locks = {name: (root / name).read_bytes() for name in ('Cargo.lock', 'flutter/pubspec.lock')}
-    subprocess.run([str(executable), 'generate', '--config-file', 'flutter_rust_bridge.yaml'], cwd=root, check=True)
+    subprocess.run([str(executable), 'generate', '--config-file', 'flutter_rust_bridge.yaml'], cwd=root, env=environment, check=True)
     if any((root / name).read_bytes() != data for name, data in locks.items()):
         raise ValueError('Code generation changed a lockfile; review the dependency change separately')
 

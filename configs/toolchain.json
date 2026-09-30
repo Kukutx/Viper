@@ -8,6 +8,7 @@
   "uv": "0.12.20",
   "cmake": "4.4.3",
   "actionlint": "1.7.12",
+  "cargo_expand": "1.0.126",
   "flutter_rust_bridge": {
     "version": "2.13.0",
     "assets": {
@@ -40,6 +41,7 @@
     "uv": "https://github.com/astral-sh/uv/releases/tag/0.12.20",
     "cmake": "https://github.com/Kitware/CMake/releases/tag/v4.4.3",
     "actionlint": "https://github.com/rhysd/actionlint/releases/tag/v1.7.12",
+    "cargo_expand": "https://github.com/dtolnay/cargo-expand/releases/tag/1.0.126",
     "vcpkg": "https://github.com/microsoft/vcpkg/releases/tag/2026.07.29",
     "flutter_rust_bridge": "https://github.com/fzyzcjy/flutter_rust_bridge/releases/tag/v2.13.0"
   }

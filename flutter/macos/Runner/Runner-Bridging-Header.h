@@ -1,3 +1,3 @@
 #pragma once
 
-#include "bridge_generated.h"
+#include "../../native/rustdesk.h"
