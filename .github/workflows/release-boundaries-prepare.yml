@@ -1,0 +1,75 @@
+name: Validate release credential boundaries
+on:
+  push:
+    branches: [codex/viper-android-preparation]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Apply the exact reviewed release migration
+        run: python .migration/apply-release.py
+      - name: Validate all repository tools and shell entry points
+        run: |
+          set -euo pipefail
+          python -m pip install -r tools/requirements-dev.txt
+          mkdir -p tools/.reports
+          python tools/viper.py check
+          python tools/release_policy.py
+          python -m unittest discover -s tools/tests -v 2>&1 | tee tools/.reports/release-tests.log
+          for p in flutter/ndk_*.sh flutter/build_fdroid.sh tools/native/*.sh; do bash -n "$p"; done
+      - name: Validate workflow syntax and expressions
+        run: |
+          set -euo pipefail
+          version=$(python -c 'import json; print(json.load(open("configs/toolchain.json"))["actionlint"])')
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 3 "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}" -o "$archive"
+          curl -fsSL --retry 3 "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_checksums.txt" -o checksums.txt
+          awk -v f="$archive" '$2 == f' checksums.txt > selected.sha256
+          test "$(wc -l < selected.sha256)" -eq 1
+          sha256sum -c selected.sha256
+          tar -xzf "$archive" actionlint
+          cd "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
+      - name: Preserve only validated file objects without changing refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, os, urllib.request, zipfile
+          from pathlib import Path
+          paths=['.github/workflows/flutter-build.yml','flutter/build_fdroid.sh','flutter/ndk_arm.sh','flutter/ndk_arm64.sh','flutter/ndk_x64.sh','flutter/ndk_x86.sh','tools/tests/test_android_release_entry.py','tools/signing_identity.py','tools/release_policy.py','tools/tests/test_release_policy.py','docs/engineering/release-credential-boundaries.md']
+          out=Path('tools/.reports'); entries=[]
+          with zipfile.ZipFile(out/'release-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in paths:
+                  path=Path(name)
+                  assert path.is_file() and not path.is_symlink()
+                  data=path.read_bytes()
+                  sha=hashlib.sha1(f'blob {len(data)}\0'.encode()+data).hexdigest()
+                  request=urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs',data=json.dumps({'content':base64.b64encode(data).decode(),'encoding':'base64'}).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'},method='POST')
+                  with urllib.request.urlopen(request,timeout=60) as response: result=json.load(response)
+                  assert result['sha']==sha
+                  entries.append({'path':name,'mode':'100644','type':'blob','sha':sha})
+                  z.writestr(name,data)
+          (out/'release-objects.json').write_text(json.dumps(entries,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: reviewed-release-boundaries
+          path: tools/.reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
