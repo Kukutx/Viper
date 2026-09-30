@@ -81,7 +81,7 @@ jobs:
           sdkmanager="${ANDROID_HOME:?}/cmdline-tools/latest/bin/sdkmanager"
           test -x "$sdkmanager"
           "$sdkmanager" --list > tools/.reports/android-sdk-packages.log 2>&1
-          "$sdkmanager" "platforms;android-37" "build-tools;37.0.0" "ndk;$ANDROID_NDK_VERSION" > tools/.reports/android-sdk-setup.log 2>&1 || { tail -100 tools/.reports/android-sdk-setup.log; exit 1; }
+          "$sdkmanager" "platforms;android-37.0" "build-tools;37.0.0" "ndk;$ANDROID_NDK_VERSION" > tools/.reports/android-sdk-setup.log 2>&1 || { tail -100 tools/.reports/android-sdk-setup.log; exit 1; }
           cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
       - name: Compile actual Android application sources with the new Gradle stack
         shell: bash
