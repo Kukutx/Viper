@@ -8,6 +8,9 @@ jobs:
   android:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -18,10 +21,11 @@ jobs:
           python-version-file: .python-version
       - name: Snapshot the exact input
         run: |
+          set -euo pipefail
           mkdir -p tools/.reports
-          git archive 26dca1c161f570213623ade65a2e4e78ddcfae07 | gzip > tools/.reports/source.tar.gz
+          git archive HEAD | gzip > tools/.reports/source.tar.gz
           git -C libs/hbb_common archive HEAD | gzip > tools/.reports/hbb_common.tar.gz
-          git ls-tree -r 26dca1c161f570213623ade65a2e4e78ddcfae07 > tools/.reports/tree.txt
+          git ls-tree -r HEAD > tools/.reports/tree.txt
           python -m pip install -r tools/requirements-dev.txt
           python tools/viper.py env >> "$GITHUB_ENV"
           echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
