@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_hbb/generated/flutter_ffi.dart' as native;
@@ -25,6 +26,17 @@ void main() {
     final asynchronous = await native.mainGetAppName();
     expect(synchronous, isNotEmpty);
     expect(asynchronous, synchronous);
+  });
+
+  test('the real printer bridge returns the platform string synchronously', () {
+    final String printers = native.mainGetPrinterNames();
+    if (Platform.isWindows) {
+      final names = jsonDecode(printers);
+      expect(names, isA<List<dynamic>>());
+      expect(names as List<dynamic>, everyElement(isA<String>()));
+    } else {
+      expect(printers, isEmpty);
+    }
   });
 
   test('the real asynchronous bridge returns a native version', () async {

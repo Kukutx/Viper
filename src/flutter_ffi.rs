@@ -2723,10 +2723,8 @@ pub fn main_audio_support_loopback() -> bool {
 #[flutter_rust_bridge::frb(sync)]
 pub fn main_get_printer_names() -> String {
     #[cfg(target_os = "windows")]
-    return (
-        serde_json::to_string(&crate::platform::windows::get_printer_names().unwrap_or_default())
-            .unwrap_or_default(),
-    );
+    return serde_json::to_string(&crate::platform::windows::get_printer_names().unwrap_or_default())
+        .unwrap_or_default();
     #[cfg(not(target_os = "windows"))]
     return ("".to_owned());
 }
