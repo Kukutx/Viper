@@ -1,0 +1,87 @@
+name: Validate Android release entry convergence
+on:
+  push:
+    branches: [codex/viper-android-preparation]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Apply the reviewed checksum-bound Android changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import gzip,hashlib,re,subprocess
+          p=Path('.migration/android-matrix.patch.gz'); data=p.read_bytes()
+          assert hashlib.sha256(data).hexdigest()=='fc27451f3a0b592d86ccc620ff54deacbcff620ef827c63c64fb4d9850e50380'
+          p=Path('.github/workflows/flutter-build.yml');data0=p.read_bytes()
+          assert hashlib.sha1(f'blob {len(data0)}\0'.encode()+data0).hexdigest()=='bc40409a471790ebb833e3a655ae5baae31efab8'
+          patch=gzip.decompress(data)
+          subprocess.run(['git','apply','--check'],input=patch,check=True)
+          subprocess.run(['git','apply'],input=patch,check=True)
+          for p in Path('flutter').glob('ndk_*.sh'):
+              text=p.read_text(); index=text.index('cargo ndk --platform ')
+              target,rest=text[index:].split(' --target ',1)[1].split(' ',1)
+              assert target in {'aarch64-linux-android','armv7-linux-androideabi','i686-linux-android','x86_64-linux-android'}
+              p.write_text(text[:index]+f'python3 tools/android_cargo.py {target} {rest}')
+          p=Path('flutter/build_fdroid.sh'); text=p.read_text()
+          pattern=r'\tcargo ndk \\\n\t\t--platform [^\n]+\n\t\t--target "\$\{RUST_TARGET\}" \\\n\t\t--bindgen \\\n'
+          text,count=re.subn(pattern,lambda _: '\tANDROID_HOME="${ANDROID_SDK_ROOT}" python3 tools/android_cargo.py "${RUST_TARGET}" \\\n',text)
+          assert count==1,count
+          p.write_text(text)
+          PY
+          mkdir -p tools/.reports
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py check
+          python -m unittest discover -s tools/tests -v > tools/.reports/android-matrix-tests.log 2>&1 || { tail -100 tools/.reports/android-matrix-tests.log; exit 1; }
+          tail -12 tools/.reports/android-matrix-tests.log
+          bash -n flutter/build_fdroid.sh flutter/ndk_arm.sh flutter/ndk_arm64.sh flutter/ndk_x64.sh flutter/ndk_x86.sh
+          git diff --check
+      - name: Validate all workflow syntax and expressions
+        run: |
+          set -euo pipefail
+          version=$(python tools/build_toolchain.py --value actionlint)
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          curl -fsSL --retry 3 "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}" -o "$RUNNER_TEMP/$archive"
+          curl -fsSL --retry 3 "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_checksums.txt" -o "$RUNNER_TEMP/checksums.txt"
+          (cd "$RUNNER_TEMP"; awk -v f="$archive" '$2 == f' checksums.txt > selected.sha256; test "$(wc -l < selected.sha256)" -eq 1; sha256sum -c selected.sha256; tar -xzf "$archive" actionlint)
+          "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
+      - name: Preserve only reviewed file objects without moving any ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64,hashlib,json,os,subprocess,urllib.request,zipfile
+          paths=['.github/workflows/flutter-build.yml','flutter/build_fdroid.sh','flutter/ndk_arm.sh','flutter/ndk_arm64.sh','flutter/ndk_x64.sh','flutter/ndk_x86.sh','tools/tests/test_android_release_entry.py']
+          objects=[]
+          with zipfile.ZipFile('tools/.reports/android-matrix-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in paths:
+                  p=Path(name);assert p.is_file() and not p.is_symlink() and p.stat().st_size<500000
+                  data=p.read_bytes();z.writestr(name,data)
+                  req=urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs',data=json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'},method='POST')
+                  with urllib.request.urlopen(req,timeout=30) as response: sha=json.load(response)['sha']
+                  assert sha==hashlib.sha1(f'blob {len(data)}\0'.encode()+data).hexdigest()
+                  objects.append({'path':name,'type':'blob','mode':'100644','sha':sha})
+          Path('tools/.reports/android-matrix-objects.json').write_text(json.dumps(objects,indent=2)+'\n')
+          Path('tools/.reports/android-matrix.patch').write_bytes(subprocess.check_output(['git','diff','--binary']))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: reviewed-android-matrix
+          path: tools/.reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3

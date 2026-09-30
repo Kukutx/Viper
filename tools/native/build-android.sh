@@ -47,11 +47,13 @@ git -C "$VCPKG_ROOT" checkout -q --detach FETCH_HEAD
 bash flutter/build_android_deps.sh "$abi" > tools/.reports/android-vcpkg.log 2>&1 || { tail -120 tools/.reports/android-vcpkg.log; exit 1; }
 rustup target add "$target"
 cargo install cargo-ndk --locked --version "=$cargo_ndk" --root .tools/cargo-ndk > tools/.reports/android-cargo-ndk.log 2>&1 || { tail -100 tools/.reports/android-cargo-ndk.log; exit 1; }
-actual=$(.tools/cargo-ndk/bin/cargo-ndk --version)
-[[ "${actual##* }" == "$cargo_ndk" ]]
 export PATH="$root/.tools/cargo-ndk/bin:$PATH"
+# cargo-ndk rejects direct execution; Cargo supplies its required environment and subcommand.
+actual=$(cargo ndk --version)
+printf '%s\n' "$actual" > tools/.reports/android-cargo-ndk-version.txt
+[[ "$actual" == "cargo-ndk $cargo_ndk" ]]
 export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384"
-cargo ndk --platform "$api" --target "$target" build --locked --release --lib --features flutter,hwcodec > tools/.reports/android-cargo.log 2>&1 || { tail -150 tools/.reports/android-cargo.log; exit 1; }
+python tools/android_cargo.py "$target" build --locked --release --lib --features flutter,hwcodec > tools/.reports/android-cargo.log 2>&1 || { tail -150 tools/.reports/android-cargo.log; exit 1; }
 jni="flutter/android/app/src/main/jniLibs/$abi"
 mkdir -p "$jni"
 cp "target/$target/release/liblibrustdesk.so" "$jni/librustdesk.so"
