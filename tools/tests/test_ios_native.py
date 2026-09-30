@@ -27,6 +27,7 @@ class IosBundleTests(unittest.TestCase):
         self.bundle = self.root / 'Runner.app'
         self.archive = self.root / 'liblibrustdesk.a'
         self.expected = {'minimum': '15.0', 'sdk': '27.0'}
+        self.symbol_tool = self.root / 'llvm-nm'
         self.info = {
             'CFBundleIdentifier': 'com.carriez.flutterHbb', 'CFBundleExecutable': 'Runner',
             'MinimumOSVersion': '15.0', 'DTSDKName': 'iphoneos27.0',
@@ -49,12 +50,12 @@ class IosBundleTests(unittest.TestCase):
     def inspect(self, args):
         if args[1] == 'lipo':
             return 'arm64\n'
-        if args[1] == 'nm':
+        if args[0] == str(self.symbol_tool):
             return '\n'.join('000000 T ' + name for name in bundle_tool.BRIDGE_SYMBOLS)
         self.fail(f'Unexpected inspection: {args}')
 
     def verify(self):
-        return bundle_tool.verify(self.bundle, self.archive, self.expected)
+        return bundle_tool.verify(self.bundle, self.archive, self.expected, symbol_tool=self.symbol_tool)
 
     def test_success_reports_static_evidence_not_device_execution(self):
         result = self.verify()
@@ -108,14 +109,30 @@ class IosBundleTests(unittest.TestCase):
                 self.verify()
 
     def test_each_static_bridge_symbol_is_required(self):
-        for symbol in bundle_tool.BRIDGE_SYMBOLS:
-            def inspect(args):
-                if args[1] == 'nm':
-                    return '\n'.join('000000 T ' + name for name in bundle_tool.BRIDGE_SYMBOLS - {symbol})
-                return self.inspect(args)
-            self.mock.side_effect = inspect
-            with self.subTest(symbol=symbol), self.assertRaisesRegex(ValueError, 'Unlinked'):
-                self.verify()
+        for binary in (self.archive, self.bundle / 'Runner'):
+            for symbol in bundle_tool.BRIDGE_SYMBOLS:
+                def inspect(args):
+                    if args[0] == str(self.symbol_tool) and args[-1] == str(binary):
+                        return '\n'.join('000000 T ' + name for name in bundle_tool.BRIDGE_SYMBOLS - {symbol})
+                    return self.inspect(args)
+                self.mock.side_effect = inspect
+                with self.subTest(binary=binary, symbol=symbol), self.assertRaisesRegex(ValueError, 'Unlinked'):
+                    self.verify()
+
+    def test_both_symbol_tables_require_defined_external_symbols(self):
+        self.verify()
+        calls = [c.args[0] for c in self.mock.call_args_list if c.args[0][0] == str(self.symbol_tool)]
+        self.assertEqual(calls, [[str(self.symbol_tool), '--extern-only', '--defined-only', str(p)]
+                                 for p in (self.archive, self.bundle / 'Runner')])
+
+    def test_symbol_reader_failure_is_not_ignored(self):
+        def inspect(args):
+            if args[0] == str(self.symbol_tool):
+                raise ValueError('llvm-nm failed')
+            return self.inspect(args)
+        self.mock.side_effect = inspect
+        with self.assertRaisesRegex(ValueError, 'llvm-nm failed'):
+            self.verify()
 
     def test_inspection_errors_are_not_ignored(self):
         self.mock.side_effect = ValueError('xcrun failed')
@@ -131,7 +148,7 @@ class IosBundleTests(unittest.TestCase):
         link = self.root / 'alias.app'
         link.symlink_to(self.bundle, target_is_directory=True)
         with self.assertRaisesRegex(ValueError, 'regular iOS'):
-            bundle_tool.verify(link, self.archive, self.expected)
+            bundle_tool.verify(link, self.archive, self.expected, symbol_tool=self.symbol_tool)
 
 
 
@@ -195,6 +212,7 @@ class IosSourceTests(unittest.TestCase):
         for command in ('--locked', '--features flutter,hwcodec', '--no-codesign --no-pub', 'git diff --exit-code HEAD', 'verify_ios_bundle.py'):
             self.assertIn(command, build)
         self.assertNotIn('pod install', setup + build)
+        self.assertIn('rustup component add llvm-tools-preview', build)
 
 
 if __name__ == '__main__':

@@ -26,3 +26,11 @@ bash tools/native/build-ios.sh
 每次构建的完成状态以该提交的 Actions 结果为准。未签名设备包、静态符号检查不能证明 iPhone 真机启动、后台/前台切换、扫码、深链接、网络发现、硬件解码、跨设备远控或安装回退。没有签名、公证、商店发布或生产部署。
 
 参考：Flutter 官方 UIScene adoption 与 Swift Package Manager for app developers；netdev `v0.46.3` 的 Cargo features 和公开 API。历史准备分支产物不是最新任务提交的构建成功证据。
+
+## Rust LLVM 符号检查
+
+`0653d84` 的 CI `36780790175` 已编译 Rust 静态库与未签名 Release Runner.app，但 Xcode `nm` 在读取 Rust `compiler_builtins` 的 LLVM bitcode 时报告 `Unknown attribute kind (105)`。这属于检查工具与生产者的 LLVM 版本不匹配，不是应用编译失败。
+
+iOS 构建入口安装当前固定 Rust 的 `llvm-tools-preview` 组件。检查器从 `rustc --print sysroot` 和 `rustc -vV` 定位该编译器附带的 `llvm-nm`，校验 Rust 精确版本及 LLVM 版本，并记录工具 SHA-256。缺少组件、版本不符或检查命令失败都阻止归档；不回退系统 `nm`、不跳过 bitcode 或缺失符号。Rust archive 和最终 Runner 仍分别要求全部既有 Rust/FRB 导出。此修复只改变构建检查器，不修改 Rust、Swift、生成绑定或运行时行为。
+
+参考：[rustup components](https://rust-lang.github.io/rustup/concepts/components.html)、[LLVM nm](https://llvm.org/docs/CommandGuide/llvm-nm.html)。`preview` 是官方组件名，不切换到 nightly Rust。

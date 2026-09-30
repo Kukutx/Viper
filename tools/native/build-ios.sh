@@ -11,6 +11,7 @@ minimum=$(python tools/build_toolchain.py --value ios.minimum)
 python tools/prepare_flutter.py
 [[ ! -e flutter/ios/Podfile && ! -e flutter/ios/Podfile.lock ]]
 rustup target add aarch64-apple-ios
+rustup component add llvm-tools-preview
 env IPHONEOS_DEPLOYMENT_TARGET="$minimum" cargo build --locked --release \
   --target aarch64-apple-ios --lib --features flutter,hwcodec \
   > tools/.reports/ios-cargo.log 2>&1 || { tail -120 tools/.reports/ios-cargo.log; exit 1; }
