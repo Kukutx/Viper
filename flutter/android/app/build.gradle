@@ -2,61 +2,42 @@ import com.google.protobuf.gradle.*
 import groovy.json.JsonSlurper
 
 plugins {
-    id "com.google.protobuf" version "0.9.4"
-    id "com.android.application"
-    id "kotlin-android"
-    id "dev.flutter.flutter-gradle-plugin"
+    id 'com.android.application'
+    id 'com.google.protobuf'
+    id 'dev.flutter.flutter-gradle-plugin'
 }
 
+def androidTools = new JsonSlurper().parse(rootProject.file('../../configs/android-toolchain.json'))
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
 
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)
-    }
+    localPropertiesFile.withReader('UTF-8') { localProperties.load(it) }
 }
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode', '1')
+def flutterVersionName = localProperties.getProperty('flutter.versionName', '1.0')
 
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
-if (flutterVersionCode == null) {
-    flutterVersionCode = '1'
-}
-
-def flutterVersionName = localProperties.getProperty('flutter.versionName')
-if (flutterVersionName == null) {
-    flutterVersionName = '1.0'
-}
-
-// Add rustls-platform-verifier Android support
 String findRustlsPlatformVerifierMavenDir() {
     def dependencyText = providers.exec {
-        it.workingDir = new File("../..")
-        commandLine("cargo", "metadata", "--format-version", "1")
+        workingDir rootProject.file('../..')
+        commandLine 'cargo', 'metadata', '--locked', '--format-version', '1'
     }.standardOutput.asText.get()
-
     def dependencyJson = new JsonSlurper().parseText(dependencyText)
-    def pkg = dependencyJson.packages.find { it.name == "rustls-platform-verifier-android" }
-    
+    def pkg = dependencyJson.packages.find { it.name == 'rustls-platform-verifier-android' }
     if (pkg == null) {
-        throw new GradleException("rustls-platform-verifier-android package not found in cargo metadata!")
+        throw new GradleException('rustls-platform-verifier-android package not found in locked cargo metadata')
     }
-    
-    def manifestPath = file(pkg.manifest_path)
-    def mavenDir = new File(manifestPath.parentFile, "maven")
-    
-    if (!mavenDir.exists()) {
+    def mavenDir = new File(file(pkg.manifest_path).parentFile, 'maven')
+    if (!mavenDir.isDirectory()) {
         throw new GradleException("Maven directory not found at: ${mavenDir.path}")
     }
-    
-    println("✓ Found rustls-platform-verifier maven repo at: ${mavenDir.path}")
     return mavenDir.path
 }
-
 
 repositories {
     maven {
@@ -66,75 +47,60 @@ repositories {
 }
 
 protobuf {
-    protoc {
-        artifact = 'com.google.protobuf:protoc:3.20.1'
-    }
-
+    protoc { artifact = "com.google.protobuf:protoc:${androidTools.protobuf_java}" }
     generateProtoTasks {
         all().configureEach { task ->
             task.builtins {
-                java {
-                    option "lite"
-                }
+                java { option 'lite' }
             }
         }
     }
 }
 
 android {
-    namespace "com.carriez.flutter_hbb"
-    compileSdkVersion 36
+    namespace = 'com.carriez.flutter_hbb'
+    compileSdk = androidTools.compile_sdk
+    ndkVersion = androidTools.ndk
+    buildToolsVersion = androidTools.build_tools
     sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
-
         main.proto.srcDirs += '../../../libs/base/protos'
-        main.proto.includes += "message.proto"
+        main.proto.includes += 'message.proto'
     }
-
     compileOptions {
-        coreLibraryDesugaringEnabled true
-        targetCompatibility JavaVersion.VERSION_1_8
-        sourceCompatibility JavaVersion.VERSION_1_8
+        coreLibraryDesugaringEnabled = true
+        targetCompatibility = JavaVersion.toVersion(androidTools.java_target)
+        sourceCompatibility = JavaVersion.toVersion(androidTools.java_target)
     }
-
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId "com.carriez.flutter_hbb"
-        minSdkVersion 22
-        targetSdkVersion 36
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        applicationId = 'com.carriez.flutter_hbb'
+        minSdk = androidTools.min_sdk
+        targetSdk = androidTools.target_sdk
+        versionCode = flutterVersionCode.toInteger()
+        versionName = flutterVersionName
     }
-
     signingConfigs {
-      release {
-        keyAlias keystoreProperties['keyAlias']
-        keyPassword keystoreProperties['keyPassword']
-        storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-        storePassword keystoreProperties['storePassword']
-      }
+        release {
+            keyAlias = keystoreProperties['keyAlias']
+            keyPassword = keystoreProperties['keyPassword']
+            storeFile = keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+            storePassword = keystoreProperties['storePassword']
+        }
     }
-
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.release
+            signingConfig = signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules'
         }
     }
 }
 
-flutter {
-    source '../..'
-}
+flutter { source = '../..' }
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
-    implementation 'com.google.protobuf:protobuf-javalite:3.20.1'
-    implementation "androidx.media:media:1.6.0"
+    implementation "com.google.protobuf:protobuf-javalite:${androidTools.protobuf_java}"
+    implementation 'androidx.media:media:1.6.0'
     implementation 'com.github.getActivity:XXPermissions:18.5'
-    implementation("org.jetbrains.kotlin:kotlin-stdlib") { version { strictly("1.9.10") } }
     implementation 'com.caverock:androidsvg-aar:1.4'
-    implementation "rustls:rustls-platform-verifier:0.1.1"
+    implementation 'rustls:rustls-platform-verifier:0.1.1'
 }

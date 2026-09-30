@@ -1,0 +1,98 @@
+name: Android migration candidate
+
+on:
+  push:
+    branches: [codex/viper-android-modernization]
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Read the candidate platform toolchain
+        run: |
+          mkdir -p tools/.reports
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          data=json.loads(Path('configs/android-toolchain.json').read_text())
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              for key, value in data.items():
+                  if isinstance(value, (str, int)):
+                      f.write(f'ANDROID_{key.upper()}={value}\n')
+          PY
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.ANDROID_JAVA }}
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Install exact SDK packages and checked Gradle wrapper
+        run: |
+          set -euo pipefail
+          sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;${ANDROID_NDK}" > tools/.reports/android-sdk.log 2>&1
+          curl -fL --retry 3 "https://services.gradle.org/distributions/gradle-${ANDROID_GRADLE}-bin.zip" -o "$RUNNER_TEMP/gradle.zip"
+          printf '%s  %s\n' "$ANDROID_GRADLE_SHA256" "$RUNNER_TEMP/gradle.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          mkdir "$RUNNER_TEMP/gradle-bootstrap"
+          touch "$RUNNER_TEMP/gradle-bootstrap/settings.gradle"
+          "$RUNNER_TEMP/gradle-$ANDROID_GRADLE/bin/gradle" -p "$RUNNER_TEMP/gradle-bootstrap" wrapper --gradle-version "$ANDROID_GRADLE" --distribution-type bin --gradle-distribution-sha256-sum "$ANDROID_GRADLE_SHA256" > tools/.reports/android-wrapper.log 2>&1
+          cp "$RUNNER_TEMP/gradle-bootstrap/gradlew" "$RUNNER_TEMP/gradle-bootstrap/gradlew.bat" flutter/android/
+          cp "$RUNNER_TEMP/gradle-bootstrap/gradle/wrapper/gradle-wrapper.jar" flutter/android/gradle/wrapper/
+          printf '%s  %s\n' "$ANDROID_WRAPPER_SHA256" flutter/android/gradle/wrapper/gradle-wrapper.jar | sha256sum -c -
+      - name: Resolve the reviewed QR plugin migration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('flutter/pubspec.yaml')
+          text = path.read_text()
+          assert text.count('  qr_code_scanner: 1.0.1') == 1
+          path.write_text(text.replace('  qr_code_scanner: 1.0.1', '  qr_code_scanner_plus: 2.3.0'))
+          path = Path('flutter/lib/mobile/pages/scan_page.dart')
+          text = path.read_text()
+          assert text.count('package:qr_code_scanner/qr_code_scanner.dart') == 1
+          path.write_text(text.replace('package:qr_code_scanner/qr_code_scanner.dart', 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart'))
+          PY
+          python tools/flutter_sdk.py
+          (cd flutter && flutter pub get)
+          (cd flutter && flutter pub get --enforce-lockfile)
+      - name: Analyze and test the candidate dependency graph
+        run: |
+          python tools/analyze_flutter.py
+          (cd flutter && flutter test --no-pub test) > tools/.reports/android-dart-tests.log 2>&1
+      - name: Compile all Android plugins and generated protocol classes
+        working-directory: flutter
+        run: flutter build apk --debug --no-pub --target-platform android-arm64 > ../tools/.reports/android-gradle-build.log 2>&1
+      - name: Preserve candidate sources and full diagnostics
+        if: always()
+        run: |
+          mkdir -p tools/.reports/snapshot
+          git rev-parse HEAD > tools/.reports/revision.txt
+          git diff > tools/.reports/android-candidate.patch
+          for path in flutter/pubspec.yaml flutter/pubspec.lock flutter/lib/mobile/pages/scan_page.dart flutter/android/gradlew flutter/android/gradlew.bat flutter/android/gradle/wrapper/gradle-wrapper.jar flutter/android/gradle/wrapper/gradle-wrapper.properties; do
+            if test -f "$path"; then cp --parents "$path" tools/.reports/snapshot/; fi
+          done
+          java -version > tools/.reports/java-version.log 2>&1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: android-candidate-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
