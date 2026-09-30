@@ -1,0 +1,120 @@
+name: Android native migration probe
+on:
+  push:
+    branches: [codex/viper-android-native-probe]
+permissions:
+  contents: read
+jobs:
+  native:
+    name: Android Rust ${{ matrix.abi }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            target: aarch64-linux-android
+            triplet: arm64-android
+            features: flutter,hwcodec
+          - abi: armeabi-v7a
+            target: armv7-linux-androideabi
+            triplet: arm-neon-android
+            features: flutter,hwcodec
+          - abi: x86_64
+            target: x86_64-linux-android
+            triplet: x64-android
+            features: flutter
+    env:
+      ABI: ${{ matrix.abi }}
+      TARGET: ${{ matrix.target }}
+      TRIPLET: ${{ matrix.triplet }}
+      FEATURES: ${{ matrix.features }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Read the reviewed candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tools/.reports
+          echo 'a03a0c0f1d7ef6bab9c3a5ded7ff5ce85a63ec9763bf9cc4a3e8048a4070ce75  tools/.migration/android.patch.gz' | sha256sum -c -
+          gzip -dc tools/.migration/android.patch.gz > "$RUNNER_TEMP/android.patch"
+          git apply --check "$RUNNER_TEMP/android.patch"
+          git apply "$RUNNER_TEMP/android.patch"
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          from pathlib import Path
+          config = json.loads(Path('configs/toolchain.json').read_text())
+          spec = config['android']
+          for key, value in {'NDK_VERSION': spec['ndk'], 'CARGO_NDK_VERSION': spec['cargo_ndk'], 'ANDROID_API': spec['min_sdk'], 'CMAKE_VERSION': config['cmake'], 'VCPKG_REVISION': config['vcpkg']['revision']}.items():
+              print(f'{key}={value}')
+          PY
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: android-ndk30-${{ matrix.abi }}
+          cache-on-failure: true
+      - name: Prepare pinned NDK and native prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends clang libclang-dev nasm ninja-build pkg-config autoconf automake libtool gperf
+          python -m pip install "cmake==$CMAKE_VERSION"
+          sdkmanager="${ANDROID_HOME:?}/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$sdkmanager"
+          "$sdkmanager" "ndk;$NDK_VERSION" > tools/.reports/android-ndk.log 2>&1 || { cat tools/.reports/android-ndk.log; exit 1; }
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          rustup target add "$TARGET"
+          rustc -vV > tools/.reports/rust-version.txt
+      - name: Build actual codec libraries for the original feature profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          export VCPKG_ROOT="$RUNNER_TEMP/viper-vcpkg-android"
+          git init -q "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$VCPKG_ROOT" fetch -q --depth 1 origin "$VCPKG_REVISION"
+          git -C "$VCPKG_ROOT" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$VCPKG_ROOT" rev-parse HEAD)" = "$VCPKG_REVISION"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics > tools/.reports/android-vcpkg.log 2>&1
+          packages=(libyuv libvpx opus aom libjpeg-turbo cpu-features)
+          if [[ "$FEATURES" == *hwcodec* ]]; then packages+=(ffmpeg); fi
+          "$VCPKG_ROOT/vcpkg" install --classic --triplet="$TRIPLET" --overlay-ports="$PWD/res/vcpkg" --overlay-triplets="$PWD/res/vcpkg-triplets" "${packages[@]}" >> tools/.reports/android-vcpkg.log 2>&1 || { tail -140 tools/.reports/android-vcpkg.log; exit 1; }
+          if [[ "$ABI" == armeabi-v7a ]]; then ln -s arm-neon-android "$VCPKG_ROOT/installed/arm-android"; fi
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> "$GITHUB_ENV"
+      - name: Compile and inspect the actual JNI library
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo install cargo-ndk --version "=$CARGO_NDK_VERSION" --locked --root "$RUNNER_TEMP/cargo-ndk" > tools/.reports/cargo-ndk.log 2>&1 || { tail -100 tools/.reports/cargo-ndk.log; exit 1; }
+          export PATH="$RUNNER_TEMP/cargo-ndk/bin:$PATH"
+          cargo ndk --version
+          cargo ndk --platform "$ANDROID_API" --target "$ABI" build --locked --release --lib --features "$FEATURES" > tools/.reports/android-cargo.log 2>&1 || { tail -140 tools/.reports/android-cargo.log; exit 1; }
+          library="target/$TARGET/release/liblibrustdesk.so"
+          test -s "$library"
+          file "$library" > tools/.reports/android-library.txt
+          "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h -l -d "$library" > tools/.reports/android-elf.txt
+          mkdir -p "tools/.reports/native/$ABI"
+          cp "$library" "tools/.reports/native/$ABI/librustdesk.so"
+          case "$ABI" in
+            arm64-v8a) triple=aarch64-linux-android ;;
+            armeabi-v7a) triple=arm-linux-androideabi ;;
+            x86_64) triple=x86_64-linux-android ;;
+          esac
+          cp "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/$triple/libc++_shared.so" "tools/.reports/native/$ABI/"
+          git diff --exit-code -- Cargo.lock
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: android-native-${{ matrix.abi }}-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
