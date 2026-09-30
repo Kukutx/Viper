@@ -1,27 +1,92 @@
-name: Snapshot the exact build-migration baseline
+name: Verify reviewed build-entry convergence
 on:
   push:
     branches: [codex/viper-build-convergence-preparation]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  snapshot:
+  prepare:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: 693c0c36ada9270054bfe2a8d6c7e16bc4c2f085
           persist-credentials: false
-      - run: |
-          mkdir -p snapshot
-          test "$(git rev-parse HEAD)" = 693c0c36ada9270054bfe2a8d6c7e16bc4c2f085
-          git archive --format=tar.gz --output=snapshot/source.tar.gz HEAD
-          git ls-tree -r HEAD > snapshot/tree.txt
-          sha256sum snapshot/source.tar.gz > snapshot/SHA256SUMS
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+          submodules: recursive
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          name: viper-build-migration-baseline
-          path: snapshot/
+          python-version-file: .python-version
+      - name: Apply the exact checksum-verified patch to its reviewed preimage
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tools/.reports
+          python - <<'PY'
+          import hashlib, lzma, os, subprocess
+          from pathlib import Path
+          data = b''.join(Path(f'.github/migration-prep/part{i}.bin').read_bytes() for i in range(4))
+          assert hashlib.sha256(data).hexdigest() == 'f1d34c7249cb47c56b9e9798b807c9c88a3cadc035a264f5da1294eaf76b7b4f'
+          patch = Path(os.environ['RUNNER_TEMP']) / 'build-convergence.patch'
+          patch.write_bytes(lzma.decompress(data))
+          subprocess.run(['git', 'apply', '--check', '--index', '--unidiff-zero', str(patch)], check=True)
+          subprocess.run(['git', 'apply', '--index', '--unidiff-zero', str(patch)], check=True)
+          expected = {'.github/actionlint.yaml', '.github/workflows/apple-native.yml', '.github/workflows/bridge.yml', '.github/workflows/flutter-build.yml', '.github/workflows/flutter-validate.yml', 'build.py', 'configs/toolchain.json', 'docs/engineering/build-entry-convergence.md', 'docs/engineering/foundation.md', 'flutter/build_fdroid.sh', 'flutter/macos/Podfile.lock', 'tools/README.md', 'tools/bridge.py', 'tools/bridge_source.py', 'tools/build_toolchain.py', 'tools/flutter_sdk.py', 'tools/native/build-container.sh', 'tools/native/install-flutter.sh', 'tools/prepare_flutter.py', 'tools/tests/test_build_toolchain.py', 'tools/tests/test_flutter_sdk.py', 'tools/tests/test_flutter_workflows.py', 'tools/viper.py'}
+          actual = set(subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines())
+          assert actual == expected, (actual - expected, expected - actual)
+          Path('tools/.reports/reviewed-paths.txt').write_text('\n'.join(sorted(actual)) + '\n')
+          PY
+          git diff --cached --check
+          git diff --cached > tools/.reports/convergence.patch
+      - name: Verify repository tools and shell entry points
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py check
+          python tools/bridge.py check
+          python -m unittest discover -s tools/tests -v > tools/.reports/tool-tests.log 2>&1 || { tail -120 tools/.reports/tool-tests.log; exit 1; }
+          tail -15 tools/.reports/tool-tests.log
+          bash -n tools/native/build-container.sh tools/native/install-flutter.sh flutter/build_fdroid.sh
+      - name: Validate all workflow syntax and expressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python -c 'import json; print(json.load(open("configs/toolchain.json"))["actionlint"])')
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 3 "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}" -o "$archive"
+          curl -fsSL --retry 3 "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_checksums.txt" -o checksums.txt
+          awk -v f="$archive" '$2 == f' checksums.txt > selected.sha256
+          test "$(wc -l < selected.sha256)" -eq 1
+          sha256sum -c selected.sha256
+          tar -xzf "$archive" actionlint
+          cd "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes= > tools/.reports/actionlint.log 2>&1 || { cat tools/.reports/actionlint.log; exit 1; }
+      - name: Store only validated blobs without updating refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, os, subprocess, urllib.request
+          from pathlib import Path
+          entries = []
+          for path in Path('tools/.reports/reviewed-paths.txt').read_text().splitlines():
+              mode, expected, stage = subprocess.check_output(['git', 'ls-files', '--stage', '--', path], text=True).split('\t')[0].split()
+              assert stage == '0' and mode in ('100644', '100755'), path
+              data = Path(path).read_bytes()
+              assert hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest() == expected, path
+              request = urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs', method='POST', headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'}, data=json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode())
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  sha = json.load(response)['sha']
+              assert sha == expected, path
+              entries.append({'path': path, 'mode': mode, 'type': 'blob', 'sha': sha})
+          Path('tools/.reports/objects.json').write_text(json.dumps({'base': '693c0c36ada9270054bfe2a8d6c7e16bc4c2f085', 'entries': entries}, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: reviewed-build-entry-convergence
+          path: tools/.reports/
+          include-hidden-files: true
           retention-days: 3
           if-no-files-found: error
