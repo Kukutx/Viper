@@ -1,0 +1,182 @@
+name: Windows and iOS native migration diagnostics
+on:
+  push:
+    branches: [codex/viper-android-diagnostic]
+    paths: ['.github/workflows/platform-native-diagnostic.yml']
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Prepare reviewed toolchain
+        run: |
+          New-Item -ItemType Directory -Force tools/.reports | Out-Null
+          python -m pip install -r tools/requirements-dev.txt
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tools/viper.py env | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $config = Get-Content configs/toolchain.json | ConvertFrom-Json
+          python -m pip install "cmake==$($config.cmake)"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          rustup show
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: x64
+          cache: true
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          prefix-key: windows-vs2026-native
+          cache-on-failure: true
+      - name: Install reviewed LLVM 23 binary
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP llvm.tar.xz
+          Invoke-WebRequest 'https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.2/clang%2Bllvm-23.1.2-x86_64-pc-windows-msvc.tar.xz' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne '8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095') { throw 'LLVM archive checksum mismatch' }
+          $destination = Join-Path $env:RUNNER_TEMP viper-llvm
+          New-Item -ItemType Directory -Force $destination | Out-Null
+          tar -xf $archive -C $destination --strip-components=1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & "$destination/bin/clang.exe" --version
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          "LIBCLANG_PATH=$destination/bin" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "$destination/bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/viper-vcpkg-binary-cache
+          key: windows-vs2026-native-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**') }}
+      - name: Build pinned native dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          export VCPKG_ROOT="$RUNNER_TEMP/viper-vcpkg"
+          export VCPKG_DEFAULT_BINARY_CACHE="$HOME/viper-vcpkg-binary-cache"
+          export VCPKG_DEFAULT_HOST_TRIPLET=x64-windows-static
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+          git init -q "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$VCPKG_ROOT" fetch -q --depth 1 origin "$VCPKG_COMMIT_ID"
+          git -C "$VCPKG_ROOT" checkout -q --detach FETCH_HEAD
+          "$VCPKG_ROOT/bootstrap-vcpkg.bat" -disableMetrics > tools/.reports/windows-vcpkg.log 2>&1
+          "$VCPKG_ROOT/vcpkg.exe" install --triplet x64-windows-static --x-install-root="$VCPKG_ROOT/installed" >> tools/.reports/windows-vcpkg.log 2>&1 || { tail -120 tools/.reports/windows-vcpkg.log; exit 1; }
+          printf 'VCPKG_ROOT=%s\n' "$VCPKG_ROOT" >> "$GITHUB_ENV"
+      - name: Build the actual hardware-codec Rust library
+        run: |
+          cargo build --locked --release --lib --features flutter,hwcodec,vram *> tools/.reports/windows-cargo.log
+          if ($LASTEXITCODE) { Get-Content tools/.reports/windows-cargo.log -Tail 150; exit $LASTEXITCODE }
+          if (!(Test-Path target/release/librustdesk.dll)) { throw 'Missing native DLL' }
+      - name: Build the Windows Release application
+        working-directory: flutter
+        run: |
+          flutter pub get
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          flutter build windows --release --no-pub *> ../tools/.reports/windows-flutter.log
+          if ($LASTEXITCODE) { Get-Content ../tools/.reports/windows-flutter.log -Tail 150; exit $LASTEXITCODE }
+          $bundle = Join-Path $pwd 'build/windows/x64/runner/Release'
+          if (!(Test-Path "$bundle/rustdesk.exe")) { throw 'Missing Windows executable' }
+          $original = (Get-FileHash ../target/release/librustdesk.dll -Algorithm SHA256).Hash
+          if ((Get-FileHash "$bundle/librustdesk.dll" -Algorithm SHA256).Hash -ne $original) { throw 'Bundled DLL mismatch' }
+          $env:VIPER_NATIVE_LIBRARY = "$bundle/librustdesk.dll"
+          flutter test --no-pub test_native/bridge_ffi_test.dart *> ../tools/.reports/windows-ffi.log
+          if ($LASTEXITCODE) { Get-Content ../tools/.reports/windows-ffi.log -Tail 100; exit $LASTEXITCODE }
+      - name: Capture proposed native project changes
+        if: always()
+        run: |
+          git diff | Out-File -Encoding utf8 tools/.reports/windows-changes.patch
+          if (Test-Path flutter/pubspec.lock) { Copy-Item flutter/pubspec.lock tools/.reports/ }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: windows-native-diagnostics-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
+  ios:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      IPHONEOS_DEPLOYMENT_TARGET: '13.0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Prepare reviewed Apple toolchain
+        run: |
+          set -euo pipefail
+          mkdir -p tools/.reports
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          python tools/apple_sdk.py --github-env
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: arm64
+          cache: true
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          prefix-key: ios-xcode27-native
+          cache-on-failure: true
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.cache/viper-vcpkg-ios
+          key: ios-xcode27-native-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**') }}
+      - name: Build pinned iOS native dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install "cmake==$CMAKE_VERSION"
+          brew install nasm pkg-config autoconf automake libtool > tools/.reports/ios-prerequisites.log 2>&1
+          export VCPKG_ROOT="$RUNNER_TEMP/viper-vcpkg-ios"
+          export VCPKG_DEFAULT_BINARY_CACHE="$HOME/.cache/viper-vcpkg-ios"
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+          git init -q "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$VCPKG_ROOT" fetch -q --depth 1 origin "$VCPKG_COMMIT_ID"
+          git -C "$VCPKG_ROOT" checkout -q --detach FETCH_HEAD
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics > tools/.reports/ios-vcpkg.log 2>&1
+          "$VCPKG_ROOT/vcpkg" install --triplet arm64-ios --x-install-root="$VCPKG_ROOT/installed" >> tools/.reports/ios-vcpkg.log 2>&1 || { tail -120 tools/.reports/ios-vcpkg.log; exit 1; }
+          printf 'VCPKG_ROOT=%s\n' "$VCPKG_ROOT" >> "$GITHUB_ENV"
+      - name: Build actual iOS Rust archive
+        run: |
+          rustup target add aarch64-apple-ios
+          cargo build --locked --release --lib --target aarch64-apple-ios --features flutter,hwcodec > tools/.reports/ios-cargo.log 2>&1 || { tail -150 tools/.reports/ios-cargo.log; exit 1; }
+          test -s target/aarch64-apple-ios/release/liblibrustdesk.a
+      - name: Compile the unsigned iOS application
+        working-directory: flutter
+        run: |
+          flutter pub get
+          flutter build ios --release --no-pub --no-codesign > ../tools/.reports/ios-flutter.log 2>&1 || { tail -150 ../tools/.reports/ios-flutter.log; exit 1; }
+          test -d build/ios/iphoneos/Runner.app
+      - name: Capture proposed iOS project migration
+        if: always()
+        run: |
+          mkdir -p tools/.reports/native-project
+          git diff > tools/.reports/native-project/ios-changes.patch
+          tar -czf tools/.reports/ios-project.tar.gz --exclude=Pods --exclude=.symlinks --exclude=ephemeral --exclude=Flutter/Flutter.framework --exclude=Flutter/App.framework flutter/ios
+          cp flutter/pubspec.lock tools/.reports/native-project/
+          xcodebuild -version > tools/.reports/native-project/xcode.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: ios-native-diagnostics-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
