@@ -10,10 +10,11 @@ $spec = Get-Content configs/windows-toolchain.json -Raw | ConvertFrom-Json
 New-Item tools/.reports -ItemType Directory -Force | Out-Null
 $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
 $vs = @(& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json | ConvertFrom-Json)
-if ($vs.Count -ne 1 -or $vs[0].installationVersion -ne $spec.visual_studio) {
-    throw "Expected Visual Studio $($spec.visual_studio); found $($vs.installationVersion)"
-}
 $vs | ConvertTo-Json -Depth 8 | Set-Content tools/.reports/windows-visual-studio.json -Encoding utf8
+# Hosted runner rollout currently serves both reviewed VS2026 patch builds.
+if ($vs.Count -ne 1 -or $vs[0].installationVersion -notin $spec.visual_studio_builds) {
+    throw "Unreviewed Visual Studio build: $($vs.installationVersion)"
+}
 & python -m pip install "cmake==$($config.cmake)"
 $llvm = Join-Path $env:RUNNER_TEMP 'viper-llvm'
 $archive = Join-Path $env:RUNNER_TEMP 'viper-llvm.tar.xz'
