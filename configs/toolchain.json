@@ -75,5 +75,20 @@
     "vcpkg": "https://github.com/microsoft/vcpkg/releases/tag/2026.07.29",
     "flutter_rust_bridge": "https://github.com/fzyzcjy/flutter_rust_bridge/releases/tag/v2.13.0"
   },
-  "flutter_revision": "6a19cca56475dbfba1478ee68d7bd0c2ef891da1"
+  "flutter_revision": "6a19cca56475dbfba1478ee68d7bd0c2ef891da1",
+  "windows": {
+    "verified_at": "2026-09-30",
+    "visual_studio_major": 18,
+    "llvm": "23.1.2",
+    "assets": {
+      "x64": {
+        "name": "clang+llvm-23.1.2-x86_64-pc-windows-msvc.tar.xz",
+        "sha256": "8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095"
+      },
+      "arm64": {
+        "name": "clang+llvm-23.1.2-aarch64-pc-windows-msvc.tar.xz",
+        "sha256": "9703cceafb5a0efd6c8720c9b6d35a0d0858079cd2175229e7fa4b922f3d8822"
+      }
+    }
+  }
 }
