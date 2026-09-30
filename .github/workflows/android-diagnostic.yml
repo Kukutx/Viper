@@ -1,0 +1,59 @@
+name: Android migration diagnostics
+on:
+  push:
+    branches: [codex/viper-android-diagnostic]
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Snapshot the exact input
+        run: |
+          mkdir -p tools/.reports
+          git archive 26dca1c161f570213623ade65a2e4e78ddcfae07 | gzip > tools/.reports/source.tar.gz
+          git -C libs/hbb_common archive HEAD | gzip > tools/.reports/hbb_common.tar.gz
+          git ls-tree -r 26dca1c161f570213623ade65a2e4e78ddcfae07 > tools/.reports/tree.txt
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Resolve locked inputs and capture Android plugin sources
+        run: |
+          python tools/flutter_sdk.py
+          (cd flutter && flutter pub get --enforce-lockfile)
+          python - <<'PY'
+          import json, pathlib, tarfile
+          data = json.loads(pathlib.Path('flutter/.flutter-plugins-dependencies').read_text())
+          with tarfile.open('tools/.reports/android-plugins.tar.gz', 'w:gz') as archive:
+              for plugin in data['plugins']['android']:
+                  root = pathlib.Path(plugin['path'])
+                  for relative in ('android', 'pubspec.yaml', 'LICENSE'):
+                      path = root / relative
+                      if path.exists():
+                          archive.add(path, arcname=plugin['name'] + '/' + relative)
+          pathlib.Path('tools/.reports/plugins.json').write_text(json.dumps(data, indent=2))
+          PY
+      - name: Compile the existing Android application
+        working-directory: flutter
+        run: |
+          flutter build apk --debug --target-platform android-arm64 --no-pub > ../tools/.reports/android-build.log 2>&1 || { tail -160 ../tools/.reports/android-build.log; exit 1; }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: android-migration-diagnostics-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error
