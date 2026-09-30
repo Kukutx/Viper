@@ -11,6 +11,8 @@ MIRRORS = {
     'FLUTTER_VERSION': ('flutter',),
     'VCPKG_CMAKE_VERSION': ('cmake',),
     'VCPKG_COMMIT_ID': ('vcpkg', 'revision'),
+    'CARGO_NDK_VERSION': ('android', 'cargo_ndk'),
+    'NDK_VERSION': ('android', 'ndk_release'),
 }
 
 

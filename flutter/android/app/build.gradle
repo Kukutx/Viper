@@ -2,11 +2,13 @@ import com.google.protobuf.gradle.*
 import groovy.json.JsonSlurper
 
 plugins {
-    id "com.google.protobuf" version "0.9.4"
+    id "com.google.protobuf"
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
 }
+
+def toolchain = new JsonSlurper().parse(rootProject.file("../../configs/toolchain.json")).android
 
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
@@ -35,8 +37,8 @@ if (flutterVersionName == null) {
 // Add rustls-platform-verifier Android support
 String findRustlsPlatformVerifierMavenDir() {
     def dependencyText = providers.exec {
-        it.workingDir = new File("../..")
-        commandLine("cargo", "metadata", "--format-version", "1")
+        it.workingDir = rootProject.file("../..")
+        commandLine("cargo", "metadata", "--locked", "--format-version", "1")
     }.standardOutput.asText.get()
 
     def dependencyJson = new JsonSlurper().parseText(dependencyText)
@@ -67,7 +69,7 @@ repositories {
 
 protobuf {
     protoc {
-        artifact = 'com.google.protobuf:protoc:3.20.1'
+        artifact = "com.google.protobuf:protoc:${toolchain.protobuf}"
     }
 
     generateProtoTasks {
@@ -82,8 +84,16 @@ protobuf {
 }
 
 android {
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+            keepDebugSymbols += ['**/librustdesk.so']
+        }
+    }
     namespace "com.carriez.flutter_hbb"
-    compileSdkVersion 36
+    compileSdk toolchain.compile_sdk
+    buildToolsVersion toolchain.build_tools
+    ndkVersion toolchain.ndk
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
 
@@ -93,15 +103,15 @@ android {
 
     compileOptions {
         coreLibraryDesugaringEnabled true
-        targetCompatibility JavaVersion.VERSION_1_8
-        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.toVersion(toolchain.jvm_target)
+        sourceCompatibility JavaVersion.toVersion(toolchain.jvm_target)
     }
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId "com.carriez.flutter_hbb"
-        minSdkVersion 22
-        targetSdkVersion 36
+        minSdk toolchain.min_sdk
+        targetSdk toolchain.target_sdk
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
@@ -117,11 +127,18 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.release
+            // CI produces an unsigned Release APK; never substitute a debug identity.
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules'
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(toolchain.jvm_target.toString()))
     }
 }
 
@@ -131,10 +148,9 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
-    implementation 'com.google.protobuf:protobuf-javalite:3.20.1'
+    implementation "com.google.protobuf:protobuf-javalite:${toolchain.protobuf}"
     implementation "androidx.media:media:1.6.0"
     implementation 'com.github.getActivity:XXPermissions:18.5'
-    implementation("org.jetbrains.kotlin:kotlin-stdlib") { version { strictly("1.9.10") } }
     implementation 'com.caverock:androidsvg-aar:1.4'
     implementation "rustls:rustls-platform-verifier:0.1.1"
 }

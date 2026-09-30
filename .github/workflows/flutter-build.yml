@@ -20,7 +20,7 @@ on:
 env:
   SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
   RUST_VERSION: "1.98.1" # managed by tools/viper.py versions
-  CARGO_NDK_VERSION: "3.1.2"
+  CARGO_NDK_VERSION: "4.1.2" # managed by tools/viper.py versions
   SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
   SCITER_NASM_DEBVERSION: "2.15.05-1"
   LLVM_VERSION: "15.0.6"
@@ -38,7 +38,7 @@ env:
   VCPKG_CMAKE_VERSION: "4.4.3" # managed by tools/viper.py versions
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836" # 2025.01.13, got "/opt/artifacts/vcpkg/vcpkg: No such file or directory" with latest version
   VERSION: "1.5.0"
-  NDK_VERSION: "r28c"
+  NDK_VERSION: "r30" # managed by tools/viper.py versions
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"

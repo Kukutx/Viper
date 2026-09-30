@@ -109,18 +109,14 @@ prebuild)
 	# '.github/workflows/flutter-build.yml'
 	#
 
-	CARGO_NDK_VERSION="$(yq -r \
-		.env.CARGO_NDK_VERSION \
-		.github/workflows/flutter-build.yml)"
+	CARGO_NDK_VERSION="$(python3 tools/build_toolchain.py --value android.cargo_ndk)"
 
 	# One SDK and generator from the central configuration, not workflow internals.
 	FLUTTER_VERSION="$(python3 tools/build_toolchain.py --value flutter)"
 	CARGO_EXPAND_VERSION="$(python3 tools/build_toolchain.py --value cargo_expand)"
 	FLUTTER_RUST_BRIDGE_VERSION="$(python3 tools/build_toolchain.py --value flutter_rust_bridge.version)"
 
-	NDK_VERSION="$(yq -r \
-		.env.NDK_VERSION \
-		.github/workflows/flutter-build.yml)"
+	NDK_VERSION="$(python3 tools/build_toolchain.py --value android.ndk)"
 
 	RUST_VERSION="$(python3 tools/build_toolchain.py --value rust)"
 
@@ -134,15 +130,6 @@ prebuild)
 		exit 1
 	fi
 
-	# Map NDK version to revision
-	NDK_VERSION="$(curl https://gitlab.com/fdroid/android-sdk-transparency-log/-/raw/master/signed/checksums.json |
-		jq -r ".\"https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip\"[0].\"source.properties\"" |
-		sed -n -E 's/.*Pkg.Revision = ([0-9.]+).*/\1/p')"
-
-	if [ -z "${NDK_VERSION}" ]; then
-		echo "ERROR: Can not map Android NDK codename to revision!" >&2
-		exit 1
-	fi
 
 	export ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
 	export ANDROID_NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
@@ -183,7 +170,7 @@ prebuild)
 
 	cargo install \
 		cargo-ndk \
-		--version "${CARGO_NDK_VERSION}" \
+		--version "=${CARGO_NDK_VERSION}" \
 		--locked
 
 	# Populate native vcpkg dependencies
@@ -292,19 +279,8 @@ build)
 
 	FLUTTER_VERSION="$(python3 tools/build_toolchain.py --value flutter)"
 
-	NDK_VERSION="$(yq -r \
-		.env.NDK_VERSION \
-		.github/workflows/flutter-build.yml)"
+	NDK_VERSION="$(python3 tools/build_toolchain.py --value android.ndk)"
 
-	# Map NDK version to revision
-	NDK_VERSION="$(curl https://gitlab.com/fdroid/android-sdk-transparency-log/-/raw/master/signed/checksums.json |
-		jq -r ".\"https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip\"[0].\"source.properties\"" |
-		sed -n -E 's/.*Pkg.Revision = ([0-9.]+).*/\1/p')"
-
-	if [ -z "${NDK_VERSION}" ]; then
-		echo "ERROR: Can not map Android NDK codename to revision!" >&2
-		exit 1
-	fi
 
 	export ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
 	export ANDROID_NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
@@ -329,7 +305,7 @@ build)
 	# Build rustdesk lib
 
 	cargo ndk \
-		--platform 21 \
+		--platform "$(python3 -c 'import json; print(json.load(open("configs/toolchain.json"))["android"]["min_sdk"])')" \
 		--target "${RUST_TARGET}" \
 		--bindgen \
 		build \

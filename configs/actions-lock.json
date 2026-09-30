@@ -1,6 +1,7 @@
 {
   "verified_at": "2026-09-29",
   "actions": {
+    "actions/setup-java": {"version": "v6.0.1", "sha": "de7274f081f381c8f8158605e0321c36c376e2e6"},
     "actions/checkout": {"version": "v7.0.1", "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1"},
     "actions/setup-python": {"version": "v7.0.0", "sha": "5fda3b95a4ea91299a34e894583c3862153e4b97"},
     "actions/cache": {"version": "v6.1.0", "sha": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"},
