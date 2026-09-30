@@ -1,0 +1,11 @@
+{
+  "source": "https://github.com/rustdesk/rustdesk",
+  "trees": {
+    "mipmap-mdpi": "8b20ad571df144501c0e1475ce9661881a6f2c49",
+    "mipmap-hdpi": "bf509a2ae70ff67033c59c39f88892212a62e9e8",
+    "mipmap-xhdpi": "f8075fe79e4b6fbfc18a382319bc441ff59fdaf4",
+    "mipmap-xxhdpi": "c14f4c12f54ab2f62621e54b7861b8fb1f691c0b",
+    "mipmap-xxxhdpi": "8a44c6ae5fc3f3f078fb6d8d8a5922d3dbd5b75b"
+  },
+  "files": ["ic_launcher.png", "ic_launcher_foreground.png", "ic_launcher_round.png", "ic_stat_logo.png"]
+}

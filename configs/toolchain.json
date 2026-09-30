@@ -90,5 +90,33 @@
         "sha256": "9703cceafb5a0efd6c8720c9b6d35a0d0858079cd2175229e7fa4b922f3d8822"
       }
     }
+  },
+  "android": {
+    "verified_at": "2026-09-30",
+    "agp": "9.4.0",
+    "gradle": "9.8.0",
+    "gradle_sha256": "bafd5ce9cfaea0fbccfdc8439a1ac42fbd4cd9c89dc9a988228d8a2639a58e6c",
+    "wrapper_sha256": "238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5",
+    "kotlin": "2.4.20",
+    "jdk": "25.0.4.1+1",
+    "jvm_target": 17,
+    "ndk": "30.0.16248370",
+    "ndk_release": "r30",
+    "cargo_ndk": "4.1.2",
+    "compile_sdk": 37,
+    "target_sdk": 37,
+    "min_sdk": 23,
+    "build_tools": "37.0.0",
+    "protobuf_plugin": "0.10.0",
+    "protobuf": "4.36.2",
+    "sources": {
+      "agp": "https://developer.android.com/build/releases/agp-9-4-0-release-notes",
+      "gradle": "https://gradle.org/release-checksums/",
+      "kotlin": "https://kotlinlang.org/docs/releases.html",
+      "ndk": "https://developer.android.com/ndk/downloads",
+      "jdk": "https://adoptium.net/support",
+      "protobuf": "https://github.com/protocolbuffers/protobuf/releases/tag/v36.2"
+    },
+    "compatibility_note": "Flutter 3.47.5 requires the AGP legacy DSL and external Kotlin plugin. The two explicit opt-outs must be removed together with the upstream Flutter Gradle plugin migration, not hidden in build-time patches."
   }
 }

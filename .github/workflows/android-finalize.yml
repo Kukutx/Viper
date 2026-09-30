@@ -1,0 +1,182 @@
+name: Validate reviewed Android source integration
+on:
+  push:
+    branches: [codex/viper-android-preparation]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Apply the exact reviewed source integrations
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json, re
+          def edit(name, old, new, count=1):
+              p=Path(name); text=p.read_text()
+              assert text.count(old)==count, (name, old, text.count(old), count)
+              p.write_text(text.replace(old,new))
+          p=Path('configs/toolchain.json'); cfg=json.loads(p.read_text())
+          assert cfg['android']['min_sdk']==23
+          cfg['android']['min_sdk']=24
+          p.write_text(json.dumps(cfg,indent=2)+'\n')
+          edit('flutter/android/app/build.gradle', 'android {\n', "android {\n    packaging {\n        jniLibs {\n            useLegacyPackaging = false\n            keepDebugSymbols += ['**/librustdesk.so']\n        }\n    }\n")
+          p=Path('flutter/android/app/src/main/kotlin/com/carriez/flutter_hbb/MainActivity.kt')
+          text=p.read_text(); start=text.index('    private fun setCodecInfo()'); end=text.index('    private fun onVoiceCallStarted()',start)
+          part=text[start:end]; needle='                val caps = codec.getCapabilitiesForType(mime_type)\n'
+          assert part.count(needle)==1
+          part=part.replace('caps.videoCapabilities','videoCaps').replace(needle,needle+'                val videoCaps = caps.videoCapabilities ?: return@forEach\n')
+          p.write_text(text[:start]+part+text[end:])
+          for p in Path('res/vcpkg-triplets').glob('*-android.cmake'):
+              text=p.read_text(); assert text.count('SYSTEM_VERSION 21')==1, str(p)
+              p.write_text(text.replace('SYSTEM_VERSION 21','SYSTEM_VERSION 24'))
+          edit('tools/tests/test_build_toolchain.py', "'vcpkg':{'revision':'a'*40}}", "'vcpkg':{'revision':'a'*40},\n                     'android':{'cargo_ndk':'4.1.2','ndk_release':'r30'}}")
+          p=Path('tools/viper.py'); t=p.read_text(); idx=t.index('def check('); idx=t.index('    versions(root)',idx)+len('    versions(root)')
+          p.write_text(t[:idx]+'\n    from android_toolchain import check as check_android\n    check_android(root)'+t[idx:])
+          p=Path('flutter/build_fdroid.sh'); t=p.read_text()
+          t,n=re.subn(r'CARGO_NDK_VERSION="\$\(yq -r \\\n\s*\.env.CARGO_NDK_VERSION \\\n\s*\.github/workflows/flutter-build.yml\)"', 'CARGO_NDK_VERSION="$(python3 tools/build_toolchain.py --value android.cargo_ndk)"', t); assert n==1,n
+          t,n=re.subn(r'NDK_VERSION="\$\(yq -r \\\n\s*\.env.NDK_VERSION \\\n\s*\.github/workflows/flutter-build.yml\)"', 'NDK_VERSION="$(python3 tools/build_toolchain.py --value android.ndk)"',t); assert n==2,n
+          t,n=re.subn(r'\t# Map NDK version to revision\n.*?\n\tfi\n','',t,flags=re.S); assert n==2,n
+          minimum='--platform "$(python3 -c \'import json; print(json.load(open("configs/toolchain.json"))["android"]["min_sdk"])\')"'
+          t=t.replace('--version "${CARGO_NDK_VERSION}"','--version "=${CARGO_NDK_VERSION}"').replace('--platform 21',minimum)
+          p.write_text(t)
+          for p in Path('flutter').glob('ndk_*.sh'):
+              t=p.read_text()
+              assert t.count('--platform 21')==1, str(p)
+              p.write_text(t.replace('--platform 21',minimum))
+          p=Path('tools/README.md')
+          p.write_text(p.read_text()+'\n## Android native validation\n\nAndroid pins, wrapper checksums and the minimum API 24 baseline are in `configs/toolchain.json.android`. Run `python tools/android_toolchain.py --java-only`, `bash tools/native/install-android-sdk.sh`, then `bash tools/native/build-android.sh arm64-v8a`. The read-only three-ABI CI keeps hardware codecs and checks actual APK contents, Rust library identity, ELF/ZIP 16 KiB alignment, app ID and SDK levels. See `docs/engineering/android-native-migration.md` for remaining upstream compatibility and device-validation boundaries.\n')
+          PY
+          python tools/build_toolchain.py --write
+      - name: Restore original PNG resources from the reviewed immutable upstream trees
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, os, urllib.request
+          from pathlib import Path
+          spec=json.loads(Path('configs/android-resources.json').read_text())
+          def get(url):
+              req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+              with urllib.request.urlopen(req,timeout=30) as res: return json.load(res)
+          def git_hash(kind,data): return hashlib.sha1(f'{kind} {len(data)}\0'.encode()+data).hexdigest()
+          for folder,sha in spec['trees'].items():
+              assert folder in {'mipmap-mdpi','mipmap-hdpi','mipmap-xhdpi','mipmap-xxhdpi','mipmap-xxxhdpi'}
+              target=Path('flutter/android/app/src/main/res')/folder
+              assert not target.exists()
+              tree=get('https://api.github.com/repos/rustdesk/rustdesk/git/trees/'+sha)
+              assert tree['sha']==sha and not tree['truncated']
+              assert {e['path'] for e in tree['tree']}==set(spec['files'])
+              raw=b''; assets={}
+              for entry in sorted(tree['tree'],key=lambda e:e['path']):
+                  assert entry['type']=='blob' and entry['mode']=='100644' and 32<entry['size']<500000
+                  blob=get('https://api.github.com/repos/rustdesk/rustdesk/git/blobs/'+entry['sha'])
+                  assert blob['encoding']=='base64'
+                  data=base64.b64decode(blob['content'])
+                  assert len(data)==entry['size'] and data.startswith(b'\x89PNG\r\n\x1a\n')
+                  assert git_hash('blob',data)==entry['sha']
+                  raw+=b'100644 '+entry['path'].encode()+b'\0'+bytes.fromhex(entry['sha'])
+                  assets[entry['path']]=data
+              assert git_hash('tree',raw)==sha
+              target.mkdir()
+              for name,data in assets.items(): (target/name).write_bytes(data)
+          PY
+      - name: Validate all tools and source invariants
+        run: |
+          mkdir -p tools/.reports
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py check
+          python tools/bridge.py check
+          python -m unittest discover -s tools/tests -v > tools/.reports/android-tool-tests.log 2>&1 || { tail -100 tools/.reports/android-tool-tests.log; exit 1; }
+          tail -15 tools/.reports/android-tool-tests.log
+          bash -n flutter/build_fdroid.sh tools/native/build-android.sh tools/native/install-android-sdk.sh
+          git diff --check
+      - name: Validate all workflow syntax
+        run: |
+          set -euo pipefail
+          version=$(python tools/build_toolchain.py --value actionlint)
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          curl -fsSL --retry 3 "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}" -o "$RUNNER_TEMP/$archive"
+          curl -fsSL --retry 3 "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_checksums.txt" -o "$RUNNER_TEMP/checksums.txt"
+          (cd "$RUNNER_TEMP"; awk -v f="$archive" '$2 == f' checksums.txt > selected.sha256; test "$(wc -l < selected.sha256)" -eq 1; sha256sum -c selected.sha256; tar -xzf "$archive" actionlint)
+          "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
+      - name: Store only reviewed files without modifying any ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, hashlib, json, os, subprocess, urllib.request, zipfile
+          paths = '''.github/workflows/android-native.yml
+          .github/workflows/flutter-build.yml
+          configs/actions-lock.json
+          configs/toolchain.json
+          configs/android-resources.json
+          docs/engineering/android-native-migration.md
+          flutter/android/app/build.gradle
+          flutter/android/app/src/main/AndroidManifest.xml
+          flutter/android/app/src/main/kotlin/com/carriez/flutter_hbb/MainActivity.kt
+          flutter/android/build.gradle
+          flutter/android/gradle.properties
+          flutter/android/settings.gradle
+          flutter/android/gradlew
+          flutter/android/gradlew.bat
+          flutter/android/gradle/wrapper/gradle-wrapper.jar
+          flutter/android/gradle/wrapper/gradle-wrapper.properties
+          flutter/build_fdroid.sh
+          flutter/lib/mobile/pages/scan_page.dart
+          flutter/ndk_arm.sh
+          flutter/ndk_arm64.sh
+          flutter/ndk_x64.sh
+          flutter/ndk_x86.sh
+          flutter/pubspec.lock
+          flutter/pubspec.yaml
+          res/vcpkg-triplets/arm-neon-android.cmake
+          res/vcpkg-triplets/arm64-android.cmake
+          res/vcpkg-triplets/x64-android.cmake
+          res/vcpkg-triplets/x86-android.cmake
+          tools/README.md
+          tools/android_toolchain.py
+          tools/build_toolchain.py
+          tools/native/build-android.sh
+          tools/native/install-android-sdk.sh
+          tools/tests/test_android_apk.py
+          tools/tests/test_android_toolchain.py
+          tools/tests/test_android_resources.py
+          tools/tests/test_build_toolchain.py
+          tools/verify_android_apk.py
+          tools/viper.py'''.split()
+          spec=json.loads(Path('configs/android-resources.json').read_text())
+          paths += [f'flutter/android/app/src/main/res/{folder}/{name}' for folder in spec['trees'] for name in spec['files']]
+          objects=[]
+          with zipfile.ZipFile('tools/.reports/android-reviewed-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in paths:
+                  p=Path(name); assert p.is_file() and not p.is_symlink() and p.stat().st_size<500000
+                  data=p.read_bytes(); z.writestr(name,data)
+                  req=urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs', data=json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}).encode(), headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'},method='POST')
+                  with urllib.request.urlopen(req,timeout=30) as res: sha=json.load(res)['sha']
+                  assert sha==hashlib.sha1(f'blob {len(data)}\0'.encode()+data).hexdigest(),name
+                  mode='100755' if p.stat().st_mode & 0o111 else '100644'
+                  objects.append({'path':name,'mode':mode,'type':'blob','sha':sha})
+          Path('tools/.reports/android-objects.json').write_text(json.dumps(objects,indent=2)+'\n')
+          Path('tools/.reports/android-source.patch').write_bytes(subprocess.check_output(['git','diff','--binary']))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: reviewed-android-final-objects
+          path: tools/.reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3

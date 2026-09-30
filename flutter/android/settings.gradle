@@ -1,4 +1,10 @@
 pluginManagement {
+    def toolchain = new groovy.json.JsonSlurper().parse(file("../../configs/toolchain.json")).android
+    plugins {
+        id "com.android.application" version toolchain.agp
+        id "org.jetbrains.kotlin.android" version toolchain.kotlin
+        id "com.google.protobuf" version toolchain.protobuf_plugin
+    }
     def flutterSdkPath = {
         def properties = new Properties()
         file("local.properties").withInputStream { properties.load(it) }
@@ -18,8 +24,8 @@ pluginManagement {
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" version "8.10.1" apply false
-    id "org.jetbrains.kotlin.android" version "2.1.21" apply false
+    id "com.android.application" apply false
+    id "org.jetbrains.kotlin.android" apply false
 }
 
 include ":app"
