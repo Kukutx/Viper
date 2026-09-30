@@ -23,8 +23,6 @@ pluginManagement {
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" apply false
-    id "com.google.protobuf" apply false
 }
 
 include ":app"

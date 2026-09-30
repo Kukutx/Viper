@@ -10,6 +10,12 @@ buildscript {
     }
 }
 
+// Resolve AGP and the reviewed Kotlin compiler together, before plugin subprojects.
+plugins {
+    id "com.android.application" apply false
+    id "com.google.protobuf" apply false
+}
+
 allprojects {
     repositories {
         google()
