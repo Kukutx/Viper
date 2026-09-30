@@ -1,4 +1,4 @@
-name: Validate iOS native migration candidate
+name: Validate iOS SwiftPM native migration candidate
 on:
   push:
     branches: [codex/viper-ios-preparation]
@@ -22,8 +22,8 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           repository: Kukutx/Viper
-          run-id: 36752863644
-          artifact-ids: 11115203738
+          run-id: 36754376925
+          artifact-ids: 11116713460
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/ios-reviewed
           merge-multiple: true
@@ -33,9 +33,9 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path, PurePosixPath
-          import hashlib, os, zipfile
+          import hashlib, json, os, zipfile
           file=Path(os.environ['REVIEWED_DIR'])/'ios-native-source.zip'
-          assert hashlib.sha256(file.read_bytes()).hexdigest()=='89c5934ac455d8c94df15e49d5a79f06129a7a89841d1d75f37bc69f11766524'
+          assert hashlib.sha256(file.read_bytes()).hexdigest()=='2386198809f1f206b4b6c9729781754955abd008b6356ae741f05ce33f13ece6'
           with zipfile.ZipFile(file) as z:
               assert len(z.namelist())==26 and len(set(z.namelist()))==26
               for item in z.infolist():
@@ -46,12 +46,40 @@ jobs:
                   assert not dest.is_symlink()
                   dest.parent.mkdir(parents=True,exist_ok=True)
                   dest.write_bytes(z.read(item))
+          p=Path('configs/toolchain.json'); data=json.loads(p.read_text())
+          data['ios']={'minimum':'15.0','sdk':'27.0','verified_at':'2026-09-30'}
+          p.write_text(json.dumps(data,indent=2)+'\n')
           PY
           python -m pip install -r tools/requirements-dev.txt
           python tools/viper.py env >> "$GITHUB_ENV"
           python tools/apple_sdk.py --github-env
           mkdir -p tools/.reports
           cp "$REVIEWED_DIR/ios-resource-hashes.json" tools/.reports/
+      - name: Remove retired CocoaPods integration and manual plugin framework flags
+        run: |
+          (cd flutter/ios && pod deintegrate) > tools/.reports/ios-deintegrate.log 2>&1
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('flutter/ios/Runner.xcodeproj/project.pbxproj'); text=p.read_text()
+          retired=['DKImagePickerController','DKPhotoGallery','MTBBarcodeScanner','SDWebImage','SwiftyGif','device_info_plus','file_picker','flutter_keyboard_visibility','image_picker_ios','package_info_plus','path_provider_foundation','qr_code_scanner','sqflite','uni_links','url_launcher_ios','video_player_avfoundation','wakelock_plus']
+          for name in retired:
+              block='\t\t\t\t\t"-framework",\n\t\t\t\t\t"\\"'+name+'\\"",\n'
+              assert text.count(block)==3,(name,text.count(block))
+              text=text.replace(block,'')
+          p.write_text(text)
+          for name in ['Podfile','Podfile.lock']:
+              Path('flutter/ios',name).unlink()
+          for mode in ['Debug','Release']:
+              p=Path('flutter/ios/Flutter',mode+'.xcconfig'); text=p.read_text()
+              lines=text.splitlines(keepends=True)
+              removed=[line for line in lines if line.startswith('#include? "Pods/')]
+              assert len(removed)==1
+              p.write_text(''.join(line for line in lines if line not in removed))
+          p=Path('flutter/ios/Runner.xcworkspace/contents.xcworkspacedata'); text=p.read_text()
+          block='   <FileRef\n      location = "group:Pods/Pods.xcodeproj">\n   </FileRef>\n'
+          assert text.count(block)==1
+          p.write_text(text.replace(block,''))
+          PY
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -66,7 +94,8 @@ jobs:
         with:
           prefix-key: ios-xcode27-api15
           cache-on-failure: true
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: native-cache
         with:
           path: ~/.cache/viper-vcpkg-ios
           key: ios-xcode27-api15-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**') }}
@@ -86,6 +115,11 @@ jobs:
           "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics > tools/.reports/ios-vcpkg-bootstrap.log 2>&1
           env -u IPHONEOS_DEPLOYMENT_TARGET "$VCPKG_ROOT/vcpkg" install --triplet arm64-ios --x-install-root="$VCPKG_ROOT/installed" > tools/.reports/ios-vcpkg.log 2>&1 || { tail -120 tools/.reports/ios-vcpkg.log; exit 1; }
           echo "VCPKG_ROOT=$VCPKG_ROOT" >> "$GITHUB_ENV"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/viper-vcpkg-ios
+          key: ios-xcode27-api15-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**') }}
       - name: Compile the actual Rust static library
         env:
           IPHONEOS_DEPLOYMENT_TARGET: '15.0'
@@ -94,13 +128,13 @@ jobs:
           cargo build --locked --release --target aarch64-apple-ios --lib --features flutter,hwcodec > tools/.reports/ios-cargo.log 2>&1 || { tail -150 tools/.reports/ios-cargo.log; exit 1; }
           test -s target/aarch64-apple-ios/release/liblibrustdesk.a
           lipo -info target/aarch64-apple-ios/release/liblibrustdesk.a > tools/.reports/ios-archive.txt
-      - name: Build the unsigned iOS application
+      - name: Build and inspect the unsigned iOS application
         working-directory: flutter
         run: |
           flutter build ios --release --no-codesign --no-pub > ../tools/.reports/ios-flutter.log 2>&1 || { tail -180 ../tools/.reports/ios-flutter.log; exit 1; }
           test -s build/ios/iphoneos/Runner.app/Runner
           plutil -p build/ios/iphoneos/Runner.app/Info.plist > ../tools/.reports/ios-built-info.txt
-          (cd ios && pod install --deployment) > ../tools/.reports/ios-pods-deployment.log 2>&1 || { tail -100 ../tools/.reports/ios-pods-deployment.log; exit 1; }
+          python ../tools/verify_ios_bundle.py build/ios/iphoneos/Runner.app ../target/aarch64-apple-ios/release/liblibrustdesk.a --report ../tools/.reports/ios-bundle.json
       - name: Capture native migration evidence
         if: always()
         run: |
@@ -110,8 +144,9 @@ jobs:
           out=Path('tools/.reports'); out.mkdir(parents=True,exist_ok=True)
           (out/'ios-revision.txt').write_bytes(subprocess.check_output(['git','rev-parse','HEAD']))
           (out/'ios-changes.patch').write_bytes(subprocess.check_output(['git','diff','--binary','--','flutter/ios','res/vcpkg-triplets/arm64-ios.cmake']))
-          names=['flutter/ios/Podfile','flutter/ios/Podfile.lock','flutter/ios/Runner/AppDelegate.swift','flutter/ios/Runner/Info.plist','flutter/ios/Flutter/AppFrameworkInfo.plist','flutter/ios/Runner.xcodeproj/project.pbxproj','flutter/ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme','res/vcpkg-triplets/arm64-ios.cmake']
+          names=['flutter/ios/Runner/AppDelegate.swift','flutter/ios/Runner/Info.plist','flutter/ios/Flutter/AppFrameworkInfo.plist','flutter/ios/Flutter/Debug.xcconfig','flutter/ios/Flutter/Release.xcconfig','flutter/ios/Runner.xcodeproj/project.pbxproj','flutter/ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme','flutter/ios/Runner.xcworkspace/contents.xcworkspacedata','res/vcpkg-triplets/arm64-ios.cmake']
           names += [str(p) for p in Path('flutter/ios/Runner/Assets.xcassets').rglob('*.png')]
+          names += [str(p) for base in ('flutter/ios/Runner.xcodeproj','flutter/ios/Runner.xcworkspace') for p in Path(base).rglob('Package.resolved')]
           with zipfile.ZipFile(out/'ios-native-source.zip','w',zipfile.ZIP_DEFLATED) as archive:
               for name in names:
                   p=Path(name)
