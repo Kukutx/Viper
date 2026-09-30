@@ -5,7 +5,7 @@ on:
     inputs:
       upload-artifact:
         type: boolean
-        default: true
+        default: false
       upload-tag:
         type: string
         default: "nightly"
@@ -39,11 +39,12 @@ env:
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836" # 2025.01.13, got "/opt/artifacts/vcpkg/vcpkg: No such file or directory" with latest version
   VERSION: "1.5.0"
   NDK_VERSION: "r30" # managed by tools/viper.py versions
-  #signing keys env variable checks
-  ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
-  MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
+  # Only availability booleans are shared; credentials are scoped to signing steps.
+  RELEASE_ALLOWED: "${{ inputs.upload-artifact && github.repository == 'Kukutx/Viper' && !startsWith(github.event_name, 'pull_request') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}"
+  HAS_ANDROID_SIGNING: "${{ secrets.ANDROID_SIGNING_KEY != '' }}"
+  HAS_MACOS_SIGNING: "${{ secrets.MACOS_P12_BASE64 != '' }}"
+  HAS_WINDOWS_SIGNING: "${{ secrets.SIGN_BASE_URL != '' && secrets.SIGN_SECRET_KEY != '' }}"
   UPLOAD_ARTIFACT: "${{ inputs.upload-artifact }}"
-  SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}-2"
 
 jobs:
   generate-sbom:
@@ -52,6 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - name: Install Syft
@@ -64,7 +66,7 @@ jobs:
 
       - name: Publish Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        if: ${{ inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
@@ -134,6 +136,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -314,11 +317,14 @@ jobs:
           path: rustdesk
 
       - name: Sign rustdesk files
-        if: env.UPLOAD_ARTIFACT == 'true' && env.SIGN_BASE_URL != '-2'
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (env.UPLOAD_ARTIFACT == 'true' && env.HAS_WINDOWS_SIGNING == 'true') }}
         shell: bash
+        env:
+          BASE_URL: ${{ format('{0}-2', secrets.SIGN_BASE_URL) }}
+          SECRET_KEY: ${{ secrets.SIGN_SECRET_KEY }}
         run: |
           pip3 install requests argparse
-          BASE_URL=${{ env.SIGN_BASE_URL }} SECRET_KEY=${{ secrets.SIGN_SECRET_KEY }} python3 res/job.py sign_files ./rustdesk/
+          python3 res/job.py sign_files ./rustdesk/
 
       - name: Build self-extracted executable
         shell: bash
@@ -405,14 +411,17 @@ jobs:
           path: ./msi-template
 
       - name: Sign rustdesk self-extracted file
-        if: env.UPLOAD_ARTIFACT == 'true' && env.SIGN_BASE_URL != '-2'
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (env.UPLOAD_ARTIFACT == 'true' && env.HAS_WINDOWS_SIGNING == 'true') }}
         shell: bash
+        env:
+          BASE_URL: ${{ format('{0}-2', secrets.SIGN_BASE_URL) }}
+          SECRET_KEY: ${{ secrets.SIGN_SECRET_KEY }}
         run: |
-          BASE_URL=${{ env.SIGN_BASE_URL }} SECRET_KEY=${{ secrets.SIGN_SECRET_KEY }} python3 res/job.py sign_files ./SignOutput
+          python3 res/job.py sign_files ./SignOutput
 
       - name: Publish Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        if: ${{ inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
@@ -450,6 +459,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - name: Install LLVM and Clang
@@ -549,11 +559,14 @@ jobs:
           path: Release
 
       - name: Sign rustdesk files
-        if: env.UPLOAD_ARTIFACT == 'true' && env.SIGN_BASE_URL != '-2'
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (env.UPLOAD_ARTIFACT == 'true' && env.HAS_WINDOWS_SIGNING == 'true') }}
         shell: bash
+        env:
+          BASE_URL: ${{ format('{0}-2', secrets.SIGN_BASE_URL) }}
+          SECRET_KEY: ${{ secrets.SIGN_SECRET_KEY }}
         run: |
           pip3 install requests argparse
-          BASE_URL=${{ env.SIGN_BASE_URL }} SECRET_KEY=${{ secrets.SIGN_SECRET_KEY }} python3 res/job.py sign_files ./Release/
+          python3 res/job.py sign_files ./Release/
 
       - name: Build self-extracted executable
         shell: bash
@@ -567,14 +580,17 @@ jobs:
           mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}-sciter.exe
 
       - name: Sign rustdesk self-extracted file
-        if: env.UPLOAD_ARTIFACT == 'true' && env.SIGN_BASE_URL != '-2'
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (env.UPLOAD_ARTIFACT == 'true' && env.HAS_WINDOWS_SIGNING == 'true') }}
         shell: bash
+        env:
+          BASE_URL: ${{ format('{0}-2', secrets.SIGN_BASE_URL) }}
+          SECRET_KEY: ${{ secrets.SIGN_SECRET_KEY }}
         run: |
-          BASE_URL=${{ env.SIGN_BASE_URL }} SECRET_KEY=${{ secrets.SIGN_SECRET_KEY }} python3 res/job.py sign_files ./SignOutput/
+          python3 res/job.py sign_files ./SignOutput/
 
       - name: Publish Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        if: ${{ inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
@@ -610,6 +626,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -691,14 +708,14 @@ jobs:
           flutter build ipa --no-pub --release --no-codesign
 
       # - name: Upload Artifacts
-      #   # if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
+      #   # if: env.HAS_ANDROID_SIGNING == 'true' && env.UPLOAD_ARTIFACT == 'true'
       #   uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       #   with:
       #     name: rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.apk
       #     path: flutter/build/ios/ipa/*.ipa
 
       # - name: Publish ipa package
-      #   # if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
+      #   # if: env.HAS_ANDROID_SIGNING == 'true' && env.UPLOAD_ARTIFACT == 'true'
       #   uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
       #   with:
       #     prerelease: true
@@ -741,6 +758,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -754,7 +772,7 @@ jobs:
           python tools/build_toolchain.py
 
       - name: Import the codesign cert
-        if: env.MACOS_P12_BASE64 != null
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (env.HAS_MACOS_SIGNING == 'true') }}
         uses: apple-actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0
         with:
           p12-file-base64: ${{ secrets.MACOS_P12_BASE64 }}
@@ -762,22 +780,22 @@ jobs:
           keychain: rustdesk
 
       - name: Check sign and import sign key
-        if: env.MACOS_P12_BASE64 != null
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (env.HAS_MACOS_SIGNING == 'true') }}
         run: |
           security default-keychain -s rustdesk.keychain
           security find-identity -v
 
       - name: Import notarize key
-        if: env.MACOS_P12_BASE64 != null
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (env.HAS_MACOS_SIGNING == 'true') }}
         uses: timheuer/base64-to-file@dfa5a5dd38803cb4f5c3a081eeb28e8362d43e9c # v2
         with:
           # https://gregoryszorc.com/docs/apple-codesign/stable/apple_codesign_rcodesign.html#notarizing-and-stapling
           fileName: rustdesk.json
-          fileDir: ${{ github.workspace }}
+          fileDir: ${{ runner.temp }}/viper-signing
           encodedString: ${{ secrets.MACOS_NOTARIZE_JSON }}
 
       - name: Install rcodesign tool
-        if: env.MACOS_P12_BASE64 != null
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (env.HAS_MACOS_SIGNING == 'true') }}
         shell: bash
         run: |
           pushd /tmp
@@ -887,26 +905,36 @@ jobs:
           path: rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg # can not upload the directory directly or tar.gz, which destroy the link structure, causing the codesign failed
 
       - name: Codesign app and create signed dmg
-        if: env.MACOS_P12_BASE64 != null && env.UPLOAD_ARTIFACT == 'true'
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (env.HAS_MACOS_SIGNING == 'true' && env.UPLOAD_ARTIFACT == 'true') }}
+        env:
+          MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          NOTARIZE_KEY: ${{ runner.temp }}/viper-signing/rustdesk.json
         run: |
+          identity=$(python tools/signing_identity.py)
           # Patch create-dmg to give more attempts to unmount image
           CREATE_DMG="$(command -v create-dmg)"
           CREATE_DMG="$(readlink -f "$CREATE_DMG")"
           sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
           # Unlock keychain
           security default-keychain -s rustdesk.keychain
-          security unlock-keychain -p ${{ secrets.MACOS_P12_PASSWORD }} rustdesk.keychain
+          security unlock-keychain -p "$MACOS_P12_PASSWORD" rustdesk.keychain
           # start sign the rustdesk.app and dmg
           rm -rf *.dmg || true
-          # the identity secret carries its own shell quoting, so expand it inline like the dmg codesign below
           bash ./.github/scripts/sign-macos-app.sh \
             ./flutter/build/macos/Build/Products/Release/RustDesk.app \
-            ${{ secrets.MACOS_CODESIGN_IDENTITY }} \
+            "$identity" \
             ./flutter/macos/Runner/Release.entitlements
           create-dmg --icon "RustDesk.app" 200 190 --hide-extension "RustDesk.app" --window-size 800 400 --app-drop-link 600 185 rustdesk-${{ env.VERSION }}.dmg ./flutter/build/macos/Build/Products/Release/RustDesk.app
-          codesign --force --options runtime -s ${{ secrets.MACOS_CODESIGN_IDENTITY }} --deep --strict rustdesk-${{ env.VERSION }}.dmg -vvv
+          codesign --force --options runtime -s "$identity" --deep --strict rustdesk-${{ env.VERSION }}.dmg -vvv
           # notarize the rustdesk-${{ env.VERSION }}.dmg
-          rcodesign notary-submit --api-key-path ${{ github.workspace }}/rustdesk.json  --staple rustdesk-${{ env.VERSION }}.dmg
+          rcodesign notary-submit --api-key-path "$NOTARIZE_KEY"  --staple rustdesk-${{ env.VERSION }}.dmg
+
+      - name: Remove temporary notarization credential
+        if: ${{ always() && env.RELEASE_ALLOWED == 'true' && env.HAS_MACOS_SIGNING == 'true' }}
+        env:
+          NOTARIZE_KEY: ${{ runner.temp }}/viper-signing/rustdesk.json
+        run: rm -f -- "$NOTARIZE_KEY"
 
       - name: Rename rustdesk
         if: env.UPLOAD_ARTIFACT == 'true'
@@ -916,7 +944,7 @@ jobs:
           done
 
       - name: Publish DMG package
-        if: ${{ inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           prerelease: true
@@ -980,7 +1008,7 @@ jobs:
 
       - name: Publish unsigned app
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        if: inputs.upload-artifact
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact) }}
         with:
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
@@ -1063,7 +1091,6 @@ jobs:
                llvm-dev \
                nasm \
                ninja-build \
-               openjdk-17-jdk-headless \
                pkg-config \
                tree \
                wget
@@ -1071,6 +1098,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -1082,18 +1110,30 @@ jobs:
           python -m pip install -r tools/requirements-dev.txt
           python -m pip install "cmake==$VCPKG_CMAKE_VERSION"
           python tools/build_toolchain.py
+          python tools/android_toolchain.py --env >> "$GITHUB_ENV"
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.ANDROID_JDK_FEATURE }}
+          check-latest: true
+      - name: Require the pinned Android JDK runtime
+        run: python tools/android_toolchain.py --java-only
 
       - name: Install flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: "stable"
           flutter-version: ${{ env.FLUTTER_VERSION }}
-
-      - uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779 # v1.6.0
+      - name: Install and verify the pinned Android SDK
         id: setup-ndk
-        with:
-          ndk-version: ${{ env.NDK_VERSION }}
-          add-to-path: true
+        run: |
+          bash tools/native/install-android-sdk.sh
+          python tools/android_toolchain.py --runtime
+          echo "ndk-path=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> "$GITHUB_OUTPUT"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> "$GITHUB_ENV"
+          flutter config --jdk-dir="$JAVA_HOME"
+
 
       - name: Setup vcpkg with Github Actions binary cache
         uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11.6
@@ -1118,7 +1158,7 @@ jobs:
               ANDROID_TARGET=x86
             ;;
           esac
-          if ! ./flutter/build_android_deps.sh "${ANDROID_TARGET}"; then
+          if ! bash ./flutter/build_android_deps.sh "${ANDROID_TARGET}"; then
             find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
               echo "$_1:"
               echo "======"
@@ -1153,25 +1193,25 @@ jobs:
           ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           rustup target add ${{ matrix.job.target }}
-          cargo install cargo-ndk --version ${{ env.CARGO_NDK_VERSION }} --locked
+          cargo install cargo-ndk --version "=${{ env.CARGO_NDK_VERSION }}" --locked
           case ${{ matrix.job.target }} in
             aarch64-linux-android)
-              ./flutter/ndk_arm64.sh
+              bash ./flutter/ndk_arm64.sh
               mkdir -p ./flutter/android/app/src/main/jniLibs/arm64-v8a
               cp ./target/${{ matrix.job.target }}/release/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/librustdesk.so
             ;;
             armv7-linux-androideabi)
-              ./flutter/ndk_arm.sh
+              bash ./flutter/ndk_arm.sh
               mkdir -p ./flutter/android/app/src/main/jniLibs/armeabi-v7a
               cp ./target/${{ matrix.job.target }}/release/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/librustdesk.so
             ;;
             x86_64-linux-android)
-              ./flutter/ndk_x64.sh
+              bash ./flutter/ndk_x64.sh
               mkdir -p ./flutter/android/app/src/main/jniLibs/x86_64
               cp ./target/${{ matrix.job.target }}/release/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/x86_64/librustdesk.so
             ;;
             i686-linux-android)
-              ./flutter/ndk_x86.sh
+              bash ./flutter/ndk_x86.sh
               mkdir -p ./flutter/android/app/src/main/jniLibs/x86
               cp ./target/${{ matrix.job.target }}/release/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/x86/librustdesk.so
             ;;
@@ -1185,15 +1225,12 @@ jobs:
 
       - name: Build rustdesk
         shell: bash
-        env:
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
           python tools/prepare_flutter.py
-          export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
-          # Increase Gradle JVM memory for CI builds
-          sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" ./flutter/android/gradle.properties
-          # temporary use debug sign config
-          sed -i "s/signingConfigs.release/signingConfigs.debug/g" ./flutter/android/app/build.gradle
+          if test -e flutter/android/key.properties || test -L flutter/android/key.properties; then
+            echo 'CI packaging refuses signing credentials in the source tree.' >&2
+            exit 1
+          fi
           case ${{ matrix.job.target }} in
             aarch64-linux-android)
               mkdir -p ./flutter/android/app/src/main/jniLibs/arm64-v8a
@@ -1240,13 +1277,13 @@ jobs:
       - name: Setup sign tool version variable
         shell: bash
         run: |
-          BUILD_TOOL_VERSION=$(ls /usr/local/lib/android/sdk/build-tools/ | tail -n 1)
+          BUILD_TOOL_VERSION="$ANDROID_BUILD_TOOLS"
           echo "ANDROID_SIGN_TOOL_VERSION=$BUILD_TOOL_VERSION" >> $GITHUB_ENV
           echo Last build tool version is: $BUILD_TOOL_VERSION
 
       - uses: r0adkll/sign-android-release@349ebdef58775b1e0d8099458af0816dc79b6407 # v1
         name: Sign app APK
-        if: env.ANDROID_SIGNING_KEY != null
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (!startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && env.HAS_ANDROID_SIGNING == 'true') }}
         id: sign-rustdesk
         with:
           releaseDirectory: ./signed-apk
@@ -1259,14 +1296,14 @@ jobs:
           BUILD_TOOLS_VERSION: ${{ env.ANDROID_SIGN_TOOL_VERSION }}
 
       - name: Upload Artifacts
-        if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
+        if: ${{ !startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && steps.sign-rustdesk.outputs.signedReleaseFile != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.apk
           path: ${{steps.sign-rustdesk.outputs.signedReleaseFile}}
 
       - name: Publish signed apk package
-        if: ${{ inputs.upload-artifact && (env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (!startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && (env.HAS_ANDROID_SIGNING == 'true' && env.UPLOAD_ARTIFACT == 'true')) }}
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           prerelease: true
@@ -1275,7 +1312,7 @@ jobs:
             ${{steps.sign-rustdesk.outputs.signedReleaseFile}}
 
       - name: Publish unsigned apk package
-        if: ${{ inputs.upload-artifact && (env.ANDROID_SIGNING_KEY == null && env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (!startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && (env.HAS_ANDROID_SIGNING != 'true' && env.UPLOAD_ARTIFACT == 'true')) }}
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           prerelease: true
@@ -1340,7 +1377,6 @@ jobs:
                llvm-dev \
                nasm \
                ninja-build \
-               openjdk-17-jdk-headless \
                pkg-config \
                tree \
                wget
@@ -1348,6 +1384,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -1359,12 +1396,29 @@ jobs:
           python -m pip install -r tools/requirements-dev.txt
           python -m pip install "cmake==$VCPKG_CMAKE_VERSION"
           python tools/build_toolchain.py
+          python tools/android_toolchain.py --env >> "$GITHUB_ENV"
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.ANDROID_JDK_FEATURE }}
+          check-latest: true
+      - name: Require the pinned Android JDK runtime
+        run: python tools/android_toolchain.py --java-only
 
       - name: Install flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: "stable"
           flutter-version: ${{ env.FLUTTER_VERSION }}
+      - name: Install and verify the pinned Android SDK
+        id: setup-ndk
+        run: |
+          bash tools/native/install-android-sdk.sh
+          python tools/android_toolchain.py --runtime
+          echo "ndk-path=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> "$GITHUB_OUTPUT"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION" >> "$GITHUB_ENV"
+          flutter config --jdk-dir="$JAVA_HOME"
 
       - name: Restore bridge files
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -1399,15 +1453,12 @@ jobs:
 
       - name: Build rustdesk
         shell: bash
-        env:
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
           python tools/prepare_flutter.py
-          export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
-          # Increase Gradle JVM memory for CI builds
-          sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" ./flutter/android/gradle.properties
-          # temporary use debug sign config
-          sed -i "s/signingConfigs.release/signingConfigs.debug/g" ./flutter/android/app/build.gradle
+          if test -e flutter/android/key.properties || test -L flutter/android/key.properties; then
+            echo 'CI packaging refuses signing credentials in the source tree.' >&2
+            exit 1
+          fi
           mv ./flutter/android/app/src/main/jniLibs/arm64-v8a/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/librustdesk.so
           cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/
           mv ./flutter/android/app/src/main/jniLibs/armeabi-v7a/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/librustdesk.so
@@ -1429,13 +1480,13 @@ jobs:
       - name: Setup sign tool version variable
         shell: bash
         run: |
-          BUILD_TOOL_VERSION=$(ls /usr/local/lib/android/sdk/build-tools/ | tail -n 1)
+          BUILD_TOOL_VERSION="$ANDROID_BUILD_TOOLS"
           echo "ANDROID_SIGN_TOOL_VERSION=$BUILD_TOOL_VERSION" >> $GITHUB_ENV
           echo Last build tool version is: $BUILD_TOOL_VERSION
 
       - uses: r0adkll/sign-android-release@349ebdef58775b1e0d8099458af0816dc79b6407 # v1
         name: Sign app APK
-        if: env.ANDROID_SIGNING_KEY != null
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (!startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && env.HAS_ANDROID_SIGNING == 'true') }}
         id: sign-rustdesk
         with:
           releaseDirectory: ./signed-apk
@@ -1448,14 +1499,14 @@ jobs:
           BUILD_TOOLS_VERSION: ${{ env.ANDROID_SIGN_TOOL_VERSION }}
 
       - name: Upload Artifacts
-        if: env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true'
+        if: ${{ !startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && steps.sign-rustdesk.outputs.signedReleaseFile != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rustdesk-${{ env.VERSION }}-universal.apk
           path: ${{steps.sign-rustdesk.outputs.signedReleaseFile}}
 
       - name: Publish signed apk package
-        if: ${{ inputs.upload-artifact && (env.ANDROID_SIGNING_KEY != null && env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (!startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && (env.HAS_ANDROID_SIGNING == 'true' && env.UPLOAD_ARTIFACT == 'true')) }}
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           prerelease: true
@@ -1464,7 +1515,7 @@ jobs:
             ${{steps.sign-rustdesk.outputs.signedReleaseFile}}
 
       - name: Publish unsigned apk package
-        if: ${{ inputs.upload-artifact && (env.ANDROID_SIGNING_KEY == null && env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (!startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && (env.HAS_ANDROID_SIGNING != 'true' && env.UPLOAD_ARTIFACT == 'true')) }}
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           prerelease: true
@@ -1514,6 +1565,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -1670,7 +1722,7 @@ jobs:
           done
 
       - name: Publish debian/rpm package
-        if: ${{ inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           prerelease: true
@@ -1706,7 +1758,7 @@ jobs:
             cd res && HBB=`pwd`/.. FLUTTER=1 makepkg -f
 
       - name: Publish archlinux package
-        if: ${{ inputs.upload-artifact && (matrix.job.arch == 'x86_64' && env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (matrix.job.arch == 'x86_64' && env.UPLOAD_ARTIFACT == 'true')) }}
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           prerelease: true
@@ -1741,6 +1793,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -1957,7 +2010,7 @@ jobs:
         shell: bash
 
       - name: Publish debian package
-        if: ${{ inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           prerelease: true
@@ -2014,6 +2067,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - name: Modify vcpkg.json for armv7
@@ -2201,7 +2255,7 @@ jobs:
           done
 
       - name: Publish debian package
-        if: ${{ inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           prerelease: true
@@ -2231,6 +2285,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - name: Download Binary
@@ -2259,7 +2314,7 @@ jobs:
           sudo appimage-builder --skip-tests --recipe ./AppImageBuilder-${{ matrix.job.arch }}.yml
 
       - name: Publish appimage package
-        if: ${{ inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true') }}
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           prerelease: true
@@ -2305,6 +2360,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: recursive
 
       - name: Download Binary
@@ -2346,7 +2402,7 @@ jobs:
 
       - name: Publish flatpak package
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        if: inputs.upload-artifact
+        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact) }}
         with:
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}

@@ -304,10 +304,7 @@ build)
 
 	# Build rustdesk lib
 
-	cargo ndk \
-		--platform "$(python3 -c 'import json; print(json.load(open("configs/toolchain.json"))["android"]["min_sdk"])')" \
-		--target "${RUST_TARGET}" \
-		--bindgen \
+	ANDROID_HOME="${ANDROID_SDK_ROOT}" python3 tools/android_cargo.py "${RUST_TARGET}" \
 		build \
 		--locked \
 		--release \
