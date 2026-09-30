@@ -45,7 +45,9 @@ jobs:
       - name: Install exact SDK packages and checked Gradle wrapper
         run: |
           set -euo pipefail
-          sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;${ANDROID_NDK}" > tools/.reports/android-sdk.log 2>&1
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$sdkmanager"
+          "$sdkmanager" "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;${ANDROID_NDK}" > tools/.reports/android-sdk.log 2>&1
           curl -fL --retry 3 "https://services.gradle.org/distributions/gradle-${ANDROID_GRADLE}-bin.zip" -o "$RUNNER_TEMP/gradle.zip"
           printf '%s  %s\n' "$ANDROID_GRADLE_SHA256" "$RUNNER_TEMP/gradle.zip" | sha256sum -c -
           unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
