@@ -1,0 +1,94 @@
+name: Validate Android toolchain migration
+on:
+  push:
+    branches: [codex/viper-android-preparation]
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Apply the reviewed patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import gzip, hashlib, subprocess
+          data = Path('.migration/android.patch.gz').read_bytes()
+          assert hashlib.sha256(data).hexdigest() == '8495bddbbf940854c4bba89cd1f2d11bad30c9d33fa551ad4bb53066ef1587d8'
+          patch = gzip.decompress(data)
+          subprocess.run(['git', 'apply', '--check'], input=patch, check=True)
+          subprocess.run(['git', 'apply'], input=patch, check=True)
+          PY
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          mkdir -p tools/.reports
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25.0.4.1+1'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Resolve the reviewed scanner replacement
+        run: |
+          python tools/flutter_sdk.py
+          flutter config --jdk-dir="$JAVA_HOME"
+          cd flutter
+          flutter pub get > ../tools/.reports/android-pub.log 2>&1 || { cat ../tools/.reports/android-pub.log; exit 1; }
+      - name: Generate and verify the current Gradle wrapper
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 https://services.gradle.org/distributions/gradle-9.8.0-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          echo 'bafd5ce9cfaea0fbccfdc8439a1ac42fbd4cd9c89dc9a988228d8a2639a58e6c  '"$RUNNER_TEMP/gradle.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          mkdir "$RUNNER_TEMP/wrapper"
+          touch "$RUNNER_TEMP/wrapper/settings.gradle"
+          "$RUNNER_TEMP/gradle-9.8.0/bin/gradle" -p "$RUNNER_TEMP/wrapper" wrapper --gradle-version 9.8.0 --distribution-type bin --gradle-distribution-sha256-sum bafd5ce9cfaea0fbccfdc8439a1ac42fbd4cd9c89dc9a988228d8a2639a58e6c > tools/.reports/android-wrapper.log 2>&1
+          echo '238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5  '"$RUNNER_TEMP/wrapper/gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
+          cp "$RUNNER_TEMP/wrapper/gradlew" "$RUNNER_TEMP/wrapper/gradlew.bat" flutter/android/
+          cp "$RUNNER_TEMP/wrapper/gradle/wrapper/gradle-wrapper.jar" flutter/android/gradle/wrapper/
+          chmod +x flutter/android/gradlew
+      - name: Install the exact Android SDK
+        run: |
+          sdkmanager 'platforms;android-37' 'build-tools;37.0.0' 'ndk;30.0.16248370' > tools/.reports/android-sdk.log 2>&1 || { tail -100 tools/.reports/android-sdk.log; exit 1; }
+      - name: Analyze and test Flutter
+        run: |
+          python tools/analyze_flutter.py
+          (cd flutter && flutter test --no-pub test) > tools/.reports/android-flutter-tests.log 2>&1 || { tail -100 tools/.reports/android-flutter-tests.log; exit 1; }
+      - name: Compile the complete Android application shell
+        working-directory: flutter
+        run: |
+          flutter build apk --debug --no-pub --target-platform android-arm64 > ../tools/.reports/android-build.log 2>&1 || { tail -180 ../tools/.reports/android-build.log; exit 1; }
+      - name: Capture exact migration outputs
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil, subprocess
+          paths = ['configs/toolchain.json', 'configs/actions-lock.json', 'flutter/pubspec.yaml', 'flutter/pubspec.lock', 'flutter/lib/mobile/pages/scan_page.dart', 'flutter/android/settings.gradle', 'flutter/android/build.gradle', 'flutter/android/gradle.properties', 'flutter/android/app/build.gradle', 'flutter/android/app/src/main/AndroidManifest.xml', 'flutter/android/gradlew', 'flutter/android/gradlew.bat', 'flutter/android/gradle/wrapper/gradle-wrapper.jar', 'flutter/android/gradle/wrapper/gradle-wrapper.properties']
+          out = Path('tools/.reports/reviewed-source')
+          for name in paths:
+              p = Path(name)
+              if p.is_file():
+                  dest = out / name
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(p, dest)
+          Path('tools/.reports/android-changes.patch').write_bytes(subprocess.check_output(['git', 'diff', '--binary']))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: android-migration-diagnostics
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error
