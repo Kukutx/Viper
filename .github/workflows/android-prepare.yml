@@ -33,7 +33,19 @@ jobs:
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
-          java-version: '25.0.4.1+1'
+          java-version: '25'
+          check-latest: true
+      - name: Require the exact four-component JDK release
+        run: |
+          python - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          expected = json.loads(Path('configs/toolchain.json').read_text())['android']['jdk']
+          text = (Path(os.environ['JAVA_HOME']) / 'release').read_text()
+          actual = re.search(r'^JAVA_RUNTIME_VERSION="([^"]+)"', text, re.M).group(1)
+          assert actual.removesuffix('-LTS') == expected, (actual, expected)
+          Path('tools/.reports/android-jdk.txt').write_text(text)
+          PY
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
