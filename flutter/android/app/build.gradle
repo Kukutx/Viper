@@ -84,6 +84,12 @@ protobuf {
 }
 
 android {
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+            keepDebugSymbols += ['**/librustdesk.so']
+        }
+    }
     namespace "com.carriez.flutter_hbb"
     compileSdk toolchain.compile_sdk
     buildToolsVersion toolchain.build_tools

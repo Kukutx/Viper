@@ -103,3 +103,7 @@ python tools/viper.py verify dist
 F-Droid 使用同一 SDK 和 `python tools/bridge.py generate --from-source` 从固定 Cargo 版本、锁文件编译生成器；失败不会回退到预编译文件。该入口迁移不是 F-Droid 全构建验收，Android Gradle/NDK 等仍待迁移。
 
 Apple 验证显式选择中央配置的 Xcode 版本、build ID、SDK 和 CocoaPods，分别验证 Debug 与 Release 包内 FFI；Release 归档及清单是未签名 CI 产物，不是可直接发布的安装包。GitHub `xcode-27` runner 目前标为预览，独立记录，不能把 runner 标签当成 SDK 版本验证。范围见 `docs/engineering/build-entry-convergence.md`。
+
+## Android native validation
+
+Android pins, wrapper checksums and the minimum API 24 baseline are in `configs/toolchain.json.android`. Run `python tools/android_toolchain.py --java-only`, `bash tools/native/install-android-sdk.sh`, then `bash tools/native/build-android.sh arm64-v8a`. The read-only three-ABI CI keeps hardware codecs and checks actual APK contents, Rust library identity, ELF/ZIP 16 KiB alignment, app ID and SDK levels. See `docs/engineering/android-native-migration.md` for remaining upstream compatibility and device-validation boundaries.

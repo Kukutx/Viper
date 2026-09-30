@@ -27,7 +27,8 @@ class ToolchainTests(unittest.TestCase):
         (self.root / 'configs').mkdir()
         (self.root / '.github/workflows').mkdir(parents=True)
         self.data = {'rust':'1.98.1','flutter':'3.47.5','cmake':'4.4.3',
-                     'vcpkg':{'revision':'a'*40}}
+                     'vcpkg':{'revision':'a'*40},
+                     'android':{'cargo_ndk':'4.1.2','ndk_release':'r30'}}
         (self.root / 'configs/toolchain.json').write_text(json.dumps(self.data))
         self.workflow = self.root / '.github/workflows/flutter-build.yml'
         self.workflow.write_text('env:\n'+''.join(f'  {key}: "old"\n' for key in build_toolchain.MIRRORS))

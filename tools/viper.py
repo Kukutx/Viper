@@ -184,6 +184,8 @@ def verify_manifest(directory: Path) -> None:
 
 def check(root: Path = ROOT) -> None:
     versions(root)
+    from android_toolchain import check as check_android
+    check_android(root)
     actions(root)
     paths = run("git", "ls-files", "-z", cwd=root).split("\0")
     if not (root / "agent.md").is_file():

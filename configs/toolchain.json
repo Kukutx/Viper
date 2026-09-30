@@ -105,7 +105,7 @@
     "cargo_ndk": "4.1.2",
     "compile_sdk": 37,
     "target_sdk": 37,
-    "min_sdk": 23,
+    "min_sdk": 24,
     "build_tools": "37.0.0",
     "protobuf_plugin": "0.10.0",
     "protobuf": "4.36.2",
