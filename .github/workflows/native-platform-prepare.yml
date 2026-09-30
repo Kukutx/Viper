@@ -1,0 +1,38 @@
+name: Inspect native migration inputs
+on:
+  push:
+    branches: [codex/viper-native-platform-completion]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.5'
+          cache: true
+      - name: Snapshot the exact input and resolve locked plugins
+        run: |
+          mkdir -p tools/.reports/native-input
+          git archive --format=tar.gz HEAD > tools/.reports/native-input/source.tar.gz
+          git ls-tree -r HEAD > tools/.reports/native-input/tree.txt
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/flutter_sdk.py
+          (cd flutter && flutter pub get --enforce-lockfile)
+          python .github/scripts/inspect-native-inputs.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: native-migration-inputs
+          path: tools/.reports/native-input/
+          retention-days: 3
+          if-no-files-found: error
