@@ -45,9 +45,10 @@ jobs:
           text = replace(text, '  workflow_dispatch:\n', '  workflow_dispatch:\n  workflow_call:\n')
           text = replace(text, '      - uses: subosito/flutter-action@', '      - name: Select and verify the pinned Apple SDK\n        run: python tools/apple_sdk.py --github-env\n      - uses: subosito/flutter-action@')
           text = replace(text, 'prefix-key: apple-native-v2', 'prefix-key: apple-native-xcode27-v1')
-          text = replace(text, 'key: viper-apple-${{ runner.arch }}-', 'key: viper-apple-xcode27-${{ runner.arch }}-', 2)
+          text = replace(text, 'key: viper-apple-', 'key: viper-apple-xcode27-', 2)
           text = replace(text, '      - name: Require unchanged native project settings\n', '      - name: Build and verify the unsigned Release bundle\n        run: bash tools/native/build-macos-release.sh\n      - name: Require unchanged native project settings\n')
-          text += '\n      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1\n        with:\n          name: macos-arm64-unsigned-${{ github.sha }}\n          path: dist/macos-arm64-unsigned/\n          retention-days: 3\n          if-no-files-found: error\n'
+          expression = '$' + '{{ github.sha }}'
+          text += '\n      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1\n        with:\n          name: macos-arm64-unsigned-' + expression + '\n          path: dist/macos-arm64-unsigned/\n          retention-days: 3\n          if-no-files-found: error\n'
           path.write_text(text)
           Path('tools/.reports').mkdir(exist_ok=True)
           PY
