@@ -1,0 +1,80 @@
+name: Prepare reviewed toolchain convergence objects
+on:
+  push:
+    branches: [codex/viper-build-convergence-preparation]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Apply exact reviewed configuration changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json
+          expected = {
+            'configs/toolchain.json': 'a2579a381979a36afdeee6b1c1bad22f311084a5',
+            '.github/workflows/apple-native.yml': 'c0936de7fdd3f7c1bca1190398097d67b2afa6fe',
+            'flutter/macos/Runner.xcodeproj/project.pbxproj': 'e53dea95009c7e79a4847a0c32cf8c0182234bf1',
+          }
+          for path, sha in expected.items():
+              data = Path(path).read_bytes()
+              assert hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest() == sha, path
+          def replace(text, old, new, count=1):
+              assert text.count(old) == count, (old, text.count(old), count)
+              return text.replace(old, new)
+          path = Path('configs/toolchain.json')
+          text = path.read_text()
+          apple = {'verified_at': '2026-09-30', 'xcode': '27.0', 'build': '27A266a', 'developer_dir': '/Applications/Xcode_27.app/Contents/Developer', 'macos_sdk': '27.0', 'cocoapods': '1.17.0', 'runner': 'xcode-27', 'runner_preview': True, 'sources': ['https://apps.apple.com/us/app/xcode/id497799835', 'https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md']}
+          block = '  "apple": ' + json.dumps(apple, indent=2).replace('\n', '\n  ') + ',\n'
+          path.write_text(replace(text, '  "flutter_rust_bridge": {\n', block + '  "flutter_rust_bridge": {\n'))
+          path = Path('flutter/macos/Runner.xcodeproj/project.pbxproj')
+          text = replace(path.read_text(), 'OTHER_LDFLAGS = (\n', 'OTHER_LDFLAGS = (\n\t\t\t\t\t"$(inherited)",\n', 2)
+          path.write_text(text)
+          path = Path('.github/workflows/apple-native.yml')
+          text = replace(path.read_text(), 'runs-on: macos-15', 'runs-on: xcode-27')
+          text = replace(text, '  workflow_dispatch:\n', '  workflow_dispatch:\n  workflow_call:\n')
+          text = replace(text, '      - uses: subosito/flutter-action@', '      - name: Select and verify the pinned Apple SDK\n        run: python tools/apple_sdk.py --github-env\n      - uses: subosito/flutter-action@')
+          text = replace(text, 'prefix-key: apple-native-v2', 'prefix-key: apple-native-xcode27-v1')
+          text = replace(text, 'key: viper-apple-${{ runner.arch }}-', 'key: viper-apple-xcode27-${{ runner.arch }}-', 2)
+          text = replace(text, '      - name: Require unchanged native project settings\n', '      - name: Build and verify the unsigned Release bundle\n        run: bash tools/native/build-macos-release.sh\n      - name: Require unchanged native project settings\n')
+          text += '\n      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1\n        with:\n          name: macos-arm64-unsigned-${{ github.sha }}\n          path: dist/macos-arm64-unsigned/\n          retention-days: 3\n          if-no-files-found: error\n'
+          path.write_text(text)
+          Path('tools/.reports').mkdir(exist_ok=True)
+          PY
+          python -m pip install -r tools/requirements-dev.txt
+          python -m unittest discover -s tools/tests -v
+          git diff --check
+          git diff > tools/.reports/convergence.patch
+      - name: Store only reviewed blobs without updating any ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, json, os, urllib.request
+          from pathlib import Path
+          paths = ['configs/toolchain.json', '.github/workflows/apple-native.yml', 'flutter/macos/Runner.xcodeproj/project.pbxproj', 'tools/apple_sdk.py', 'tools/native/build-macos-release.sh', 'tools/tests/test_apple_sdk.py']
+          entries = []
+          for path in paths:
+              request = urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs', method='POST', headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'}, data=json.dumps({'content': base64.b64encode(Path(path).read_bytes()).decode(), 'encoding': 'base64'}).encode())
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  sha = json.load(response)['sha']
+              entries.append({'path': path, 'mode': '100755' if path.endswith('.sh') else '100644', 'type': 'blob', 'sha': sha})
+          Path('tools/.reports/objects.json').write_text(json.dumps({'base': 'b13263fc9fb5a8819de3cf5a0abd583e03f5c9d0', 'entries': entries}, indent=2))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: reviewed-toolchain-convergence
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error
