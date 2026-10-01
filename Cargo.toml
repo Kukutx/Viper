@@ -20,7 +20,13 @@ path = "src/naming.rs"
 name = "service"
 path = "src/service.rs"
 
+[[test]]
+name = "http_dependency_contract"
+required-features = ["http-contract-tests"]
+
 [features]
+# Ephemeral certificates and a private HOME are prepared by tools/native/test-http.sh.
+http-contract-tests = []
 inline = []
 use_samplerate = ["samplerate", "libsamplerate-sys"]
 use_rubato = ["rubato"]
