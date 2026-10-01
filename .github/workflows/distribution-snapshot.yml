@@ -1,0 +1,31 @@
+name: Export distribution validation baseline
+on:
+  push:
+    branches: [codex/viper-distribution-validation]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 7359942dc8636b32500837760e2de5b81a6d1cb5
+          persist-credentials: false
+          submodules: recursive
+      - name: Export exact tracked sources only
+        run: |
+          mkdir -p "$RUNNER_TEMP/viper-export"
+          git archive --format=tar.gz HEAD > "$RUNNER_TEMP/viper-export/source.tar.gz"
+          git -C libs/hbb_common archive --format=tar.gz HEAD > "$RUNNER_TEMP/viper-export/hbb-common.tar.gz"
+          git ls-tree -r HEAD > "$RUNNER_TEMP/viper-export/tree.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/viper-export/revision.txt"
+          cd "$RUNNER_TEMP/viper-export"
+          sha256sum source.tar.gz hbb-common.tar.gz tree.txt revision.txt > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: distribution-baseline
+          path: ${{ runner.temp }}/viper-export/
+          if-no-files-found: error
+          retention-days: 3
