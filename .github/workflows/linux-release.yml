@@ -1,0 +1,73 @@
+name: Linux native Release validation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+concurrency:
+  group: linux-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  linux-release:
+    name: Linux ${{ matrix.arch }} native Release and FFI
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {arch: x64, runner: ubuntu-24.04, flutter-arch: x64}
+          - {arch: arm64, runner: ubuntu-24.04-arm, flutter-arch: arm64}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Verify pinned inputs and install isolated Rust
+        run: |
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          python tools/ci_rust.py
+          python tools/bridge.py check
+          python tools/check_bridge_outputs.py
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: ${{ matrix.flutter-arch }}
+          cache: true
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: linux-release-${{ matrix.arch }}
+          cache-on-failure: true
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/viper-vcpkg
+          key: linux-release-yuv-${{ matrix.arch }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**') }}
+      - name: Prepare native Linux dependencies
+        run: bash tools/native/setup-linux.sh
+      - name: Build, inspect and archive the actual Release bundle
+        run: python tools/linux_release.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: linux-release-diagnostics-${{ matrix.arch }}-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linux-${{ matrix.arch }}-unsigned-${{ github.sha }}
+          path: dist/linux-${{ matrix.arch }}-unsigned/
+          retention-days: 3
+          if-no-files-found: error

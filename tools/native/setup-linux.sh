@@ -3,10 +3,15 @@ set -euo pipefail
 
 root=$(git rev-parse --show-toplevel)
 cd "$root"
-if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
-  echo 'This native setup supports Linux x86_64 only; use the platform-specific build workflow elsewhere.' >&2
+if [[ "$(uname -s)" != Linux ]]; then
+  echo 'This native setup requires Linux.' >&2
   exit 1
 fi
+case "$(uname -m)" in
+  x86_64) triplet=x64-linux ;;
+  aarch64) triplet=arm64-linux ;;
+  *) echo 'This native setup supports Linux x64 and arm64 only.' >&2; exit 1 ;;
+esac
 mkdir -p tools/.reports
 cmake_version=$(python -c 'import json; print(json.load(open("configs/toolchain.json"))["cmake"])')
 revision=$(python -c 'import json; print(json.load(open("configs/toolchain.json"))["vcpkg"]["revision"])')
@@ -39,11 +44,11 @@ git -C "$VCPKG_ROOT" fetch -q --depth 1 origin "$revision"
 git -C "$VCPKG_ROOT" checkout -q --detach FETCH_HEAD
 test "$(git -C "$VCPKG_ROOT" rev-parse HEAD)" = "$revision"
 "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics > tools/.reports/vcpkg.log 2>&1
-"$VCPKG_ROOT/vcpkg" install libyuv:x64-linux --classic \
+"$VCPKG_ROOT/vcpkg" install "libyuv:$triplet" --classic \
   --overlay-ports="$root/res/vcpkg" >> tools/.reports/vcpkg.log 2>&1 \
   || { tail -100 tools/.reports/vcpkg.log; exit 1; }
-test -f "$VCPKG_ROOT/installed/x64-linux/lib/libyuv.a"
-test -f "$VCPKG_ROOT/installed/x64-linux/include/libyuv.h"
+test -f "$VCPKG_ROOT/installed/$triplet/lib/libyuv.a"
+test -f "$VCPKG_ROOT/installed/$triplet/include/libyuv.h"
 if [[ -n "${GITHUB_ENV:-}" ]]; then
   printf 'VCPKG_ROOT=%s\nNO_PKG_CONFIG_libyuv=1\n' "$VCPKG_ROOT" >> "$GITHUB_ENV"
 fi
