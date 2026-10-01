@@ -142,3 +142,7 @@ Windows 原生主机准备好固定 SDK 后，执行 `python tools/windows_nativ
 ## 保留的 PulseAudio fork
 
 `python tools/verify_pulse_vendor.py` 对照原 Git blob 校验源码、许可和限定替换。`bash tools/native/test-pulsectl.sh` 显式启用私有服务测试，在临时 Unix socket 和 cookie 下运行虚拟 null sink，测试完成或失败都只清理自身进程。普通 `cargo test --workspace` 不会因为这项新增集成测试要求用户正在运行音频服务；CI 会显式运行全部三个测试，不使用忽略或放宽断言。
+
+## Linux Debian package
+
+After the same-commit native Release build, `python tools/linux_deb.py` creates and verifies an unsigned `.deb` on Ubuntu 24.04 x64/arm64 (`dpkg-dev` required). It preserves the existing service, maintainer scripts, identities and runtime requirements, adds ELF-derived dependencies, verifies both archive trees and repeat serialization, and runs FFI against the extracted Rust library. CI never installs the package or starts its service. Output: `dist/linux-<arch>-deb-unsigned/`. See [Debian validation](../docs/engineering/linux-debian-validation.md) for the explicit DRM, hardware, installation and signing boundaries.

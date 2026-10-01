@@ -330,18 +330,8 @@ def generate_control_file(version):
     control_file_path = "../res/DEBIAN/control"
     system2('/bin/rm -rf %s' % control_file_path)
 
-    content = """Package: rustdesk
-Section: net
-Priority: optional
-Version: %s
-Architecture: %s
-Maintainer: rustdesk <info@rustdesk.com>
-Homepage: https://rustdesk.com
-Depends: libgtk-3-0t64 | libgtk-3-0, libxcb-randr0, libxdo3 | libxdo4, libxfixes3, libxcb-shape0, libxcb-xfixes0, libasound2t64 | libasound2, libsystemd0, curl, libva2, libva-drm2, libva-x11-2, libgstreamer-plugins-base1.0-0, gstreamer1.0-pipewire%s
-Recommends: libayatana-appindicator3-1
-Description: A remote control software.
-
-""" % (version, get_deb_arch(), get_deb_extra_depends())
+    content = (Path(REPO_ROOT) / "configs/linux-deb-control.in").read_text(encoding="utf-8") % (
+        version, get_deb_arch(), get_deb_extra_depends())
     file = open(control_file_path, "w")
     file.write(content)
     file.close()
