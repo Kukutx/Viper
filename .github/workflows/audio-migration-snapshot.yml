@@ -1,4 +1,4 @@
-name: Export audio migration inputs
+name: Inspect audio migration transport
 on:
   push:
     branches: [codex/viper-audio-modernization-validation]
@@ -8,49 +8,20 @@ permissions:
 jobs:
   snapshot:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 29e154ecb91e29d04a68bea81070aa93b46bcdfd
-          submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        with:
-          python-version-file: .python-version
-      - name: Export exact source and published audio API inputs
-        shell: bash
+      - name: Export transport inputs without applying code
         run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/audio-inputs"
-          git rev-parse HEAD > "$RUNNER_TEMP/audio-inputs/revision.txt"
-          git ls-tree -r HEAD > "$RUNNER_TEMP/audio-inputs/tree.txt"
-          git archive HEAD | gzip -n > "$RUNNER_TEMP/audio-inputs/source.tar.gz"
-          git -C libs/hbb_common archive HEAD | gzip -n > "$RUNNER_TEMP/audio-inputs/hbb-common.tar.gz"
-          python - <<'PY'
-          import datetime, hashlib, json, os, pathlib, urllib.request
-          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'audio-inputs'
-          def read(url):
-              request = urllib.request.Request(url, headers={'User-Agent': 'Viper-dependency-review/1.0'})
-              with urllib.request.urlopen(request, timeout=60) as response:
-                  return response.read()
-          records = {'queried_at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'packages': {}}
-          for name in ['ringbuf', 'rubato', 'audioadapter', 'audioadapter-buffers']:
-              metadata = json.loads(read('https://crates.io/api/v1/crates/' + name))
-              version = metadata['crate']['max_stable_version']
-              data = json.loads(read(f'https://crates.io/api/v1/crates/{name}/{version}'))['version']
-              assert not data['yanked'] and '-' not in version
-              archive = read(f'https://crates.io/api/v1/crates/{name}/{version}/download')
-              assert hashlib.sha256(archive).hexdigest() == data['checksum']
-              (out / f'{name}-{version}.crate').write_bytes(archive)
-              records['packages'][name] = data
-          (out / 'published-versions.json').write_text(json.dumps(records, indent=2) + '\n')
-          PY
-          cd "$RUNNER_TEMP/audio-inputs"
-          sha256sum *.gz *.crate *.json *.txt > SHA256SUMS
+          mkdir -p "$RUNNER_TEMP/transport"
+          cp tools/.audio-migration.patch.b64 "$RUNNER_TEMP/transport/patch.b64"
+          cp .github/workflows/audio-migration-prepare.yml "$RUNNER_TEMP/transport/prepare.yml"
+          sha256sum "$RUNNER_TEMP/transport/patch.b64"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: audio-migration-inputs
-          path: ${{ runner.temp }}/audio-inputs/
-          retention-days: 3
+          name: audio-transport-inputs
+          path: ${{ runner.temp }}/transport/
+          retention-days: 1
           if-no-files-found: error
