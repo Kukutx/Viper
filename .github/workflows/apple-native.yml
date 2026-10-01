@@ -73,6 +73,8 @@ jobs:
           cargo build --locked --release --lib --features flutter > tools/.reports/macos-cargo.log 2>&1 || { tail -120 tools/.reports/macos-cargo.log; exit 1; }
           test -s target/release/liblibrustdesk.dylib
           file target/release/liblibrustdesk.dylib
+      - name: Verify production audio buffering and callback contracts
+        run: python tools/audio_tests.py
       - name: Validate the shared packaging entry
         run: python tools/prepare_flutter.py
       - name: Build the desktop bundle without signing

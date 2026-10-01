@@ -188,6 +188,7 @@ def build() -> None:
     os.environ['VIPER_NATIVE_LIBRARY'] = str(bundle / 'librustdesk.dll')
     command([flutter, 'test', '--no-pub', 'test_native/bridge_ffi_test.dart'], 'windows-ffi.log', ROOT / 'flutter')
     command(['git', 'diff', '--exit-code', 'HEAD', '--', 'Cargo.lock', 'flutter/pubspec.yaml', 'flutter/pubspec.lock', 'flutter/windows'], 'windows-source-drift.log')
+    command([sys.executable, str(ROOT / 'tools/audio_tests.py')], 'windows-audio-tests.log')
     report = {'arch': arch, 'rust_target': target, 'llvm': windows['llvm'], 'visual_studio': studio,
               'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'rust_library_sha256': digest(bundle / 'librustdesk.dll'), 'profile': 'software-codec',

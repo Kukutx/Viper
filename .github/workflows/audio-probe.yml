@@ -1,0 +1,19 @@
+name: Validate audio dependency migration
+on:
+  push:
+    branches: [codex/viper-audio-dependency-validation]
+permissions:
+  contents: read
+jobs:
+  foundation:
+    uses: ./.github/workflows/foundation.yml
+  windows:
+    uses: ./.github/workflows/windows-native.yml
+  apple:
+    uses: ./.github/workflows/apple-native.yml
+  android:
+    uses: ./.github/workflows/android-native.yml
+  ios:
+    uses: ./.github/workflows/ios-native.yml
+  linux:
+    uses: ./.github/workflows/flutter-validate.yml
