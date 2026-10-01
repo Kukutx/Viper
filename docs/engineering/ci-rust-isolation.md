@@ -9,8 +9,8 @@ hosted runner contained a partially installed toolchain, and rustup reported a
 private `RUSTUP_HOME` under `RUNNER_TEMP`, installs the central stable Rust pin
 and the components declared in `rust-toolchain.toml`, and requires rustfmt and
 Clippy. It verifies executable locations, compiler release and tool execution
-before exporting the home and toolchain through `GITHUB_ENV`. Android invokes
-it before any cache probing or native dependency setup.
+before exporting the home and toolchain through `GITHUB_ENV`. Android, Linux Release and Foundation core invoke it before any cache probing
+or native dependency setup.
 
 The existing Cargo home/cache and global rustup installation are not changed,
 uninstalled or repaired. Failed installation and verification stop the job;
@@ -36,3 +36,21 @@ condition. Release-tag, nightly, F-Droid and maintenance cancellation policies
 are unchanged. This changes read-only validation scheduling, not signing,
 publication permissions, branch protection or required checks. Cancelled runs
 are never recorded as successful validation of a newer commit.
+
+## Foundation core failure and repair
+
+The same runner-global failure recurred in Foundation run `36809629608`, job
+`110201569874`, for head `f1cb096`: rustup reported that the selected toolchain
+was not installed, and both the cache probe and final cargo test invocation
+reported `Missing manifest in toolchain '1.98.1-x86_64-unknown-linux-gnu'`.
+The core library tests did not start; this is not an application or hbb_common
+assertion failure. The Foundation Gate correctly failed rather than accepting
+the cache step's success as evidence of a usable compiler.
+
+Foundation now selects the pinned Python interpreter, then invokes the same
+isolated Rust bootstrap before prerequisites, cache probing, metadata and core
+tests. The locked metadata command and full base/hbb_common library test command
+are unchanged. Toolchain diagnostics are retained even on failure. Six workflow
+contracts require ordering, unconditional failure propagation, unchanged test
+coverage and the existing two-job Foundation Gate. No shared library code,
+platform behavior, test assertion or compiler version is changed by this fix.
