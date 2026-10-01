@@ -1,0 +1,125 @@
+name: Prepare reviewed audio dependency migration
+on:
+  push:
+    branches: [codex/viper-audio-dependency-validation]
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      lock_hash: ${{ steps.resolve.outputs.lock_hash }}
+      manifest_hash: ${{ steps.resolve.outputs.manifest_hash }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 29e154ecb91e29d04a68bea81070aa93b46bcdfd
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Install isolated pinned Rust
+        run: python tools/ci_rust.py
+      - name: Resolve only the reviewed ringbuf migration
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tools/audio-export/source .tools/audio-export/resolved
+          git rev-parse HEAD > .tools/audio-export/source/revision.txt
+          git ls-tree -r HEAD > .tools/audio-export/source/tree.txt
+          git archive HEAD | gzip -n > .tools/audio-export/source/source.tar.gz
+          git -C libs/hbb_common archive HEAD | gzip -n > .tools/audio-export/source/hbb-common.tar.gz
+          cp Cargo.lock .tools/audio-export/source/Cargo.lock.before
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('Cargo.toml')
+          text = p.read_text()
+          old = 'ringbuf = "0.3"'
+          assert text.count(old) == 1
+          p.write_text(text.replace(old, 'ringbuf = "0.5.2"'))
+          PY
+          cargo update -p ringbuf@0.3.3 --precise 0.5.2 2>&1 | tee .tools/audio-export/source/resolve.log
+          cargo metadata --locked --no-deps --format-version 1 > .tools/audio-export/source/metadata.json
+          python - <<'PY'
+          import hashlib, json, os, shutil, tomllib, urllib.request
+          from pathlib import Path
+          out = Path('.tools/audio-export')
+          before = tomllib.loads((out / 'source/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+          def identities(lock):
+              return {(p['name'], p['version'], p.get('source', ''), p.get('checksum', '')) for p in lock['package']}
+          removed = identities(before) - identities(after)
+          added = identities(after) - identities(before)
+          assert {(p[0], p[1]) for p in removed} == {('ringbuf', '0.3.3')}, removed
+          assert {(p[0], p[1]) for p in added} == {('ringbuf', '0.5.2')}, added
+          ring = next(p for p in after['package'] if p['name'] == 'ringbuf')
+          request = urllib.request.Request('https://crates.io/api/v1/crates/ringbuf/0.5.2/download', headers={'User-Agent':'Viper-dependency-migration'})
+          with urllib.request.urlopen(request, timeout=60) as response:
+              package = response.read(2_000_001)
+          assert len(package) <= 2_000_000
+          assert hashlib.sha256(package).hexdigest() == ring['checksum']
+          (out / 'source/ringbuf-0.5.2.crate').write_bytes(package)
+          (out / 'source/identities.json').write_text(json.dumps({'removed': sorted(removed), 'added': sorted(added)}, indent=2) + '\n')
+          for name, output in [('Cargo.lock','lock_hash'), ('Cargo.toml','manifest_hash')]:
+              shutil.copyfile(name, out / 'resolved' / name)
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+                  stream.write(output + '=' + hashlib.sha256(Path(name).read_bytes()).hexdigest() + '\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: audio-review-source
+          path: .tools/audio-export/source/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: audio-resolved-files
+          path: .tools/audio-export/resolved/
+          if-no-files-found: error
+          retention-days: 7
+  store-objects:
+    needs: resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: audio-resolved-files
+          path: ${{ runner.temp }}/reviewed-audio
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          LOCK_HASH: ${{ needs.resolve.outputs.lock_hash }}
+          MANIFEST_HASH: ${{ needs.resolve.outputs.manifest_hash }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const crypto = require('crypto');
+            const directory = path.join(process.env.RUNNER_TEMP, 'reviewed-audio');
+            const hashes = {'Cargo.lock': process.env.LOCK_HASH, 'Cargo.toml': process.env.MANIFEST_HASH};
+            if (fs.readdirSync(directory).sort().join('|') !== Object.keys(hashes).sort().join('|')) throw new Error('Unexpected input files');
+            const result = {};
+            for (const [name, expected] of Object.entries(hashes)) {
+              const file = path.join(directory, name);
+              const stat = fs.lstatSync(file);
+              if (!stat.isFile() || stat.size < 1 || stat.size > 500000) throw new Error('Invalid input');
+              const data = fs.readFileSync(file);
+              if (!/^[a-f0-9]{64}$/.test(expected) || crypto.createHash('sha256').update(data).digest('hex') !== expected) throw new Error('Digest mismatch');
+              const blob = await github.rest.git.createBlob({...context.repo, content: data.toString('base64'), encoding: 'base64'});
+              const expectedBlob = crypto.createHash('sha1').update(Buffer.from(`blob ${data.length}\0`)).update(data).digest('hex');
+              if (blob.data.sha !== expectedBlob) throw new Error('Git object mismatch');
+              result[name] = {sha: blob.data.sha, sha256: expected};
+            }
+            fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'audio-objects.json'), JSON.stringify(result, null, 2) + '\n');
+            core.info(JSON.stringify(result));
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: audio-reviewed-objects
+          path: ${{ runner.temp }}/audio-objects.json
+          if-no-files-found: error
+          retention-days: 7
