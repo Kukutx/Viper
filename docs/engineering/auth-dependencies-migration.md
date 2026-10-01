@@ -10,6 +10,8 @@ Sources: [SHA-2 release](https://docs.rs/crate/sha2/0.11.0), [TOTP release](http
 
 This is not a global cryptography replacement. `hbb_common` and all other maintained Git dependencies keep their revisions and their own transitive hash versions. Viper call sites deliberately importing `hbb_common::sha2` continue to use that shared implementation. The root's direct SHA-2 consumer and the new TOTP dependency use 0.11; old transitive versions are not forced out by overrides.
 
+The updated lock uses Cargo format v4, which percent-encodes Git reference query values. Six source strings change `/` to `%2F` in branch names, but all 59 Git package names, versions, repository URLs, decoded reference values and full commits remain identical. The migration audit compares the format-aware identities rather than treating a serialized URL change as a fork update. Format v4 is produced by the fixed compiler after raising the declared minimum Rust; it is not a handwritten lockfile conversion. See the [Cargo 1.83 changelog](https://doc.rust-lang.org/cargo/CHANGELOG.html#cargo-183-2024-11-28).
+
 ## Preserved authentication behavior
 
 Viper still persists its own `TOTPInfo` fields (`name: String`, `secret: Vec<u8>`, `digits: usize`, `created_at: i64`), not the upstream `Totp` serde representation. The existing encrypted byte-vector format, encryption version `00`, option key, secret decryption rules and application identity are unchanged. Existing users do not need to re-enroll solely because of this dependency migration.

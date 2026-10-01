@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+from urllib.parse import parse_qsl, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'e2ff7ab2ceef9f1602848d48c9202df58a71c385'
@@ -81,14 +82,39 @@ def apply():
     path.write_text(source)
 
 
+def git_packages(lock):
+    """Compare actual Git identities across Cargo's v3/v4 URL serialization."""
+    if lock['version'] not in (3, 4):
+        raise ValueError('Unreviewed Cargo lock format')
+    result = []
+    for package in lock['package']:
+        source = package.get('source', '')
+        if not source.startswith('git+'):
+            continue
+        url = urlsplit(source)
+        if len(url.fragment) != 40 or any(c not in '0123456789abcdef' for c in url.fragment):
+            raise ValueError('Git source must retain a full commit')
+        if lock['version'] == 4:
+            query = tuple(parse_qsl(url.query, keep_blank_values=True, strict_parsing=True))
+        else:
+            # v3 stored reference values literally, including '+' and '%'.
+            query = tuple(tuple(part.split('=', 1)) for part in url.query.split('&')) if url.query else ()
+        if any(len(pair) != 2 or pair[0] not in {'branch', 'tag', 'rev'} for pair in query) or len(query) > 1:
+            raise ValueError('Unreviewed Git reference query')
+        result.append((package['name'], package['version'], url.scheme, url.netloc,
+                       url.path, query, url.fragment))
+    return sorted(result)
+
+
 def validate_resolution():
     before = tomllib.loads(subprocess.check_output(['git', 'show', f'{BASE}:Cargo.lock'], cwd=ROOT, text=True))
     after = tomllib.loads((ROOT / 'Cargo.lock').read_text())
-    def git_packages(lock):
-        return sorted((p['name'], p['version'], p['source']) for p in lock['package'] if p.get('source', '').startswith('git+'))
     previous, current = git_packages(before), git_packages(after)
     evidence = {'before': previous, 'after': current, 'removed': sorted(set(previous) - set(current)),
-                'added': sorted(set(current) - set(previous)), 'unused_patches': after.get('patch', {})}
+                'added': sorted(set(current) - set(previous)), 'unused_patches': after.get('patch', {}),
+                'lock_formats': [before['version'], after['version']],
+                'raw_sources_before': [p['source'] for p in before['package'] if p.get('source', '').startswith('git+')],
+                'raw_sources_after': [p['source'] for p in after['package'] if p.get('source', '').startswith('git+')]}
     (ROOT / 'tools/.reports/auth-git-identities.json').write_text(json.dumps(evidence, indent=2) + '\n')
     if previous != current:
         raise ValueError('Maintained Git package identities changed; see auth-git-identities.json')
