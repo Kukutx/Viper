@@ -57,10 +57,9 @@ class AndroidReleaseEntryTests(unittest.TestCase):
         job = workflow['jobs']['android']
         steps = job['steps']
         gate_index = next(i for i, step in enumerate(steps)
-                          if step.get('name') == 'Verify Rust before caches and native dependency builds')
+                          if step.get('run', '').strip() == 'python tools/ci_rust.py')
         gate = steps[gate_index]
-        self.assertEqual(gate['run'].splitlines(),
-                         ['rustup show', 'rustc --version --verbose', 'cargo --version'])
+        self.assertEqual(gate['run'].strip(), 'python tools/ci_rust.py')
         self.assertNotIn('if', gate)
         self.assertNotIn('continue-on-error', gate)
         self.assertNotIn('continue-on-error', job)

@@ -23,3 +23,16 @@ installation verification is not equivalent to Clippy linting, native builds,
 APK validation, device execution or signing; those retain separate results.
 
 Reference: https://rust-lang.github.io/rustup/environment-variables.html
+
+## Superseded native PR runs
+
+Android, Linux, Windows, macOS and iOS native validation use PR-only cancellation:
+`cancel-in-progress: ${{ github.event_name == 'pull_request' }}`. A new PR head
+supersedes an older run in its concurrency group instead of queuing behind an
+obsolete application build. Groups retain the Git ref; Windows also retains
+its architecture and caller workflow, so x64 and arm64 do not cancel each other.
+Main pushes, manual dispatches and non-PR callers are not cancelled by this
+condition. Release-tag, nightly, F-Droid and maintenance cancellation policies
+are unchanged. This changes read-only validation scheduling, not signing,
+publication permissions, branch protection or required checks. Cancelled runs
+are never recorded as successful validation of a newer commit.

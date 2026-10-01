@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 60
     concurrency:
       group: windows-native-${{ matrix.arch }}-${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: false
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     env:
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.tools/vcpkg-cache
     strategy:
