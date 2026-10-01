@@ -1,0 +1,44 @@
+name: Export exact stabilization baseline
+on:
+  push:
+    branches: [codex/viper-ci-stabilization]
+    paths: [.github/workflows/stabilization-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 3dea1a7bb816bf6c6338773edb86833abc243667
+          submodules: recursive
+          persist-credentials: false
+      - name: Export tracked source only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/stabilization"
+          git rev-parse HEAD > "$RUNNER_TEMP/stabilization/revision.txt"
+          git ls-tree -r HEAD > "$RUNNER_TEMP/stabilization/tree.txt"
+          git archive --format=tar HEAD > "$RUNNER_TEMP/stabilization/source.tar"
+          git -C libs/hbb_common archive --format=tar HEAD > "$RUNNER_TEMP/stabilization/hbb_common.tar"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 9ec3b4e6d2942e1ce6554ef404010e55ad58e879
+          path: registry-candidate
+          persist-credentials: false
+      - name: Export reviewed registry lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp registry-candidate/Cargo.lock "$RUNNER_TEMP/stabilization/Cargo.candidate.lock"
+          cd "$RUNNER_TEMP/stabilization"
+          sha256sum source.tar hbb_common.tar Cargo.candidate.lock > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: stabilization-baseline
+          path: ${{ runner.temp }}/stabilization/
+          if-no-files-found: error
+          retention-days: 3
