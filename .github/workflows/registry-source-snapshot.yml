@@ -1,0 +1,46 @@
+name: Snapshot dependency repair inputs
+on:
+  push:
+    branches: [codex/viper-registry-upgrade-validation]
+    paths: [.github/workflows/registry-source-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 9ec3b4e6d2942e1ce6554ef404010e55ad58e879
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: rustdesk-org/pulsectl
+          ref: aa34dde499aa912a3abc5289cc0b547bd07dd6e2
+          path: .snapshot-pulse
+          persist-credentials: false
+      - name: Export immutable repository and fork inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/dependency-inputs"
+          mkdir -p "$out"
+          test "$(git rev-parse HEAD)" = 9ec3b4e6d2942e1ce6554ef404010e55ad58e879
+          test "$(git -C .snapshot-pulse rev-parse HEAD)" = aa34dde499aa912a3abc5289cc0b547bd07dd6e2
+          git archive HEAD | gzip -n > "$out/viper-source.tar.gz"
+          git -C libs/hbb_common archive HEAD | gzip -n > "$out/hbb-common.tar.gz"
+          git -C .snapshot-pulse archive HEAD | gzip -n > "$out/pulsectl-source.tar.gz"
+          git ls-files --stage > "$out/source-index.txt"
+          git -C .snapshot-pulse ls-files --stage > "$out/pulsectl-index.txt"
+          git show c4b9373edce3057815ade5eb0bf8bd1d3276ebeb:Cargo.lock > "$out/baseline-Cargo.lock"
+          cd "$out"
+          sha256sum *.tar.gz *.txt *.lock > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dependency-repair-inputs
+          path: ${{ runner.temp }}/dependency-inputs/
+          if-no-files-found: error
+          retention-days: 3
