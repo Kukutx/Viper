@@ -13,7 +13,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version-file: .python-version
@@ -25,10 +25,14 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           prefix-key: viper-auth-v6-preparation
-      - name: Resolve the migrated lock once and require locked resolution afterwards
+          cache-on-failure: true
+      - name: Resolve once and audit the actual native feature graph before compilation
         run: |
-          cargo metadata --format-version 1 > tools/.reports/auth-metadata.json
-          cargo metadata --locked --format-version 1 > tools/.reports/auth-metadata.json
+          cargo metadata --format-version 1 > tools/.reports/auth-default-metadata.json
+          cargo metadata --locked --format-version 1 --features flutter,linux-pkg-config > tools/.reports/auth-metadata.json
+          cp Cargo.lock tools/.reports/auth-resolved-Cargo.lock
+          git diff -- Cargo.lock > tools/.reports/auth-lock.patch
+          python .tools/auth-v6-prepare.py validate
           python tools/viper.py check
           python -m unittest discover -s tools/tests -v > tools/.reports/auth-tools.log 2>&1 || { tail -100 tools/.reports/auth-tools.log; exit 1; }
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9

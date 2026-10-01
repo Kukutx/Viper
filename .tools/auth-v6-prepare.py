@@ -81,13 +81,17 @@ def apply():
     path.write_text(source)
 
 
-def export():
+def validate_resolution():
     before = tomllib.loads(subprocess.check_output(['git', 'show', f'{BASE}:Cargo.lock'], cwd=ROOT, text=True))
     after = tomllib.loads((ROOT / 'Cargo.lock').read_text())
     def git_packages(lock):
         return sorted((p['name'], p['version'], p['source']) for p in lock['package'] if p.get('source', '').startswith('git+'))
-    if git_packages(before) != git_packages(after):
-        raise ValueError('Maintained Git package identities changed')
+    previous, current = git_packages(before), git_packages(after)
+    evidence = {'before': previous, 'after': current, 'removed': sorted(set(previous) - set(current)),
+                'added': sorted(set(current) - set(previous)), 'unused_patches': after.get('patch', {})}
+    (ROOT / 'tools/.reports/auth-git-identities.json').write_text(json.dumps(evidence, indent=2) + '\n')
+    if previous != current:
+        raise ValueError('Maintained Git package identities changed; see auth-git-identities.json')
     metadata = json.loads((ROOT / 'tools/.reports/auth-metadata.json').read_text())
     for name, version in [('flutter_rust_bridge', '2.13.0'), ('netdev', '0.46.3'), ('totp-rs', '6.0.0')]:
         if {p['version'] for p in metadata['packages'] if p['name'] == name} != {version}:
@@ -102,6 +106,11 @@ def export():
     sha = next(p for p in metadata['packages'] if p['id'] == sha_id)
     if sha['version'] != '0.11.0':
         raise ValueError('Root SHA-2 did not migrate')
+    return after, node
+
+
+def export():
+    after, node = validate_resolution()
     subprocess.run(['git', 'diff', '--check'], cwd=ROOT, check=True)
     changed = subprocess.check_output(['git', 'diff', '--name-only'], cwd=ROOT, text=True).splitlines()
     if set(changed) != set(EXPECTED) | {'Cargo.lock'}:
@@ -118,10 +127,10 @@ def export():
         shutil.copyfile(source, target)
         data = source.read_bytes()
         records.append({'path': name, 'sha': blob(data), 'sha256': hashlib.sha256(data).hexdigest(), 'size': len(data)})
-    (output / 'objects.json').write_text(json.dumps({'base': BASE, 'files': records, 'git_packages_preserved': len(git_packages(after)), 'totp_features': node['features']}, indent=2) + '\n')
+    (output / 'objects.json').write_text(json.dumps({'base': BASE, 'files': records, 'git_packages_preserved': sum(p.get('source', '').startswith('git+') for p in after['package']), 'totp_features': node['features']}, indent=2) + '\n')
     (output / 'migration.patch').write_bytes(subprocess.check_output(['git', 'diff', '--', *EXPECTED, 'Cargo.lock'], cwd=ROOT))
     print(json.dumps(records, indent=2))
 
 
 if __name__ == '__main__':
-    {'apply': apply, 'export': export}[sys.argv[1]]()
+    {'apply': apply, 'validate': validate_resolution, 'export': export}[sys.argv[1]]()
