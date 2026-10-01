@@ -1,0 +1,95 @@
+name: Validate bounded Flutter patch update
+on:
+  push:
+    branches: [codex/viper-flutter-patch-validation]
+    paths: [.github/workflows/flutter-patch-check.yml]
+permissions:
+  contents: read
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Read exact SDK configuration
+        run: |
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          mkdir -p tools/.reports
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Select only the requested stable patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/flutter_sdk.py
+          python - <<'PY'
+          import json, urllib.request
+          from pathlib import Path
+          report = Path('tools/.reports')
+          with urllib.request.urlopen('https://pub.dev/api/packages/wakelock_plus', timeout=60) as response:
+              upstream = json.load(response)
+          assert upstream['latest']['version'] == '1.8.1', 'Review a changed upstream latest release before upgrading'
+          (report / 'wakelock-release.json').write_text(json.dumps(upstream['latest'], indent=2) + '\n')
+          before = Path('flutter/pubspec.lock').read_bytes()
+          (report / 'before-pubspec.lock').write_bytes(before)
+          p = Path('flutter/pubspec.yaml')
+          old = '  wakelock_plus: 1.8.0\n'
+          text = p.read_text()
+          assert text.count(old) == 1
+          p.write_text(text.replace(old, '  wakelock_plus: 1.8.1\n'))
+          PY
+          (cd flutter && flutter pub get) > tools/.reports/pub-resolution.log 2>&1 || { cat tools/.reports/pub-resolution.log; exit 1; }
+      - name: Reject unreviewed transitive or fork changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json, yaml
+          report = Path('tools/.reports')
+          old = yaml.safe_load((report / 'before-pubspec.lock').read_text())
+          new = yaml.safe_load(Path('flutter/pubspec.lock').read_text())
+          changed = sorted(n for n in old['packages'].keys() | new['packages'].keys() if old['packages'].get(n) != new['packages'].get(n))
+          (report / 'resolution-changes.json').write_text(json.dumps({'changed': changed, 'before': {n: old['packages'].get(n) for n in changed}, 'after': {n: new['packages'].get(n) for n in changed}}, indent=2) + '\n')
+          assert set(changed) == {'wakelock_plus', 'dbus'}, changed
+          assert new['packages']['wakelock_plus']['version'] == '1.8.1'
+          upstream = json.loads((report / 'wakelock-release.json').read_text())
+          assert new['packages']['wakelock_plus']['description']['sha256'] == upstream['archive_sha256']
+          assert new['packages']['dbus']['version'] == '0.8.0'
+          assert old['sdks'] == new['sdks']
+          print('Only wakelock_plus and its dbus dependency changed; SDK and other locked packages unchanged.')
+          PY
+          (cd flutter && flutter pub get --enforce-lockfile)
+          git diff --exit-code -- Cargo.lock src/bridge_generated.rs flutter/lib/generated flutter/macos/Podfile.lock
+      - name: Analyze and exercise all Flutter unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/analyze_flutter.py
+          (cd flutter && flutter test --no-pub test) > tools/.reports/flutter-tests.log 2>&1 || { tail -100 tools/.reports/flutter-tests.log; exit 1; }
+          tail -10 tools/.reports/flutter-tests.log
+      - name: Capture exact dependency outputs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp flutter/pubspec.yaml tools/.reports/pubspec.yaml
+          cp flutter/pubspec.lock tools/.reports/pubspec.lock
+          git diff --binary -- flutter/pubspec.yaml flutter/pubspec.lock > tools/.reports/pub-changes.patch
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: bounded-flutter-patch
+          path: tools/.reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
