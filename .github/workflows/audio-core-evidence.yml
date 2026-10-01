@@ -1,37 +1,43 @@
-name: Export exact audio validation job evidence
+name: Verify core test initialization isolation
 on:
   push:
     branches: [codex/viper-audio-log-verification]
 permissions:
   contents: read
-  actions: read
 jobs:
-  evidence:
+  serial-core:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
-      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            const crypto = require('crypto');
-            const out = path.join(process.env.RUNNER_TEMP, 'audio-core-evidence');
-            fs.mkdirSync(out);
-            const job = await github.rest.actions.getJobForWorkflowRun({...context.repo, job_id: 110615157342});
-            if (job.data.run_id !== 36935650364 || job.data.head_sha !== 'ff3948814c9d8d727f55c837587f0e9a9af0b88c') throw new Error('Job identity mismatch');
-            fs.writeFileSync(path.join(out, 'job.json'), JSON.stringify(job.data, null, 2));
-            const response = await github.rest.actions.downloadJobLogsForWorkflowRun({...context.repo, job_id: 110615157342});
-            if (typeof response.data !== 'string' && !Buffer.isBuffer(response.data) && !(response.data instanceof ArrayBuffer)) throw new Error('Expected raw job log');
-            const data = Buffer.from(response.data);
-            fs.writeFileSync(path.join(out, 'core-job.log'), data);
-            fs.writeFileSync(path.join(out, 'core-job.sha256'), crypto.createHash('sha256').update(data).digest('hex') + '\n');
-            const config = await github.rest.repos.getContent({owner: 'rustdesk', repo: 'hbb_common', path: 'src/config.rs', ref: '229b904508364c8997aad0fb5af57effac859f60'});
-            if (config.data.sha !== '6fe1004558f154a4128d83ac8dea0892142d8c59') throw new Error('Submodule source mismatch');
-            fs.writeFileSync(path.join(out, 'config.rs'), Buffer.from(config.data.content, 'base64'));
+          ref: ff3948814c9d8d727f55c837587f0e9a9af0b88c
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - run: python tools/ci_rust.py
+      - name: Install core prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang cmake libclang-dev libssl-dev pkg-config
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+      - name: Require three complete serial core suites
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > tools/.reports/core-revision.txt
+          git submodule status --recursive > tools/.reports/core-submodules.txt
+          cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
+          for attempt in 1 2 3; do
+            cargo test --locked -p base -p hbb_common --lib -- --test-threads=1 > "tools/.reports/core-serial-${attempt}.log" 2>&1 || { tail -c 10000 "tools/.reports/core-serial-${attempt}.log"; exit 1; }
+          done
+          git diff --exit-code HEAD -- Cargo.lock Cargo.toml libs/hbb_common
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
         with:
-          name: exact-audio-core-evidence
-          path: ${{ runner.temp }}/audio-core-evidence/
+          name: audio-serial-core-evidence
+          path: tools/.reports/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
