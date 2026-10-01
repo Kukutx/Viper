@@ -1,0 +1,24 @@
+name: Validate immutable Linux Release SDK setup
+on:
+  push:
+    branches: [codex/viper-ci-stabilization]
+permissions:
+  contents: read
+jobs:
+  tools:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - run: |
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py check
+          python -m unittest discover -s tools/tests -v
+  native:
+    uses: ./.github/workflows/linux-release.yml

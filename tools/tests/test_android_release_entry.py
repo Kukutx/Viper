@@ -52,6 +52,25 @@ class AndroidReleaseEntryTests(unittest.TestCase):
                     self.assertIn("!startsWith(github.event_name, 'pull_request')", guard)
                     self.assertIn('inputs.upload-artifact', guard)
 
+    def test_native_rust_failure_stops_before_cache_and_expensive_builds(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/android-native.yml').read_text())
+        job = workflow['jobs']['android']
+        steps = job['steps']
+        gate_index = next(i for i, step in enumerate(steps)
+                          if step.get('name') == 'Verify Rust before caches and native dependency builds')
+        gate = steps[gate_index]
+        self.assertEqual(gate['run'].splitlines(),
+                         ['rustup show', 'rustc --version --verbose', 'cargo --version'])
+        self.assertNotIn('if', gate)
+        self.assertNotIn('continue-on-error', gate)
+        self.assertNotIn('continue-on-error', job)
+        for index, step in enumerate(steps):
+            if step.get('uses', '').startswith(('Swatinem/rust-cache@', 'actions/setup-java@')):
+                self.assertLess(gate_index, index)
+            if step.get('name') in ('Install native prerequisites and the exact SDK',
+                                   'Build the real native library and unsigned APK'):
+                self.assertLess(gate_index, index)
+
     def test_all_native_triplets_use_the_central_minimum(self):
         minimum = json.loads((ROOT/'configs/toolchain.json').read_text())['android']['min_sdk']
         for triplet in ('arm-neon', 'arm64', 'x64', 'x86'):

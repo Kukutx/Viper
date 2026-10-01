@@ -67,6 +67,10 @@ jobs:
         with:
           path: ~/.cache/viper-vcpkg
           key: viper-yuv-${{ runner.os }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**') }}
+      - name: Verify preserved PulseAudio fork against a private virtual device
+        run: |
+          sudo apt-get install -y pulseaudio pulseaudio-utils
+          bash tools/native/test-pulsectl.sh
       - name: Verify reproducible bindings and locked dependencies
         run: |
           python tools/bridge.py generate > tools/.reports/codegen.log 2>&1 || { tail -100 tools/.reports/codegen.log; exit 1; }

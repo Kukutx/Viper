@@ -39,6 +39,8 @@ jobs:
           python tools/bridge.py check
           python tools/check_bridge_outputs.py
           mkdir -p tools/.reports
+      - name: Install and verify isolated Rust before native prerequisites
+        run: python tools/ci_rust.py
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
