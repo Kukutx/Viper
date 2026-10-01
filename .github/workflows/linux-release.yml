@@ -62,9 +62,13 @@ jobs:
           path: ~/.cache/viper-vcpkg
           key: linux-release-yuv-${{ matrix.arch }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**') }}
       - name: Prepare native Linux dependencies
-        run: bash tools/native/setup-linux.sh
+        run: |
+          bash tools/native/setup-linux.sh
+          sudo apt-get install -y dpkg-dev
       - name: Build, inspect and archive the actual Release bundle
         run: python tools/linux_release.py
+      - name: Build and verify the native Debian package
+        run: python tools/linux_deb.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -77,5 +81,11 @@ jobs:
         with:
           name: linux-${{ matrix.arch }}-unsigned-${{ github.sha }}
           path: dist/linux-${{ matrix.arch }}-unsigned/
+          retention-days: 3
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linux-${{ matrix.arch }}-deb-unsigned-${{ github.sha }}
+          path: dist/linux-${{ matrix.arch }}-deb-unsigned/
           retention-days: 3
           if-no-files-found: error

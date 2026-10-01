@@ -1,0 +1,15 @@
+name: Validate native Debian distribution
+on:
+  push:
+    branches: [codex/viper-distribution-validation]
+permissions:
+  contents: read
+jobs:
+  foundation:
+    uses: ./.github/workflows/foundation.yml
+    permissions:
+      contents: read
+  native:
+    uses: ./.github/workflows/linux-release.yml
+    permissions:
+      contents: read
