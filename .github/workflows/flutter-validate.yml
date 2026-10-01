@@ -108,6 +108,10 @@ jobs:
           tail -10 ../tools/.reports/ffi-tests.log
       - name: Build and validate the Linux desktop bundle
         run: bash tools/native/build-linux-bundle.sh
+      - name: Verify the optional Rubato resampling API
+        run: |
+          cargo test --locked --test rubato_dependency_contract --features flutter,linux-pkg-config,use_rubato > tools/.reports/rubato-tests.log 2>&1 || { tail -120 tools/.reports/rubato-tests.log; exit 1; }
+          git diff --exit-code -- Cargo.lock flutter/pubspec.lock
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

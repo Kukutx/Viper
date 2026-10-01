@@ -359,53 +359,51 @@ pub fn resample_channels(
     channels: u16,
 ) -> Vec<f32> {
     use rubato::{
-        InterpolationParameters, InterpolationType, Resampler, SincFixedIn, WindowFunction,
+        audioadapter_buffers::direct::InterleavedSlice, Async, FixedAsync, Resampler,
+        SincInterpolationParameters, SincInterpolationType, WindowFunction,
     };
-    let params = InterpolationParameters {
-        sinc_len: 256,
-        f_cutoff: 0.95,
-        interpolation: InterpolationType::Nearest,
-        oversampling_factor: 160,
-        window: WindowFunction::BlackmanHarris2,
-    };
-    let mut resampler = SincFixedIn::<f64>::new(
-        sample_rate as f64 / sample_rate0 as f64,
-        params,
-        data.len() / (channels as usize),
-        channels as _,
-    );
-    let mut waves_in = Vec::new();
-    if channels == 2 {
-        waves_in.push(
-            data.iter()
-                .step_by(2)
-                .map(|x| *x as f64)
-                .collect::<Vec<_>>(),
-        );
-        waves_in.push(
-            data.iter()
-                .skip(1)
-                .step_by(2)
-                .map(|x| *x as f64)
-                .collect::<Vec<_>>(),
-        );
-    } else {
-        waves_in.push(data.iter().map(|x| *x as f64).collect::<Vec<_>>());
+    if data.is_empty() {
+        return Vec::new();
     }
-    if let Ok(x) = resampler.process(&waves_in) {
-        if x.is_empty() {
-            Vec::new()
-        } else if x.len() == 2 {
-            x[0].chunks(1)
-                .zip(x[1].chunks(1))
-                .flat_map(|(a, b)| a.into_iter().chain(b))
-                .map(|x| *x as f32)
-                .collect()
-        } else {
-            x[0].iter().map(|x| *x as f32).collect()
+    let process = || -> ResultType<Vec<f32>> {
+        if sample_rate0 == 0 || sample_rate == 0 || !matches!(channels, 1 | 2) {
+            bail!("invalid Rubato rates or channel count");
         }
-    } else {
-        Vec::new()
+        let channels = usize::from(channels);
+        if !data.len().is_multiple_of(channels) {
+            bail!("incomplete interleaved Rubato input frame");
+        }
+        let params = SincInterpolationParameters {
+            sinc_len: 256,
+            f_cutoff: Some(0.95),
+            interpolation: SincInterpolationType::Nearest,
+            oversampling_factor: 160,
+            window: WindowFunction::BlackmanHarris2,
+        };
+        let frames = data.len() / channels;
+        let mut resampler = Async::<f64>::new_sinc(
+            f64::from(sample_rate) / f64::from(sample_rate0),
+            1.0,
+            &params,
+            frames,
+            channels,
+            FixedAsync::Input,
+        )?;
+        let input: Vec<f64> = data.iter().map(|sample| f64::from(*sample)).collect();
+        let input = InterleavedSlice::new(&input, channels, frames)?;
+        Ok(resampler
+            .process(&input, None)?
+            .take_data()
+            .into_iter()
+            .map(|sample| sample as f32)
+            .collect())
+    };
+    match process() {
+        Ok(output) => output,
+        Err(error) => {
+            log::error!("Failed to resample audio with Rubato: {error}");
+            Vec::new()
+        }
     }
 }
 
