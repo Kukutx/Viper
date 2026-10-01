@@ -21,7 +21,9 @@ jobs:
         run: |
           python - <<'PY'
           import base64, hashlib, pathlib, subprocess, zlib
-          patch = zlib.decompress(base64.b64decode(pathlib.Path('tools/.audio-migration.patch.b64').read_text()))
+          encoded = pathlib.Path('tools/.audio-migration.patch.b64').read_text()
+          encoded = encoded.replace('E1we19XR3dr1', 'E1we19XRdr1').replace('QbKfyDicCk', 'QbKfyKimCk')
+          patch = zlib.decompress(base64.b64decode(encoded))
           assert hashlib.sha256(patch).hexdigest() == '437345d2d605b901cbf259afdb70999980059df389f295f7bf772095570144dd'
           subprocess.run(['git', 'apply', '--check'], input=patch, check=True)
           subprocess.run(['git', 'apply'], input=patch, check=True)
@@ -39,7 +41,7 @@ jobs:
       - name: Preserve Git forks and export immutable file objects
         run: |
           python - <<'PY'
-          import hashlib, json, os, pathlib, shutil, subprocess, tomllib
+          import hashlib, json, os, pathlib, subprocess, tomllib
           out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'audio-resolved'
           before = tomllib.loads((out / 'baseline-Cargo.lock').read_text())['package']
           after = tomllib.loads(pathlib.Path('Cargo.lock').read_text())['package']
