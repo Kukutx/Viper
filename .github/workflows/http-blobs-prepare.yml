@@ -1,0 +1,60 @@
+name: Store reviewed HTTP source objects
+on:
+  push:
+    branches: [codex/viper-http-migration]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    if: github.repository == 'Kukutx/Viper' && github.ref == 'refs/heads/codex/viper-http-migration'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Apply only three reviewed replacements and store immutable objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, urllib.request
+          from pathlib import Path
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              assert text.count(old) == 1, path
+              p.write_text(text.replace(old, new))
+          replace('Cargo.toml', 'reqwest = { version = "0.12", features = ["blocking", "socks", "json", "native-tls", "rustls-tls", "rustls-tls-native-roots", "gzip", "zstd"], default-features=false }', 'reqwest = { version = "0.13.5", features = ["blocking", "socks", "json", "query", "native-tls-no-alpn", "rustls-no-provider", "gzip", "zstd"], default-features=false }')
+          path = 'src/hbbs_http/http_client.rs'
+          replace(path, '.use_native_tls()', '.tls_backend_native()')
+          replace(path, '.use_preconfigured_tls(client_config)', '.tls_backend_preconfigured(client_config)')
+          p = Path(path)
+          text = p.read_text().replace('.danger_accept_invalid_certs(', '.tls_danger_accept_invalid_certs(')
+          p.write_text(text)
+          replace(path, '                #[cfg(any(target_os = "android", target_os = "ios"))]\n                match hbb_common::verifier::client_config($danger_accept_invalid_cert) {', '                // Keep the shared webpki/native roots and mobile verifier, rather than\n                // silently adopting reqwest\'s new platform-only trust policy.\n                match hbb_common::verifier::client_config($danger_accept_invalid_cert) {')
+          replace(path, '                #[cfg(not(any(target_os = "android", target_os = "ios")))]\n                {\n                    builder = builder.use_rustls_tls();\n                    if $danger_accept_invalid_cert {\n                        builder = builder.tls_danger_accept_invalid_certs(true);\n                    }\n                }\n', '')
+          replace('.github/workflows/flutter-validate.yml', '      - name: Exercise actual synchronous and asynchronous FFI\n', '      - name: Verify HTTP and TLS dependency contracts\n        run: bash tools/native/test-http.sh\n      - name: Exercise actual synchronous and asynchronous FFI\n')
+          expected = {'Cargo.toml': '613b3b507b587f7db08c30560db291ecc0fb5e14', 'src/hbbs_http/http_client.rs': 'e0977f38b5c30370d366e63abe9731669ac8e310', '.github/workflows/flutter-validate.yml': 'e69475b2ba436da98859018af03f43b0ab478f05', 'tests/http_dependency_contract.rs': 'e809947904e11bcc211d9732761aa6217c5b7cce', 'tools/native/test-http.sh': '38a28ea0b0b848ba6cec62b34dc729131fe83a3c', 'tools/tests/test_http_dependencies.py': 'b616e7d8949bd3ff8e2b5a44c4d690c72e21fe93'}
+          for path, sha in expected.items():
+              data = Path(path).read_bytes()
+              assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest() == sha, path
+          assert os.environ['GITHUB_REPOSITORY'] == 'Kukutx/Viper'
+          assert os.environ['GITHUB_REF'] == 'refs/heads/codex/viper-http-migration'
+          for path, sha in expected.items():
+              req = urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs', data=json.dumps({'content': Path(path).read_text(), 'encoding':'utf-8'}).encode(), headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'], 'Accept':'application/vnd.github+json'}, method='POST')
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  assert json.load(response)['sha'] == sha
+          Path('reviewed-http-blobs.json').write_text(json.dumps(expected, indent=2))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: reviewed-http-source-objects
+          path: reviewed-http-blobs.json
+          retention-days: 3
+          if-no-files-found: error
