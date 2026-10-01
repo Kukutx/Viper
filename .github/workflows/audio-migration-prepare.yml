@@ -1,0 +1,99 @@
+name: Prepare reviewed audio dependency migration
+on:
+  push:
+    branches: [codex/viper-audio-modernization-validation]
+    paths: [.github/workflows/audio-migration-prepare.yml, tools/.audio-migration.patch.b64]
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Apply only the reviewed migration patch
+        run: |
+          python - <<'PY'
+          import base64, hashlib, pathlib, subprocess, zlib
+          patch = zlib.decompress(base64.b64decode(pathlib.Path('tools/.audio-migration.patch.b64').read_text()))
+          assert hashlib.sha256(patch).hexdigest() == '437345d2d605b901cbf259afdb70999980059df389f295f7bf772095570144dd'
+          subprocess.run(['git', 'apply', '--check'], input=patch, check=True)
+          subprocess.run(['git', 'apply'], input=patch, check=True)
+          PY
+          python tools/ci_rust.py
+      - name: Resolve only the two migrated packages
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/audio-resolved/files"
+          cp Cargo.lock "$RUNNER_TEMP/audio-resolved/baseline-Cargo.lock"
+          cargo update --package ringbuf --package rubato > "$RUNNER_TEMP/audio-resolved/resolution.log" 2>&1 || { cat "$RUNNER_TEMP/audio-resolved/resolution.log"; exit 1; }
+          cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/audio-resolved/metadata.json"
+          python -m pip install -r tools/requirements-dev.txt
+          python -m unittest discover -s tools/tests -v > "$RUNNER_TEMP/audio-resolved/tool-tests.log" 2>&1 || { tail -120 "$RUNNER_TEMP/audio-resolved/tool-tests.log"; exit 1; }
+      - name: Preserve Git forks and export immutable file objects
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, pathlib, shutil, subprocess, tomllib
+          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'audio-resolved'
+          before = tomllib.loads((out / 'baseline-Cargo.lock').read_text())['package']
+          after = tomllib.loads(pathlib.Path('Cargo.lock').read_text())['package']
+          def git_packages(packages):
+              return sorted((p['name'], p['version'], p['source']) for p in packages if p.get('source', '').startswith('git+'))
+          assert git_packages(before) == git_packages(after)
+          paths = ['Cargo.lock', 'Cargo.toml', 'src/common.rs', 'src/client.rs', 'src/client/audio_playback.rs', 'src/client/audio_playback_tests.rs', 'src/client/tests/audio_state_tests.rs', 'tests/rubato_dependency_contract.rs', 'tools/tests/test_audio_dependencies.py', 'tools/windows_native.py', '.github/workflows/apple-native.yml', '.github/workflows/flutter-validate.yml']
+          records = []
+          for i, path in enumerate(paths):
+              data = pathlib.Path(path).read_bytes()
+              name = f'{i}.txt'
+              (out / 'files' / name).write_bytes(data)
+              records.append({'path': path, 'file': name, 'sha': hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()})
+          (out / 'objects.json').write_text(json.dumps(records, indent=2))
+          (out / 'revision.txt').write_text(subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True))
+          subprocess.run(['git', 'diff', '--stat'], check=True)
+          print(json.dumps(records, indent=2))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: audio-resolved-inputs
+          path: ${{ runner.temp }}/audio-resolved/
+          retention-days: 3
+          if-no-files-found: error
+  store:
+    needs: resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: audio-resolved-inputs
+          path: objects
+      - name: Store data blobs only without executing repository code or moving refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, re, urllib.request
+          root = pathlib.Path('objects')
+          rows = json.loads((root / 'objects.json').read_text())
+          expected = {'Cargo.lock', 'Cargo.toml', 'src/common.rs', 'src/client.rs', 'src/client/audio_playback.rs', 'src/client/audio_playback_tests.rs', 'src/client/tests/audio_state_tests.rs', 'tests/rubato_dependency_contract.rs', 'tools/tests/test_audio_dependencies.py', 'tools/windows_native.py', '.github/workflows/apple-native.yml', '.github/workflows/flutter-validate.yml'}
+          assert len(rows) == len(expected) and {r['path'] for r in rows} == expected
+          for row in rows:
+              assert re.fullmatch(r'[0-9]+\.txt', row['file'])
+              path = root / 'files' / row['file']
+              assert not path.is_symlink()
+              data = path.read_bytes()
+              assert hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest() == row['sha']
+              request = urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs', data=json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode(), headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'}, method='POST')
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  assert json.load(response)['sha'] == row['sha']
+          print(json.dumps(rows, indent=2))
+          PY
