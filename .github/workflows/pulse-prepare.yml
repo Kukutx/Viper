@@ -2,7 +2,7 @@ name: Validate preserved PulseAudio fork migration
 on:
   push:
     branches: [codex/viper-registry-upgrade-validation]
-    paths: [.github/workflows/pulse-prepare.yml, .migration/pulse-helpers.json.gz]
+    paths: [.github/workflows/pulse-prepare.yml, .migration/pulse-helpers.json.gz, .migration/prepare-pulse.py]
 permissions:
   contents: read
 jobs:
@@ -27,95 +27,13 @@ jobs:
         with:
           python-version-file: .python-version
       - name: Reconstruct only the reviewed fork migration
-        shell: bash
         run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import gzip, hashlib, json, subprocess
-          root = Path.cwd()
-          src = root / '.pulse-upstream'
-          dst = root / 'libs/pulsectl'
-          assert not dst.exists()
-          assert subprocess.check_output(['git', '-C', str(src), 'rev-parse', 'HEAD'], text=True).strip() == 'aa34dde499aa912a3abc5289cc0b547bd07dd6e2'
-          blobs = {
-              'Cargo.toml': 'b15da83cadeb4f1a836bebb657478a254631b0df',
-              'LICENSE.md': 'c8a328965105abee0d472322bb3c1936dab32d3a',
-              'README.md': 'ca8703b1e330f92b803ace2d01261d4a8ed34c9a',
-              'src/controllers/errors.rs': 'f4e50292e2ce9a4068773e3646b42799a345ffa3',
-              'src/controllers/mod.rs': '2fb1aa92ae36024d070fbc9e01feedfcee658800',
-              'src/controllers/types.rs': 'c61ad2f445a9fe35e9f0b5cc83ad1702e11a2812',
-              'src/errors.rs': 'b75a8f5335dda15f680653f683493e6e5067f898',
-              'src/lib.rs': '073902fd9d3c48aef7d5a1db48e3fb70b5e34562',
-              'examples/change_device_vol.rs': '49bb3eac9039ecaa4a2d40db99951bda7bbb1f80',
-          }
-          for name, sha in blobs.items():
-              data = (src / name).read_bytes()
-              assert hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest() == sha, name
-              p = dst / name
-              p.parent.mkdir(parents=True, exist_ok=True)
-              p.write_bytes(data)
-          changes = {
-              'Cargo.toml': [('libpulse-binding = "2.26"', 'libpulse-binding = "2.30.1"')],
-              'src/lib.rs': [('pulse::context::flags::NOFLAGS', 'pulse::context::FlagSet::NOFLAGS')],
-              'src/controllers/mod.rs': [('pulse::volume::VOLUME_NORM.0', 'Volume::NORMAL.0')],
-          }
-          def replace(path, old, new):
-              text = path.read_text()
-              assert text.count(old) == 1, (str(path), old)
-              path.write_text(text.replace(old, new))
-          for name, pairs in changes.items():
-              for old, new in pairs:
-                  replace(dst / name, old, new)
-          meta = {'repository': 'https://github.com/rustdesk-org/pulsectl', 'revision': 'aa34dde499aa912a3abc5289cc0b547bd07dd6e2', 'license': 'GPL-3.0-or-later', 'source_blobs': blobs, 'replacements': changes}
-          (dst / 'upstream.json').write_text(json.dumps(meta, indent=2) + '\n')
-          pack = (root / '.migration/pulse-helpers.json.gz').read_bytes()
-          assert hashlib.sha256(pack).hexdigest() == '2fb48de8239512849a452d9d9f85e562686c0fe90280ef37aa2bd32d5c383820'
-          expected = {'libs/pulsectl/VIPER.md', 'libs/pulsectl/tests/pulse_smoke.rs', 'tools/verify_pulse_vendor.py', 'tools/native/test-pulsectl.sh', 'tools/tests/test_pulse_vendor.py'}
-          entries = json.loads(gzip.decompress(pack))
-          assert len(entries) == len(expected) and {x['path'] for x in entries} == expected
-          for entry in entries:
-              p = root / entry['path']
-              assert not p.exists() and entry['mode'] in ('100644', '100755')
-              p.parent.mkdir(parents=True, exist_ok=True)
-              p.write_text(entry['content'])
-              p.chmod(int(entry['mode'], 8) & 0o777)
-          replace(root / 'Cargo.toml', 'rust-pulsectl = { git = "https://github.com/rustdesk-org/pulsectl" }', 'rust-pulsectl = { path = "libs/pulsectl" }')
-          old = '      - name: Verify reproducible bindings and locked dependencies\n'
-          new = '      - name: Verify preserved PulseAudio fork against a private virtual device\n        run: |\n          sudo apt-get install -y pulseaudio pulseaudio-utils\n          bash tools/native/test-pulsectl.sh\n' + old
-          replace(root / '.github/workflows/flutter-validate.yml', old, new)
-          report = root / 'tools/.reports'
-          report.mkdir(parents=True, exist_ok=True)
-          (report / 'before.lock').write_bytes((root / 'Cargo.lock').read_bytes())
-          paths = sorted([f'libs/pulsectl/{p}' for p in blobs] + ['libs/pulsectl/upstream.json'] + list(expected) + ['Cargo.toml', 'Cargo.lock', '.github/workflows/flutter-validate.yml'])
-          (report / 'export-paths.json').write_text(json.dumps(paths))
-          PY
+          python .migration/prepare-pulse.py prepare
           python -m pip install -r tools/requirements-dev.txt
           sudo apt-get update
           sudo apt-get install -y libpulse-dev pulseaudio pulseaudio-utils pkg-config
       - name: Resolve the local fork without changing any other package
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo metadata --format-version 1 > tools/.reports/cargo-metadata.json
-          cargo metadata --locked --format-version 1 > /dev/null
-          python - <<'PY'
-          from pathlib import Path
-          import json, tomllib
-          report = Path('tools/.reports')
-          before = tomllib.loads((report / 'before.lock').read_text())['package']
-          after = tomllib.loads(Path('Cargo.lock').read_text())['package']
-          key = lambda p: (p['name'], p['version'], p.get('source', ''))
-          assert sorted((p for p in before if p['name'] != 'rust-pulsectl'), key=key) == sorted((p for p in after if p['name'] != 'rust-pulsectl'), key=key), 'Unexpected dependency resolution change'
-          old = next(p for p in before if p['name'] == 'rust-pulsectl')
-          new = next(p for p in after if p['name'] == 'rust-pulsectl')
-          assert old['source'] == 'git+https://github.com/rustdesk-org/pulsectl#aa34dde499aa912a3abc5289cc0b547bd07dd6e2'
-          assert new == {k: v for k, v in old.items() if k != 'source'}
-          metadata = json.loads((report / 'cargo-metadata.json').read_text())
-          pulse = next(p for p in metadata['packages'] if p['name'] == 'rust-pulsectl')
-          assert pulse['id'] in metadata['workspace_members']
-          print('All other registry/Git packages unchanged; preserved local fork is a workspace member.')
-          PY
+        run: python .migration/prepare-pulse.py resolve
       - name: Run source contracts and real isolated audio regressions
         shell: bash
         run: |
@@ -129,29 +47,7 @@ jobs:
       - name: Export only validated source blobs, never move a ref
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import base64, hashlib, json, os, shutil, urllib.request
-          report = Path('tools/.reports')
-          manifest = []
-          for name in json.loads((report / 'export-paths.json').read_text()):
-              p = Path(name)
-              assert p.is_file() and not p.is_symlink()
-              data = p.read_bytes()
-              sha = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
-              request = urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs', data=json.dumps({'encoding': 'base64', 'content': base64.b64encode(data).decode()}).encode(), headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'}, method='POST')
-              with urllib.request.urlopen(request, timeout=60) as response:
-                  actual = json.load(response)['sha']
-              assert actual == sha
-              dest = report / 'reviewed-source' / name
-              dest.parent.mkdir(parents=True, exist_ok=True)
-              shutil.copyfile(p, dest)
-              manifest.append({'path': name, 'mode': '100755' if p.stat().st_mode & 0o111 else '100644', 'type': 'blob', 'sha': sha, 'sha256': hashlib.sha256(data).hexdigest()})
-          (report / 'reviewed-blobs.json').write_text(json.dumps(manifest, indent=2) + '\n')
-          PY
+        run: python .migration/prepare-pulse.py export
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
