@@ -33,6 +33,9 @@ Linux x86_64 的完整开发验证（使用配置中的 Flutter/Dart SDK）：
 ```sh
 bash tools/native/setup-linux.sh
 source tools/.reports/native.env
+# 私有虚拟声卡回归需要额外的测试服务，不使用真实音频设备。
+sudo apt-get install -y pulseaudio pulseaudio-utils
+bash tools/native/test-pulsectl.sh
 python tools/bridge.py generate
 python tools/check_bridge_outputs.py
 python tools/analyze_flutter.py
@@ -60,8 +63,11 @@ macOS Apple Silicon 的原生环境入口为 `bash tools/native/setup-macos.sh`�
 - `flutter-validate.yml`：Draft PR 也执行，检查可复现绑定（包括未跟踪的新增生成文件）、Flutter 分析和测试、Linux Rust 库、真实 FFI 和 Debug 桌面包；没有仓库写入或发布权限。
 - `bridge.yml`：复用唯一验证链，成功后导出同一提交的 FRB 2 绑定；所有消费者使用唯一 `bridge-artifact`，没有旧 SDK 专用产物、FRB 1 生成器或源码补丁。
 - `flutter-platform-tests.yml`：Windows x64 和 macOS runner 使用相同中央 SDK、同一 pub 锁文件和全部 `flutter/test` 测试；没有 Rust 原生库构建或签名步骤，不能当作平台安装包验证。
-- `apple-native.yml`：只读、无签名凭据，单独验证 macOS arm64 Rust Release 库、Flutter Debug 桌面包、包内真实 FFI 和项目无隐式改写。原生项目和依赖解析证据保存在报告中；iOS 只检查链接配置与 C ABI，不冒充完整 iOS 构建。
-- `ci.yml` / `flutter-ci.yml` / `flutter-build.yml`：历史完整平台矩阵的 SDK、Apple 旧 C header 消费和兼容补丁仍需继续迁移。共用桥接流程更新不等于整个发布矩阵已可用；Draft 阶段跳过的任务不能算作通过。
+- `apple-native.yml`：macOS arm64 Rust Release 库、Flutter Debug/Release 应用、包内真实 FFI、Pods 严格锁定和工程无差异；不签名、公证或发布。
+- `windows-native.yml`：Windows x64/arm64 原生 Release 应用、包内 FFI、库/架构一致性及未签名归档；当前仅 software-codec profile。
+- `android-native.yml`：三 ABI 的真实原生库和未签名 APK，保留 hwcodec；检查应用元数据和 16 KiB 对齐，不冒充真机执行。
+- `ios-native.yml`：SwiftPM 的 Release 应用、XCArchive 与静态库导出验证，使用 Rust 匹配的 LLVM 工具；无签名 IPA 或设备执行。
+- `ci.yml` / `flutter-ci.yml` / `flutter-build.yml`：完整历史平台与发行配置。SDK/FRB 和 Android/iOS 入口已收敛，Sciter、特殊架构及发行格式仍需验收；Draft 跳过不计通过。
 - `dependency-review.yml`：需要启用 GitHub Dependency graph。设置缺失时保留失败，不降低审查级别。
 
 核心库可单独验证：
@@ -100,10 +106,34 @@ python tools/viper.py verify dist
 
 `python tools/viper.py versions --write` 同步 `.github/workflows/flutter-build.yml` 的 Rust、Flutter、CMake 与 vcpkg 镜像值；`check` 会拒绝漂移。`tools/native/install-flutter.sh` 只在不存在的绝对路径安装官方固定提交，原生支持 Linux x64/arm64；不覆盖已有 SDK。
 
-F-Droid 使用同一 SDK 和 `python tools/bridge.py generate --from-source` 从固定 Cargo 版本、锁文件编译生成器；失败不会回退到预编译文件。该入口迁移不是 F-Droid 全构建验收，Android Gradle/NDK 等仍待迁移。
+F-Droid 使用同一 SDK 和固定 NDK/cargo-ndk，`python tools/bridge.py generate --from-source` 从源码编译固定生成器；失败不会回退到预编译文件。Android Gradle/NDK 已迁入新版本，但 F-Droid 四 ABI 与定制 x86 engine 的完整产物仍未验收。
 
-Apple 验证显式选择中央配置的 Xcode 版本、build ID、SDK 和 CocoaPods，分别验证 Debug 与 Release 包内 FFI；Release 归档及清单是未签名 CI 产物，不是可直接发布的安装包。GitHub `xcode-27` runner 目前标为预览，独立记录，不能把 runner 标签当成 SDK 版本验证。范围见 `docs/engineering/build-entry-convergence.md`。
+macOS 验证显式选择中央配置的 Xcode 版本、build ID、SDK 和 CocoaPods，分别验证 Debug 与 Release 包内 FFI；Release 归档及清单是未签名 CI 产物，不是可直接发布的安装包。GitHub `xcode-27` runner 目前标为预览，独立记录，不能把 runner 标签当成 SDK 版本验证。范围见 `docs/engineering/build-entry-convergence.md`。
 
-## Android native validation
+## 平台原生入口
 
-Android pins, wrapper checksums and the minimum API 24 baseline are in `configs/toolchain.json.android`. Run `python tools/android_toolchain.py --java-only`, `bash tools/native/install-android-sdk.sh`, then `bash tools/native/build-android.sh arm64-v8a`. The read-only three-ABI CI keeps hardware codecs and checks actual APK contents, Rust library identity, ELF/ZIP 16 KiB alignment, app ID and SDK levels. See `docs/engineering/android-native-migration.md` for remaining upstream compatibility and device-validation boundaries.
+Android 的版本、wrapper 校验值和最低 API 24 位于 `configs/toolchain.json.android`。Linux x64 上先准备固定 JDK/Flutter、`ANDROID_HOME` 和工作流列出的系统开发包，再执行：
+
+```sh
+python tools/android_toolchain.py --java-only
+bash tools/native/install-android-sdk.sh
+bash tools/native/build-android.sh arm64-v8a
+```
+
+其他官方 ABI 为 `armeabi-v7a`、`x86_64`。每个 ABI 使用独立、干净的构建工作区；脚本拒绝签名 key.properties 和旧产物混入。相机、后台服务、权限与 F-Droid 边界见 `docs/engineering/android-native-migration.md`。
+
+iOS 在 Apple Silicon macOS 上使用已固定的 Xcode/Flutter/Rust：
+
+```sh
+bash tools/native/setup-ios.sh
+source tools/.reports/ios-native.env
+bash tools/native/build-ios.sh
+```
+
+该入口同时验证 Release 应用和 XCArchive，保留 11 个所需原生导出与 framework 相对链接；不会导出签名 IPA。它拒绝已有 archive/产物目录，重复构建应使用新的干净工作区。iOS 不依赖 CocoaPods；macOS 六个定制插件仍使用已锁定 Pods，不能混为一谈。
+
+Windows 原生主机准备好固定 SDK 后，执行 `python tools/windows_native.py`、`python tools/package_windows.py`；环境、Visual Studio、LLVM、架构、锁文件和包内 FFI 会逐项验证。CI 的 SDK 安装入口是 `tools/install_windows_flutter.py`；不会覆盖已有目录。完整环境参数以 `windows-native.yml` 为准。
+
+## 保留的 PulseAudio fork
+
+`python tools/verify_pulse_vendor.py` 对照原 Git blob 校验源码、许可和限定替换。`bash tools/native/test-pulsectl.sh` 显式启用私有服务测试，在临时 Unix socket 和 cookie 下运行虚拟 null sink，测试完成或失败都只清理自身进程。普通 `cargo test --workspace` 不会因为这项新增集成测试要求用户正在运行音频服务；CI 会显式运行全部三个测试，不使用忽略或放宽断言。

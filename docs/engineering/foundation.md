@@ -1,6 +1,6 @@
 # Viper 底座与迁移状态
 
-版本核对日期：2026-09-29。导入基线：`d6c0376fd3cc14a64987c1a02f84c576cdcc83bf`。
+结构与入口整理日期：2026-10-01。导入基线：`d6c0376fd3cc14a64987c1a02f84c576cdcc83bf`。版本及其核对日期仍以 `configs/toolchain.json` 为准；本文不表示所有依赖已经升到最新 major。
 
 ## 代码边界
 
@@ -12,6 +12,7 @@
 | `src/ui/` | 尚未迁移完成的 Sciter UI |
 | `libs/hbb_common/` | 与服务端共享的协议、连接、配置；固定 Git 子模块 |
 | `libs/base/` | 客户端协议、文件传输和配置键 |
+| `libs/pulsectl/` | 保留并维护的原 PulseAudio fork；来源、许可和限定修改可校验 |
 | `libs/scrap/`、`libs/enigo/`、`libs/clipboard/` | 采集、输入和剪贴板 |
 | `configs/`、`tools/` | 版本真源、可测试的开发与构建入口 |
 | `.github/workflows/` | 验证、构建和发布编排 |
@@ -37,19 +38,39 @@ Rust 1.98.1、Flutter 3.47.5 / Dart 3.13.4、Python 3.14.7、CMake 4.4.3 等版�
 
 `tools/bridge.py` 校验三方版本、生成器 SHA-256 和 Flutter/Dart 版本，禁止生成过程静默更新依赖或忽略接口错误。生成代码标为 generated；常规 CI 校验再生成无差异，不在构建时补丁修改业务源码。
 
-## 验证边界
+## 当前验证与产物分层
 
-`flutter-validate.yml` 是只读验证流程，Draft PR 也执行：锁文件解析、绑定一致性、Dart 分析、Flutter 测试、Linux Rust 库编译，以及真实动态库的同步/异步 FFI 测试。每次执行的结论以对应提交的 GitHub Actions 日志为准；配置了步骤不等于该步骤已通过。
+下表描述已经实现的验证入口，不是对任意新提交自动盖章。每次改动仍须核对同一提交的 CI；运行中、跳过和历史候选成功不能替代当前结果。
 
-Dart 分析要求错误和警告为零，信息级弃用诊断仍记录在完整报告中。原生库的 Linux 编译和最小 FFI 测试不等于完整桌面壳、GPU 编码、系统服务或其他平台已通过。核心测试不代替会话、视频、输入、剪贴板和文件传输端到端测试。
+| 入口 | 实际覆盖 | 不覆盖的边界 |
+| --- | --- | --- |
+| `foundation.yml` | 配置、版本/Actions/wrapper、Python 工具、工作流语法、Rust 核心库 | 全客户端、设备权限与 GUI |
+| `flutter-validate.yml` | Linux x64 可复现绑定、Flutter 分析/测试、原生库、Debug 桌面包及包内 FFI；私有 PulseAudio 虚拟设备回归 | Linux Release 安装包、ARM、硬件编码和远程音频会话 |
+| `bridge-source.yml` | 固定版本生成器从源码编译，绑定/锁文件无差异 | Android/F-Droid 整包 |
+| `flutter-platform-tests.yml` | Windows/macOS 的完整 Flutter 单元测试和分析 | 原生安装包 |
+| `windows-native.yml` | Windows x64/arm64 Rust + Flutter Release、包内 FFI、PE 架构、未签名归档 | 当前为 software-codec profile；不等于 GPU、驱动或安装程序验收 |
+| `apple-native.yml` | macOS arm64 Rust Release 库、Debug/Release 应用、包内 FFI、Pods 锁文件和工程无差异 | 真机最低系统、硬件编码、公证；六个定制 Pods 仍保留 |
+| `android-native.yml` | 三架构完整原生库与未签名 Release APK，保留 hwcodec，验证库一致性、ELF/ZIP 16 KiB 对齐和应用元数据 | 相机、后台服务、MediaProjection、输入、设备执行和正式签名 |
+| `ios-native.yml` | SwiftPM、Rust 静态库、Release 应用及 XCArchive，使用编译器匹配的 LLVM 检查 11 个原生导出 | iPhone 上实际 FFI、安装、签名 IPA、商店交付 |
+| `build-environment.yml` | 非 root 构建环境；显式受控的镜像发布入口 | 客户端部署和远程桌面服务器 |
+
+普通 PR 验证只读，不使用签名凭据。完整历史发行矩阵只在相应条件下执行；Draft 跳过不能记作通过。Android/iOS 已有独立真实应用构建，不再只以链接配置检查代表这两个平台。
+
+Dart 分析要求错误和警告为零，信息级诊断保留。原生编译警告也不屏蔽；编译通过不等于 Clippy 无诊断。所有平台仍需会话、音视频、输入、剪贴板、文件传输、服务生命周期及权限的端到端验收。
+
+## Rust registry 与平台 fork
+
+兼容范围内的 registry 刷新和 major/API 迁移是两类工作。前者更新 workspace `Cargo.lock`，不擅自移动定制 Git fork；后者必须审查每个调用者及平台能力。Cargo/pub 锁文件、生成代码和原生工程禁止在常规构建中静默改写。
+
+`libs/pulsectl` 来自原锁定的 RustDesk fork，不是切换到同名公共包。限定改动为失效 libpulse 别名迁移、依赖下限和默认输入设备查找修复；源码、许可及精确替换由 `upstream.json` 和 `tools/verify_pulse_vendor.py` 校验。私有虚拟声卡测试显式启用 `private-server-tests`，普通 workspace 单元测试不会意外访问用户音频服务。详见该目录的 `VIPER.md` 与[registry 验证记录](registry-refresh-2026-10-01.md)。
 
 ## 未完成与发布阻塞
 
 | 项目 | 剩余验收 |
 | --- | --- |
-| 旧发布矩阵 | Flutter SDK/FRB 入口已统一到中央配置，Linux Flutter 打包迁到原生 runner；完整矩阵仍需实跑，Sciter、Android 和平台工具/签名链尚未完成迁移 |
-| Apple 平台 | 更新静态链接/旧 C header 引用，验证 macOS/iOS 编译、权限、签名、安装与运行 |
-| Android | 联动迁移 AGP、Gradle、Kotlin、JDK、NDK 和旧插件；验证权限、后台服务、相机、真机与签名 |
+| 旧发布矩阵 | Flutter SDK/FRB、Android 和 iOS 入口已收敛；完整矩阵、Linux 发行格式、Windows 完整硬件/安装配置仍需验收 |
+| Apple 平台 | 当前 macOS/iOS 编译与未签名产物有独立验证；剩余六个 macOS Pods、权限、GUI、设备运行、签名、公证、安装与回退 |
+| Android | 新构建栈已纳入真实三 ABI APK 验证；仍需去除 Flutter/插件上游 DSL/Kotlin 兼容开关，完成 F-Droid 四 ABI/定制 x86 engine、权限、后台服务、相机和真机签名验收 |
 | Web | Dart 条件导入分析不代表 Web bundle 可构建；历史 Web 构建未启用且所需资源未完整纳入版本管理 |
 | 原生依赖 major | 逐个审查平台 fork、安全补丁和破坏性 API，完成 workspace 与目标平台矩阵 |
 | Sciter / 旧系统 | 迁移实际能力、启动与服务路径后再删除旧代码，不能通过关闭功能换取通过 |
@@ -60,6 +81,6 @@ Dart 分析要求错误和警告为零，信息级弃用诊断仍记录在完整
 
 ## 本次运行时回归面
 
-Rust 变动限于 FFI 返回类型、同步属性、事件流发送/关闭方式及生成绑定；Dart 变动包含桥接初始化和调用点、链接处理、截图保存、地址簿选择状态、文件任务异常传播及无损光标补边。上述路径是 SDK/接口迁移的直接回归面，需保留对应测试并继续做平台端到端验证。远程协议、加密语义、应用/签名身份、许可与本地化不在本次改变范围。
+运行时回归面包括 FFI 返回类型/同步语义/事件流、桥接初始化、链接处理、截图保存、文件任务异常传播、无损光标补边、Android 编码能力空值处理与扫码插件、iOS UIScene，以及 Linux 默认输入设备查找。上述路径是 SDK/接口迁移的直接回归面，需保留对应测试并继续做平台端到端验证。远程协议、加密语义、应用/签名身份、许可与本地化不在本次改变范围。
 
-最新构建入口、Xcode 工具链与验证边界见 `build-entry-convergence.md`；历史验证记录的运行编号不代表新提交的结果。
+工具用法见 `tools/README.md`。各次 FRB、Apple、Android、iOS、Windows 和 registry 验证文档保留精确提交上下文；最新提交是否通过以 PR #1 的运行表和对应 Actions 结果为准。
