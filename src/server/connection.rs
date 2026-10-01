@@ -372,7 +372,7 @@ pub struct Connection {
     authorized: bool,
     // The place among the unauthorized connections; given back at authorization.
     unauthorized_id: Option<UnauthorizedID>,
-    require_2fa: Option<totp_rs::TOTP>,
+    require_2fa: Option<totp_rs::Totp>,
     awaiting_2fa: bool,
     keyboard: bool,
     clipboard: bool,
@@ -1850,7 +1850,7 @@ impl Connection {
                     }
                     _ => return,
                 };
-                let code = totp.generate_current();
+                let code = crate::auth_2fa::totp::generate_at(totp, std::time::SystemTime::now());
                 if let Ok(code) = code {
                     let text = format!(
                         "2FA code: {}\n\nA new connection has been established to your device with ID {}. The source IP address is {}.",
@@ -3048,7 +3048,7 @@ impl Connection {
                 return true;
             }
             if let Some(totp) = self.require_2fa.as_ref() {
-                if let Ok(res) = totp.check_current(&tfa.code) {
+                if let Ok(res) = crate::auth_2fa::totp::verify_at(totp, &tfa.code, std::time::SystemTime::now()) {
                     if res {
                         self.update_failure(failure, true, 1);
                         self.require_2fa.take();

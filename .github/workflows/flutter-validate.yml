@@ -94,6 +94,9 @@ jobs:
       - name: Verify migrated network interface contracts
         run: |
           cargo test --locked --test network_interfaces --features flutter,linux-pkg-config > tools/.reports/network-interfaces.log 2>&1 || { tail -100 tools/.reports/network-interfaces.log; exit 1; }
+      - name: Verify authentication dependency contracts
+        run: |
+          cargo test --locked --test auth_dependency_contract --features flutter,linux-pkg-config > tools/.reports/auth-dependencies.log 2>&1 || { tail -100 tools/.reports/auth-dependencies.log; exit 1; }
       - name: Exercise actual synchronous and asynchronous FFI
         working-directory: flutter
         env:

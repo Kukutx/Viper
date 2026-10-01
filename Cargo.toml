@@ -6,7 +6,7 @@ edition = "2021"
 build= "build.rs"
 description = "RustDesk Remote Desktop"
 default-run = "rustdesk"
-rust-version = "1.75"
+rust-version = "1.88"
 
 [lib]
 name = "librustdesk"
@@ -60,7 +60,7 @@ serde_json = "1.0"
 serde_repr = "0.1"
 cfg-if = "1.0"
 lazy_static = "1.4"
-sha2 = "0.10"
+sha2 = "0.11.0"
 repng = "0.2"
 zstd = "0.13"
 parity-tokio-ipc = { git = "https://github.com/rustdesk-org/parity-tokio-ipc" }
@@ -84,7 +84,7 @@ chrono = "0.4"
 cidr-utils = "0.5"
 fon = "0.6"
 shutdown_hooks = "0.1"
-totp-rs = { version = "5.4", default-features = false, features = ["gen_secret", "otpauth"] }
+totp-rs = { version = "6.0.0", default-features = false, features = ["std", "gen_secret", "otpauth"] }
 stunclient = "0.4"
 kcp-sys= { git = "https://github.com/rustdesk-org/kcp-sys", branch = "rustdesk-patches" }
 reqwest = { version = "0.12", features = ["blocking", "socks", "json", "native-tls", "rustls-tls", "rustls-tls-native-roots", "gzip", "zstd"], default-features=false }
