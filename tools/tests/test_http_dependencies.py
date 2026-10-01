@@ -19,6 +19,16 @@ class HttpDependencyTests(unittest.TestCase):
             'blocking', 'socks', 'json', 'query', 'native-tls-no-alpn',
             'rustls-no-provider', 'gzip', 'zstd'})
 
+    def test_private_integration_target_requires_explicit_fixture_setup(self):
+        manifest = tomllib.loads((ROOT / 'Cargo.toml').read_text())
+        target = next(t for t in manifest['test'] if t['name'] == 'http_dependency_contract')
+        self.assertEqual(target['required-features'], ['http-contract-tests'])
+        self.assertEqual(manifest['features']['http-contract-tests'], [])
+        self.assertNotIn('http-contract-tests', manifest['features']['default'])
+        script = (ROOT / 'tools/native/test-http.sh').read_text()
+        self.assertEqual(script.count('--features flutter,linux-pkg-config,http-contract-tests'), 2)
+        self.assertIn('timeout --kill-after=5s 180s env HOME=', script)
+
     def test_lock_has_one_current_http_client(self):
         packages = tomllib.loads((ROOT / 'Cargo.lock').read_text())['package']
         clients = [p for p in packages if p['name'] == 'reqwest']
@@ -32,6 +42,7 @@ class HttpDependencyTests(unittest.TestCase):
         source = (ROOT / 'src/hbbs_http/http_client.rs').read_text()
         self.assertEqual(source.count('match hbb_common::verifier::client_config($danger_accept_invalid_cert)'), 1)
         self.assertIn('builder.tls_backend_preconfigured(client_config)', source)
+        self.assertIn('config.alpn_protocols = vec![b"http/1.1".to_vec()]', source)
         self.assertIn('builder.tls_backend_native()', source)
         self.assertIn('builder.tls_danger_accept_invalid_certs(true)', source)
         self.assertIn('$builder.no_proxy()', source)

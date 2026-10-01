@@ -29,10 +29,10 @@ import gzip, pathlib, sys
 pathlib.Path(sys.argv[1]).write_bytes(gzip.compress(b'{"message":"http-contract"}', mtime=0))
 PYCODE
 # Compile before changing HOME: rustup/cargo keep their real, pinned locations.
-cargo test --locked --test http_dependency_contract --features flutter,linux-pkg-config --no-run \
+cargo test --locked --test http_dependency_contract --features flutter,linux-pkg-config,http-contract-tests --no-run \
   > tools/.reports/http-contract-build.log 2>&1 || { tail -100 tools/.reports/http-contract-build.log; exit 1; }
 # cargo emits the executable path in JSON; never pick an old target/debug binary.
-cargo test --locked --test http_dependency_contract --features flutter,linux-pkg-config \
+cargo test --locked --test http_dependency_contract --features flutter,linux-pkg-config,http-contract-tests \
   --no-run --message-format=json > "$fixture/build.json" 2> "$fixture/build.stderr"
 executable=$(python - "$fixture/build.json" <<'PY'
 import json, sys
@@ -42,7 +42,7 @@ if len(paths) != 1:
 print(paths[0])
 PY
 )
-env HOME="$fixture/home" XDG_CONFIG_HOME="$fixture/home" \
+timeout --kill-after=5s 180s env HOME="$fixture/home" XDG_CONFIG_HOME="$fixture/home" \
   SSL_CERT_FILE="$fixture/ca.pem" SSL_CERT_DIR="$fixture/empty-certs" \
   VIPER_HTTP_TEST_DIR="$fixture" \
   HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 ALL_PROXY=http://127.0.0.1:9 \

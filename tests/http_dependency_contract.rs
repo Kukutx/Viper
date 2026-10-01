@@ -7,7 +7,7 @@ use hbb_common::{
     config::{self, Config, Socks5Server},
     tls::{self, TlsType},
 };
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+use openssl::ssl::{select_next_proto, AlpnError, SslAcceptor, SslFiletype, SslMethod};
 use std::{
     collections::BTreeMap,
     io::{Read, Write},
@@ -87,11 +87,18 @@ struct Server {
 }
 impl Server {
     fn new(certificate: Option<&str>, socks: bool, reply: Vec<u8>) -> Self {
+        let require_alpn = certificate == Some("alpn");
         let tls = certificate.map(|name| {
+            let name = if require_alpn { "trusted" } else { name };
             let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls_server()).unwrap();
             builder.set_certificate_chain_file(fixture().join(format!("{name}.pem"))).unwrap();
             builder.set_private_key_file(fixture().join("server.key"), SslFiletype::PEM).unwrap();
             builder.check_private_key().unwrap();
+            if require_alpn {
+                builder.set_alpn_select_callback(|_, offered| {
+                    select_next_proto(b"\x08http/1.1", offered).ok_or(AlpnError::ALERT_FATAL)
+                });
+            }
             builder.build()
         });
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -127,7 +134,12 @@ impl Server {
                 };
                 if let Some(acceptor) = &tls {
                     // Certificate-rejection cases deliberately terminate the handshake.
-                    if let Ok(mut encrypted) = acceptor.accept(stream) { serve(&mut encrypted); }
+                    if let Ok(mut encrypted) = acceptor.accept(stream) {
+                        if require_alpn {
+                            assert_eq!(encrypted.ssl().selected_alpn_protocol(), Some(&b"http/1.1"[..]));
+                        }
+                        serve(&mut encrypted);
+                    }
                 } else { serve(&mut stream); }
             }
         });
@@ -397,4 +409,22 @@ fn tls_cache_uses_https_proxy_only_for_plain_destinations() {
     let proxy = Some(Socks5Server { proxy: "https://127.0.0.1:9443".into(), ..Default::default() });
     assert_eq!(http_client::get_url_for_tls("http://127.0.0.1:8080", &proxy), "https://127.0.0.1:9443");
     assert_eq!(http_client::get_url_for_tls("https://127.0.0.1:8443", &proxy), "https://127.0.0.1:8443");
+}
+
+#[test]
+fn desktop_rustls_preserves_http11_alpn_for_synchronous_clients() {
+    let _isolation = Isolation::new();
+    let server = Server::new(Some("alpn"), false, ok_response());
+    let client = http_client::create_http_client(TlsType::Rustls, false);
+    assert_eq!(client.get(server.url("https")).timeout(TIMEOUT).send().unwrap().status(), 200);
+    assert_eq!(server.requests().len(), 1);
+}
+
+#[tokio::test]
+async fn desktop_rustls_preserves_http11_alpn_for_asynchronous_clients() {
+    let _isolation = Isolation::new();
+    let server = Server::new(Some("alpn"), false, ok_response());
+    let client = http_client::create_http_client_async(TlsType::Rustls, false);
+    assert_eq!(client.get(server.url("https")).timeout(TIMEOUT).send().await.unwrap().status(), 200);
+    assert_eq!(server.requests().len(), 1);
 }

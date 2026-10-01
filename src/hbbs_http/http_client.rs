@@ -31,6 +31,12 @@ macro_rules! configure_http_client {
                 // silently adopting reqwest's new platform-only trust policy.
                 match hbb_common::verifier::client_config($danger_accept_invalid_cert) {
                     Ok(client_config) => {
+                        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                        let client_config = {
+                            let mut config = client_config;
+                            config.alpn_protocols = vec![b"http/1.1".to_vec()];
+                            config
+                        };
                         builder = builder.tls_backend_preconfigured(client_config);
                     }
                     Err(e) => {
