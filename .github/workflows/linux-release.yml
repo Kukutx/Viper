@@ -41,10 +41,18 @@ jobs:
           python tools/bridge.py check
           python tools/check_bridge_outputs.py
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        if: matrix.arch == 'x64'
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           architecture: ${{ matrix.flutter-arch }}
           cache: true
+      - name: Install the immutable native arm64 Flutter checkout
+        if: matrix.arch == 'arm64'
+        run: |
+          sdk="$RUNNER_TEMP/flutter-$FLUTTER_VERSION-arm64"
+          bash tools/native/install-flutter.sh "$sdk"
+          printf '%s/bin\n' "$sdk" >> "$GITHUB_PATH"
+          printf 'FLUTTER_ROOT=%s\n' "$sdk" >> "$GITHUB_ENV"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           prefix-key: linux-release-${{ matrix.arch }}

@@ -38,3 +38,10 @@ repository; this is not a claim of bit-for-bit hermetic reproducibility.
 
 Any result is specific to its source revision. Added test configuration is not
 proof of a successful native build; consult the exact workflow run in PR #1.
+
+The initial arm64 run `36807180353` failed in flutter-action's SDK archive
+selection, before application compilation. The arm64 setup therefore uses the
+existing `install-flutter.sh`: clone the centrally pinned official release
+commit, select its stable branch and verify both Flutter and Dart. It does not
+install an x64 SDK through emulation, patch engine artifacts or select a
+different Flutter version. The x64 archive installation path remains unchanged.
