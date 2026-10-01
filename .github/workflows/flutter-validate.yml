@@ -97,6 +97,8 @@ jobs:
       - name: Verify authentication dependency contracts
         run: |
           cargo test --locked --test auth_dependency_contract --features flutter,linux-pkg-config > tools/.reports/auth-dependencies.log 2>&1 || { tail -100 tools/.reports/auth-dependencies.log; exit 1; }
+      - name: Verify HTTP and TLS dependency contracts
+        run: bash tools/native/test-http.sh
       - name: Exercise actual synchronous and asynchronous FFI
         working-directory: flutter
         env:
