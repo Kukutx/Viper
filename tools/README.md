@@ -51,7 +51,7 @@ bash tools/native/build-linux-bundle.sh
 
 `build-linux-bundle.sh` 在原生库和锁文件依赖已准备好后编译 Linux Debug 桌面包，检查可执行文件、资源、包内 Rust 库与 Cargo 输出的一致性及动态链接依赖，再从包内库执行真实 FFI 测试。任何一步失败都返回非零；日志写入 `tools/.reports/bundle-*.log`。它不启动桌面会话、不验证远程连接，也不生成生产安装包。
 
-Linux 原生 setup 会安装开发系统包，因此需要 sudo；它只支持 Linux x86_64。生成器下载支持已登记的 Linux、macOS、Windows 主机，但这不表示相应应用构建已验证。
+Linux 原生 setup 会安装开发系统包，因此需要 sudo；支持 Linux x86_64 与 aarch64，并分别使用对应的 libyuv triplet。上面的 Debug / 生成器完整验证入口仍为 x86_64。生成器下载支持已登记的 Linux、macOS、Windows 主机，但这不表示相应应用构建已验证。
 
 macOS Apple Silicon 的原生环境入口为 `bash tools/native/setup-macos.sh`，随后加载 `tools/.reports/macos-native.env`；当前原生基线为 macOS 12.3。Apple 显式 C ABI、动态/静态链接、Swift Package Manager 与原生验证边界见 [Apple 迁移说明](../docs/engineering/apple-native-migration.md)。不再使用占位的 FRB 1 C header 或 dummy bundling 函数。
 
@@ -61,6 +61,7 @@ macOS Apple Silicon 的原生环境入口为 `bash tools/native/setup-macos.sh`�
 
 - `foundation.yml`：配置、工具测试、工作流检查及 Rust `base` / `hbb_common` 核心测试。
 - `flutter-validate.yml`：Draft PR 也执行，检查可复现绑定（包括未跟踪的新增生成文件）、Flutter 分析和测试、Linux Rust 库、真实 FFI 和 Debug 桌面包；没有仓库写入或发布权限。
+- `linux-release.yml`：Linux x64/arm64 原生 Release 应用、全部包内 ELF 架构与动态库检查、真实 FFI 和未签名归档；不替代 Debug、DRM 或发行格式验收。
 - `bridge.yml`：复用唯一验证链，成功后导出同一提交的 FRB 2 绑定；所有消费者使用唯一 `bridge-artifact`，没有旧 SDK 专用产物、FRB 1 生成器或源码补丁。
 - `flutter-platform-tests.yml`：Windows x64 和 macOS runner 使用相同中央 SDK、同一 pub 锁文件和全部 `flutter/test` 测试；没有 Rust 原生库构建或签名步骤，不能当作平台安装包验证。
 - `apple-native.yml`：macOS arm64 Rust Release 库、Flutter Debug/Release 应用、包内真实 FFI、Pods 严格锁定和工程无差异；不签名、公证或发布。
@@ -111,6 +112,10 @@ F-Droid 使用同一 SDK 和固定 NDK/cargo-ndk，`python tools/bridge.py gener
 macOS 验证显式选择中央配置的 Xcode 版本、build ID、SDK 和 CocoaPods，分别验证 Debug 与 Release 包内 FFI；Release 归档及清单是未签名 CI 产物，不是可直接发布的安装包。GitHub `xcode-27` runner 目前标为预览，独立记录，不能把 runner 标签当成 SDK 版本验证。范围见 `docs/engineering/build-entry-convergence.md`。
 
 ## 平台原生入口
+
+Linux x64 / arm64 主机准备固定 Flutter/Dart/Rust 后，可执行 `bash tools/native/setup-linux.sh`、`source tools/.reports/native.env`、`python tools/linux_release.py`。检查通过后生成 `dist/linux-<arch>-unsigned/`，保留可执行位和安全的相对链接；已有产物目录不会被覆盖。该入口使用 software-codec profile，不表示硬件编解码、GUI、安装包格式或生产部署已验收。详见 [Linux Release 验证](../docs/engineering/linux-release-validation.md)。
+
+Android 与 Linux Release CI 先运行 `python tools/ci_rust.py`：在 runner 临时目录安装并核验中央 Rust pin、rustfmt 和 Clippy，通过后才导出环境。它不改用户全局 Rustup/Cargo 目录，不降级、不移除组件；本地开发不调用这个 CI 专用入口。详见 [Rust 安装隔离](../docs/engineering/ci-rust-isolation.md)。
 
 Android 的版本、wrapper 校验值和最低 API 24 位于 `configs/toolchain.json.android`。Linux x64 上先准备固定 JDK/Flutter、`ANDROID_HOME` 和工作流列出的系统开发包，再执行：
 
