@@ -1,0 +1,77 @@
+name: HTTP policy reviewed objects
+on:
+  push:
+    branches: [codex/viper-http-policy-validation]
+permissions:
+  contents: read
+jobs:
+  objects:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Store preimage-checked text objects without executing repository code
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const zlib = require('zlib');
+            const gitHash = b => crypto.createHash('sha1').update(Buffer.from(`blob ${b.length}\0`)).update(b).digest('hex');
+            const sha256 = b => crypto.createHash('sha256').update(b).digest('hex');
+            const payloadSha = '7f98b3bae86629b28f4c6facd47889e2458ccd99';
+            const {data: dataBlob} = await github.rest.git.getBlob({...context.repo, file_sha: payloadSha});
+            if (dataBlob.encoding !== 'base64') throw Error('Unexpected encoding');
+            const transferred = Buffer.from(dataBlob.content, 'base64');
+            if (gitHash(transferred) !== payloadSha) throw Error('Transfer hash mismatch');
+            fs.writeFileSync('transferred.txt', transferred);
+            let encoded = transferred.toString('utf8');
+            const typo = 'Oja1qnjY';
+            if (encoded.split(typo).length !== 2) throw Error('Unexpected data transport preimage');
+            encoded = encoded.replace(typo, 'Oja1njY');
+            if (gitHash(Buffer.from(encoded)) !== 'c5574c04c5d8a8f3b477793ab11d839bb8f5c165') throw Error('Reviewed payload transport mismatch');
+            const bytes = zlib.gunzipSync(Buffer.from(encoded, 'base64'), {maxOutputLength: 100000});
+            if (sha256(bytes) !== '3a02519e1227850fca1f8cc796a43d0ee5d3fe8a7a91294f36e7770af0c6bcdd') throw Error('Reviewed payload mismatch');
+            const plan = JSON.parse(bytes.toString('utf8'));
+            const expected = {
+              'docs/engineering/http-dependency-migration.md': ['ab9dd815fa4053a150d51ae396319c34e1a4585e', '105cf70b91b3b9f34d548eb2fd86137398608bcb'],
+              'src/common.rs': ['289925a0cb0c38a24f7c683ca31c212b877e8d81', 'de260813cf567f2eabf1c645a377d5696f20b86c'],
+              'src/hbbs_http.rs': ['e33c811d4e53a2d00aff84da879d6b4d8fb3e58b', '076ca698239fca0909f21b3e95d44d90ff705835'],
+              'src/hbbs_http/account.rs': ['634c95383988868c25e6e5acd87a77116540c3aa', 'c08b6f1f762974934a934a7956e2bd7bfc02d3be'],
+              'src/hbbs_http/http_client.rs': ['1388dfd8d42c7daeb8a2eddf0bbcc247b004a57f', '3b16a229582556ab07ee574128d3b79a6dcc22a0'],
+              'src/hbbs_http/record_upload.rs': ['ac51d5c322e9eed9a7d5a5c52939916667701408', '93b8c4ae9679334bf6a196f0956f8ecebeae2255'],
+              'tests/http_dependency_contract.rs': ['bc894088fd1cfad1bd7cace9603dc4323e0b2324', 'e4bd09304819695e0421489efe0efebf05868efa'],
+              'tools/tests/test_http_dependencies.py': ['75fb6f50d4b89c421b187e4cb5a497cc57dec3e1', 'e783c52d7a43b29658d9fdaee913e4cd25420620']
+            };
+            if (!Array.isArray(plan) || plan.length !== Object.keys(expected).length) throw Error('Wrong path count');
+            const seen = new Set();
+            const results = [];
+            for (const item of plan) {
+              const allowed = expected[item.path];
+              if (!allowed || seen.has(item.path) || item.before !== allowed[0] || item.after !== allowed[1]) throw Error('Object is not reviewed');
+              seen.add(item.path);
+              const {data} = await github.rest.git.getBlob({...context.repo, file_sha: item.before});
+              if (data.encoding !== 'base64') throw Error('Source encoding mismatch');
+              const before = Buffer.from(data.content, 'base64');
+              if (gitHash(before) !== item.before) throw Error('Source preimage mismatch');
+              let text = before.toString('utf8');
+              for (const [old, replacement] of item.edits) {
+                if (typeof old !== 'string' || !old || typeof replacement !== 'string' || text.split(old).length !== 2) throw Error('Edit not unique');
+                text = text.replace(old, () => replacement);
+              }
+              if (gitHash(Buffer.from(text)) !== item.after) throw Error('Result differs from reviewed source');
+              const {data: stored} = await github.rest.git.createBlob({...context.repo, content: text, encoding: 'utf-8'});
+              if (stored.sha !== item.after) throw Error('Stored object mismatch');
+              results.push({path: item.path, before: item.before, sha: stored.sha});
+            }
+            fs.writeFileSync('objects.json', JSON.stringify(results, null, 2));
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: http-policy-objects-${{ github.run_id }}
+          path: |
+            objects.json
+            transferred.txt
+          if-no-files-found: error
+          retention-days: 1
