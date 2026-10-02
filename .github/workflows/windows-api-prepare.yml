@@ -29,7 +29,7 @@ jobs:
           python - <<'PY'
           import hashlib, json, pathlib, urllib.request
           root = pathlib.Path('.tools/windows-api-inputs')
-          expected = {'winreg': '0.56.0', 'windows-service': '0.8.1', 'windows': '0.100.0'}
+          expected = {'winreg': '0.56.0', 'windows-service': '0.8.1', 'windows': '0.62.2'}
           published = {}
           for name, version in expected.items():
               request = urllib.request.Request('https://crates.io/api/v1/crates/' + name, headers={'User-Agent': 'Viper-reviewed-dependency-migration'})
@@ -45,8 +45,8 @@ jobs:
               (root / (name + '-' + version + '.crate')).write_bytes(data)
           (root / 'published.json').write_text(json.dumps(published, indent=2) + '\n')
           replacements = {
-              'Cargo.toml': [('windows = { version = "0.61"', 'windows = { version = "0.100.0"'), ('winreg = "0.11"', 'winreg = "0.56.0"'), ('windows-service = "0.6"', 'windows-service = "0.8.1"'), ('rust-version = "1.88"', 'rust-version = "1.95"')],
-              'libs/portable/Cargo.toml': [('windows = { version = "0.61"', 'windows = { version = "0.100.0"'), ('edition = "2021"', 'edition = "2021"\nrust-version = "1.95"')],
+              'Cargo.toml': [('windows = { version = "0.61"', 'windows = { version = "0.62.2"'), ('winreg = "0.11"', 'winreg = "0.56.0"'), ('windows-service = "0.6"', 'windows-service = "0.8.1"')],
+              'libs/portable/Cargo.toml': [('windows = { version = "0.61"', 'windows = { version = "0.62.2"')],
               'src/platform/windows.rs': [('        winreg::HKEY_CURRENT_USER,\n', '')],
           }
           for name, edits in replacements.items():
@@ -58,7 +58,7 @@ jobs:
               path.write_text(content)
           PY
       - name: Install isolated pinned Rust
-        run: python tools/ci_rust.py --label windows-api-resolver
+        run: python tools/ci_rust.py
       - name: Resolve only the reviewed dependency families
         shell: bash
         run: |
