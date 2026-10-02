@@ -179,6 +179,7 @@ def build() -> None:
     command([sys.executable, str(ROOT / 'tools/prepare_flutter.py')], 'windows-preflight.log')
     command(['cargo', 'build', '--locked', '--release', '--lib', '--features', 'flutter'], 'windows-cargo.log')
     command(['cargo', 'test', '--locked', '--release', '--lib', '--features', 'flutter', 'audio', '--', '--test-threads=1'], 'windows-audio-tests.log')
+    command(['cargo', 'test', '--locked', '--release', '--lib', '--features', 'flutter', 'windows_dependency', '--', '--test-threads=1'], 'windows-dependency-tests.log')
     flutter = shutil.which('flutter')
     if flutter is None:
         raise ValueError('Flutter is missing')
