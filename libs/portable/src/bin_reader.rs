@@ -403,3 +403,48 @@ mod tests {
         assert!(entry(&files, ".\\rustdesk.exe").is_none());
     }
 }
+
+#[cfg(all(test, windows, feature = "native-payload-tests"))]
+mod native_payload_tests {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn embedded_bundle_matches_every_source_file_without_launching() {
+        let source = std::path::PathBuf::from(
+            std::env::var_os("VIPER_TEST_PORTABLE_BUNDLE").expect("explicit native bundle fixture"),
+        );
+        assert!(source.is_absolute() && source.is_dir());
+        let (files, exe) = read_embedded().expect("parse the real generated payload");
+        assert_eq!(normalize_path(&exe), "rustdesk.exe");
+        let mut expected_names = BTreeSet::new();
+        let mut pending = vec![source.clone()];
+        while let Some(directory) = pending.pop() {
+            for item in fs::read_dir(directory).unwrap() {
+                let path = item.unwrap().path();
+                let metadata = fs::symlink_metadata(&path).unwrap();
+                assert!(!metadata.file_type().is_symlink());
+                if metadata.is_dir() {
+                    pending.push(path);
+                } else {
+                    assert!(metadata.is_file());
+                    let name = normalize_path(path.strip_prefix(&source).unwrap().to_str().unwrap());
+                    assert!(expected_names.insert(name));
+                }
+            }
+        }
+        assert!(!expected_names.is_empty());
+        let mut actual_names = BTreeSet::new();
+        for item in files {
+            let relative = item.path.replace('\\', "/");
+            let path = super::super::resolve_within(&source, &relative).expect("safe payload path");
+            let expected = fs::read(path).unwrap();
+            let decoded = item.decompress();
+            assert!(decoded == expected, "embedded bytes differ for {}", item.path);
+            let recorded_md5 = std::str::from_utf8(item.md5_code).unwrap();
+            assert_eq!(recorded_md5, format!("{:x}", md5::compute(&decoded)));
+            assert!(actual_names.insert(normalize_path(&item.path)));
+        }
+        assert_eq!(actual_names, expected_names);
+    }
+}

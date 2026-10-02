@@ -143,6 +143,75 @@ def visual_studio(arch: str, major: int) -> dict[str, str]:
     return {'installationVersion': installation['installationVersion'], 'installationPath': installation['installationPath']}
 
 
+def build_portable(bundle: Path, arch: str) -> None:
+    """Compile a real self-extracting payload, but never execute the application."""
+    project = ROOT / 'libs/portable'
+    inputs = [project / 'data.bin', project / 'app_metadata.toml']
+    for path in inputs:
+        if path.exists() or path.is_symlink():
+            raise ValueError(f'Refusing to overwrite portable build input: {path}')
+    output = ROOT / f'dist/windows-{arch}-portable-unsigned'
+    if output.exists() or output.is_symlink():
+        raise ValueError(f'Refusing to overwrite portable output: {output}')
+    # Enumerate the same actual bundle consumed by the generator. No fixture exe
+    # or synthetic library can stand in for the just-validated native application.
+    entries = []
+    names = set()
+    for path in sorted(bundle.rglob('*')):
+        if path.is_symlink() or path.is_junction():
+            raise ValueError(f'Portable bundle cannot contain links: {path}')
+        if path.is_file():
+            name = path.relative_to(bundle).as_posix()
+            if name.casefold() in names:
+                raise ValueError(f'Case-colliding portable path: {name}')
+            names.add(name.casefold())
+            entries.append({'path': name, 'size': path.stat().st_size, 'sha256': digest(path)})
+        elif not path.is_dir():
+            raise ValueError(f'Unexpected portable bundle entry: {path}')
+    if not entries or 'rustdesk.exe' not in names:
+        raise ValueError('Portable input must contain the actual application')
+    command([sys.executable, '-m', 'pip', 'install', '-r', str(project / 'requirements.txt')], 'windows-portable-python.log')
+    try:
+        command([sys.executable, str(project / 'generate.py'), '-f', str(bundle),
+                 '-o', str(project), '-e', str(bundle / 'rustdesk.exe'), '-l', '5'], 'windows-portable-build.log')
+        packed = ROOT / 'target/release/rustdesk-portable-packer.exe'
+        if packed.is_symlink() or pe_machine(packed) != MACHINES[arch]:
+            raise ValueError('Portable executable is not the native architecture')
+        payload = inputs[0].read_bytes()
+        if not payload or payload not in packed.read_bytes():
+            raise ValueError('Portable executable does not embed the exact generated payload')
+        previous = os.environ.get('VIPER_TEST_PORTABLE_BUNDLE')
+        os.environ['VIPER_TEST_PORTABLE_BUNDLE'] = str(bundle)
+        try:
+            command(['cargo', 'test', '--locked', '--release', '-p', 'rustdesk-portable-packer',
+                     '--features', 'native-payload-tests'], 'windows-portable-tests.log')
+        finally:
+            if previous is None:
+                os.environ.pop('VIPER_TEST_PORTABLE_BUNDLE', None)
+            else:
+                os.environ['VIPER_TEST_PORTABLE_BUNDLE'] = previous
+        for entry in entries:
+            path = bundle / entry['path']
+            if path.stat().st_size != entry['size'] or digest(path) != entry['sha256']:
+                raise ValueError(f'Portable source changed during packaging: {path}')
+        command(['git', 'diff', '--exit-code', 'HEAD', '--', 'Cargo.lock', 'libs/portable'], 'windows-portable-source-drift.log')
+        output.mkdir(parents=True)
+        shutil.copy2(packed, output / packed.name)
+        revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+        report = {'revision': revision, 'arch': arch, 'payload_sha256': hashlib.sha256(payload).hexdigest(),
+                  'executable_sha256': digest(packed), 'files': entries, 'signing': 'not-performed',
+                  'application_execution': 'not-performed', 'payload_byte_comparison': 'passed'}
+        text = json.dumps(report, indent=2) + '\n'
+        (output / 'portable-validation.json').write_text(text, encoding='utf-8')
+        (ROOT / 'tools/.reports/windows-portable.json').write_text(text, encoding='utf-8')
+        command([sys.executable, str(ROOT / 'tools/viper.py'), 'manifest', str(output), '--revision', revision], 'windows-portable-manifest.log')
+        command([sys.executable, str(ROOT / 'tools/viper.py'), 'verify', str(output)], 'windows-portable-verify.log')
+    finally:
+        # These paths were absent at entry and created only by this invocation.
+        for path in inputs:
+            path.unlink(missing_ok=True)
+
+
 def build() -> None:
     arch = host()
     config = json.loads((ROOT / 'configs/toolchain.json').read_text(encoding='utf-8'))
@@ -179,6 +248,7 @@ def build() -> None:
     command([sys.executable, str(ROOT / 'tools/prepare_flutter.py')], 'windows-preflight.log')
     command(['cargo', 'build', '--locked', '--release', '--lib', '--features', 'flutter'], 'windows-cargo.log')
     command(['cargo', 'test', '--locked', '--release', '--lib', '--features', 'flutter', 'audio', '--', '--test-threads=1'], 'windows-audio-tests.log')
+    command(['cargo', 'test', '--locked', '--release', '--lib', '--features', 'flutter', 'platform::windows::dependency_contract_tests', '--', '--test-threads=1'], 'windows-api-tests.log')
     flutter = shutil.which('flutter')
     if flutter is None:
         raise ValueError('Flutter is missing')
@@ -188,6 +258,7 @@ def build() -> None:
     command(['dumpbin', '/dependents', str(bundle / 'rustdesk.exe')], 'windows-linked-libraries.log')
     os.environ['VIPER_NATIVE_LIBRARY'] = str(bundle / 'librustdesk.dll')
     command([flutter, 'test', '--no-pub', 'test_native/bridge_ffi_test.dart'], 'windows-ffi.log', ROOT / 'flutter')
+    build_portable(bundle, arch)
     command(['git', 'diff', '--exit-code', 'HEAD', '--', 'Cargo.lock', 'flutter/pubspec.yaml', 'flutter/pubspec.lock', 'flutter/windows'], 'windows-source-drift.log')
     report = {'arch': arch, 'rust_target': target, 'llvm': windows['llvm'], 'visual_studio': studio,
               'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),

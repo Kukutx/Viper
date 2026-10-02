@@ -62,7 +62,6 @@ use winapi::{
             PSID, SECURITY_BUILTIN_DOMAIN_RID, SECURITY_NT_AUTHORITY, SID_IDENTIFIER_AUTHORITY,
             TOKEN_ELEVATION, TOKEN_GROUPS, TOKEN_QUERY, TOKEN_TYPE,
         },
-        winreg::HKEY_CURRENT_USER,
         winspool::{
             EnumPrintersW, GetDefaultPrinterW, PRINTER_ENUM_CONNECTIONS, PRINTER_ENUM_LOCAL,
             PRINTER_INFO_1W,
@@ -100,6 +99,8 @@ mod acl;
 mod installer_handoff;
 mod installer_shell;
 mod msi_registry;
+#[cfg(test)]
+mod dependency_contract_tests;
 pub(crate) use acl::current_process_user_sid_string;
 pub use acl::{
     set_path_permission, set_path_permission_for_portable_service_shmem_dir,
@@ -4304,7 +4305,7 @@ pub mod reg_display_settings {
         new: (Vec<u8>, isize),
     }
 
-    pub fn read_reg_connectivity() -> ResultType<HashMap<String, HashMap<String, RegValue>>> {
+    pub fn read_reg_connectivity() -> ResultType<HashMap<String, HashMap<String, RegValue<'static>>>> {
         let hklm = winreg::RegKey::predef(HKEY_LOCAL_MACHINE);
         let reg_connectivity = hklm.open_subkey_with_flags(
             format!("{}\\{}", REG_GRAPHICS_DRIVERS_PATH, REG_CONNECTIVITY_PATH),
@@ -4326,8 +4327,8 @@ pub mod reg_display_settings {
     }
 
     pub fn diff_recent_connectivity(
-        map1: HashMap<String, HashMap<String, RegValue>>,
-        map2: HashMap<String, HashMap<String, RegValue>>,
+        map1: HashMap<String, HashMap<String, RegValue<'_>>>,
+        map2: HashMap<String, HashMap<String, RegValue<'_>>>,
     ) -> Option<RegRecovery> {
         for (subkey, map_item2) in map2 {
             if let Some(map_item1) = map1.get(&subkey) {
@@ -4341,8 +4342,8 @@ pub mod reg_display_settings {
                                     REG_GRAPHICS_DRIVERS_PATH, REG_CONNECTIVITY_PATH, subkey
                                 ),
                                 key: key.to_owned(),
-                                old: (value1.bytes.clone(), value1.vtype.clone() as isize),
-                                new: (value2.bytes.clone(), value2.vtype.clone() as isize),
+                                old: (value1.bytes.to_vec(), value1.vtype.clone() as isize),
+                                new: (value2.bytes.to_vec(), value2.vtype.clone() as isize),
                             });
                         }
                     }
@@ -4355,10 +4356,20 @@ pub mod reg_display_settings {
     pub fn restore_reg_connectivity(reg_recovery: RegRecovery, force: bool) -> ResultType<()> {
         let hklm = winreg::RegKey::predef(HKEY_LOCAL_MACHINE);
         let reg_item = hklm.open_subkey_with_flags(&reg_recovery.path, KEY_READ | KEY_WRITE)?;
+        restore_connectivity_value(&reg_item, reg_recovery, force)
+    }
+
+    // Keep the value comparison separate from locating the machine key so it can
+    // be verified against a private test key without changing display settings.
+    pub(super) fn restore_connectivity_value(
+        reg_item: &winreg::RegKey,
+        reg_recovery: RegRecovery,
+        force: bool,
+    ) -> ResultType<()> {
         if !force {
             let cur_reg_value = reg_item.get_raw_value(&reg_recovery.key)?;
             let new_reg_value = RegValue {
-                bytes: reg_recovery.new.0,
+                bytes: reg_recovery.new.0.into(),
                 vtype: isize_to_reg_type(reg_recovery.new.1),
             };
             // Compare if the current value is the same as the new value.
@@ -4369,7 +4380,7 @@ pub mod reg_display_settings {
             }
         }
         let reg_value = RegValue {
-            bytes: reg_recovery.old.0,
+            bytes: reg_recovery.old.0.into(),
             vtype: isize_to_reg_type(reg_recovery.old.1),
         };
         reg_item.set_raw_value(&reg_recovery.key, &reg_value)?;

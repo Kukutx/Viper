@@ -80,3 +80,9 @@ jobs:
           path: dist/windows-${{ matrix.arch }}-unsigned/
           retention-days: 3
           if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-${{ matrix.arch }}-portable-unsigned-${{ github.sha }}
+          path: dist/windows-${{ matrix.arch }}-portable-unsigned/
+          retention-days: 3
+          if-no-files-found: error

@@ -8,6 +8,10 @@ description = "RustDesk Remote Desktop"
 
 build = "build.rs"
 
+[features]
+# Exercises the real embedded CI bundle without launching or installing it.
+native-payload-tests = []
+
 [dependencies]
 brotli = "3.4"
 dirs = "5.0"
@@ -15,7 +19,7 @@ md5 = "0.7"
 winapi = { version = "0.3", features = ["winbase", "libloaderapi"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.61", features = [
+windows = { version = "0.62.2", features = [
     "Wdk",
     "Wdk_System",
     "Wdk_System_SystemServices",
