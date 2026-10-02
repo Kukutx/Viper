@@ -161,6 +161,6 @@ fn windows_dependency_service_ffi_constants_remain_compatible() {
     assert_eq!(super::super::SERVICE_TYPE.bits(), 0x10);
     assert_eq!(ServiceControlAccept::STOP.bits(), 1);
     assert_eq!(ServiceControlAccept::empty().bits(), 0);
-    assert_eq!(ServiceState::Running.to_raw(), 4);
-    assert_eq!(ServiceState::Stopped.to_raw(), 1);
+    assert_eq!(ServiceState::Running as u32, 4);
+    assert_eq!(ServiceState::Stopped as u32, 1);
 }
