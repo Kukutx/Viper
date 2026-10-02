@@ -64,6 +64,8 @@ Dart 分析要求错误和警告为零，信息级诊断保留。原生编译警
 
 `libs/pulsectl` 来自原锁定的 RustDesk fork，不是切换到同名公共包。限定改动为失效 libpulse 别名迁移、依赖下限和默认输入设备查找修复；源码、许可及精确替换由 `upstream.json` 和 `tools/verify_pulse_vendor.py` 校验。私有虚拟声卡测试显式启用 `private-server-tests`，普通 workspace 单元测试不会意外访问用户音频服务。详见该目录的 `VIPER.md` 与[registry 验证记录](registry-refresh-2026-10-01.md)。
 
+音频缓冲的 ringbuf 0.5 与可选 Rubato 5 接口迁移使用独立原生回归；默认流式音频后端及定制 cpal fork 保持不变，具体行为边界见 [音频迁移说明](audio-dependency-migration.md)。依赖 API 测试不代替声卡、设备或远控音质验收。
+
 ## 未完成与发布阻塞
 
 | 项目 | 剩余验收 |

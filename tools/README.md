@@ -146,3 +146,7 @@ Windows 原生主机准备好固定 SDK 后，执行 `python tools/windows_nativ
 ## Linux Debian package
 
 After the same-commit native Release build, `python tools/linux_deb.py` creates and verifies an unsigned `.deb` on Ubuntu 24.04 x64/arm64 (`dpkg-dev` required). It preserves the existing service, maintainer scripts, identities and runtime requirements, adds ELF-derived dependencies, verifies both archive trees and repeat serialization, and runs FFI against the extracted Rust library. CI never installs the package or starts its service. Output: `dist/linux-<arch>-deb-unsigned/`. See [Debian validation](../docs/engineering/linux-debian-validation.md) for the explicit DRM, hardware, installation and signing boundaries.
+
+## 音频依赖回归
+
+Windows/macOS 原生构建在打包前执行 `cargo test --locked --release --lib --features flutter audio -- --test-threads=1`，覆盖当前构建配置的缓冲、欠载恢复、争用和分配回归。Linux 在默认桌面包及 FFI 检查之后执行 `cargo test --locked --test rubato_dependency_contract --features flutter,linux-pkg-config,use_rubato`；默认 `use_dasp` 不变。版本来源、API 变化和设备验收边界见 [音频迁移说明](../docs/engineering/audio-dependency-migration.md)。

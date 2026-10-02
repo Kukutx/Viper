@@ -12,7 +12,7 @@ use cpal::{
 use crossbeam_queue::ArrayQueue;
 use magnum_opus::{Channels::*, Decoder as AudioDecoder};
 #[cfg(not(target_os = "linux"))]
-use ringbuf::{ring_buffer::RbBase, Rb};
+use ringbuf::traits::{Consumer, Observer, RingBuffer};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -2216,7 +2216,7 @@ impl Default for AudioBuffer {
 impl AudioBuffer {
     pub fn resize(&mut self, sample_rate: usize, channels: usize) {
         let capacity = sample_rate * channels * AUDIO_BUFFER_MS / 1000;
-        let old_capacity = self.0.lock().unwrap().capacity();
+        let old_capacity = self.0.lock().unwrap().capacity().get();
         if capacity != old_capacity {
             *self.0.lock().unwrap() = ringbuf::HeapRb::<f32>::new(capacity);
             self.1 = sample_rate * channels;
@@ -2277,7 +2277,7 @@ impl AudioBuffer {
         }
 
         let mut lock = self.0.lock().unwrap();
-        let cap = lock.capacity();
+        let cap = lock.capacity().get();
         let having = lock.occupied_len();
         let skip = (cap * max / (30 * N) + 1) & (!1);
         if (having > skip * 3) && (skip > 0) {
@@ -2300,7 +2300,7 @@ impl AudioBuffer {
     /// will be kept.
     fn append_pcm2(&self, buffer: &[f32]) -> usize {
         let mut lock = self.0.lock().unwrap();
-        let cap = lock.capacity();
+        let cap = lock.capacity().get();
         let having = lock.occupied_len() + buffer.len();
         lock.push_slice_overwrite(buffer);
         let discard = (having > cap).then(|| (having - cap, self.signal_discontinuity()));
@@ -2357,6 +2357,64 @@ mod audio_buffer_discontinuity_tests {
         assert_eq!(audio_buffer.3.load(Ordering::Relaxed), 1);
         assert_eq!(audio_buffer.append_pcm2(&OVERSIZED_INPUT), BUFFER_CAPACITY);
         assert_eq!(audio_buffer.3.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn wrapped_audio_overwrite_preserves_newest_stereo_frames() {
+        use ringbuf::traits::{Consumer, Observer};
+
+        let audio_buffer = AudioBuffer(
+            Arc::new(Mutex::new(ringbuf::HeapRb::new(6))),
+            6,
+            [0; BUFFER_LEVELS],
+            Arc::new(AtomicUsize::new(0)),
+        );
+        audio_buffer.append_pcm2(&[1.0, -1.0, 2.0, -2.0, 3.0, -3.0]);
+        let mut consumed = [0.0; 4];
+        assert_eq!(audio_buffer.0.lock().unwrap().pop_slice(&mut consumed), 4);
+        assert_eq!(consumed, [1.0, -1.0, 2.0, -2.0]);
+        audio_buffer.append_pcm2(&[4.0, -4.0, 5.0, -5.0, 6.0, -6.0]);
+        assert_eq!(audio_buffer.3.load(Ordering::Relaxed), 1);
+        let mut retained = [0.0; 6];
+        let mut buffer = audio_buffer.0.lock().unwrap();
+        assert_eq!(buffer.pop_slice(&mut retained), 6);
+        assert_eq!(retained, [4.0, -4.0, 5.0, -5.0, 6.0, -6.0]);
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn audio_buffer_resize_retains_equal_capacity_and_replaces_changed_capacity() {
+        use ringbuf::traits::{Consumer, Observer};
+
+        let mut audio_buffer = AudioBuffer::default();
+        let shared_buffer = audio_buffer.0.clone();
+        audio_buffer.append_pcm2(&FIRST_INPUT);
+        audio_buffer.resize(48_000, 2);
+        assert!(Arc::ptr_eq(&shared_buffer, &audio_buffer.0));
+        assert_eq!(audio_buffer.0.lock().unwrap().pop_iter().collect::<Vec<_>>(), FIRST_INPUT);
+        audio_buffer.append_pcm2(&FIRST_INPUT);
+        audio_buffer.resize(24_000, 1);
+        let buffer = audio_buffer.0.lock().unwrap();
+        assert_eq!(buffer.capacity().get(), 24_000 * super::AUDIO_BUFFER_MS / 1000);
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn audio_ring_slice_operations_reuse_the_existing_allocation() {
+        use ringbuf::traits::{Consumer, Observer, Producer, RingBuffer};
+
+        let mut buffer = ringbuf::HeapRb::new(4);
+        let mut output = [0.0; 2];
+        crate::audio_resampler::allocation_tests::assert_no_allocations(|| {
+            assert_eq!(buffer.push_slice(&[0.1, 0.2, 0.3, 0.4, 0.5]), 4);
+            assert_eq!(buffer.pop_slice(&mut output), 2);
+            assert_eq!(output, [0.1, 0.2]);
+            buffer.push_slice_overwrite(&[0.5, 0.6, 0.7, 0.8, 0.9]);
+            assert_eq!(buffer.skip(2), 2);
+            assert_eq!(buffer.pop_slice(&mut output), 2);
+            assert_eq!(output, [0.8, 0.9]);
+            assert!(buffer.is_empty());
+        });
     }
 }
 
