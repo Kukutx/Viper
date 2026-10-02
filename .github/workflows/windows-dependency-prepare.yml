@@ -1,0 +1,120 @@
+name: Prepare reviewed Windows dependency migration
+
+on:
+  push:
+    branches: [codex/viper-windows-dependency-validation]
+    paths:
+      - '.github/workflows/windows-dependency-prepare.yml'
+      - 'tools/.windows-dependency-prepare.py'
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Verify published stable releases and exact source inputs
+        run: |
+          mkdir -p tools/.reports/windows-dependency-preparation
+          cp Cargo.lock tools/.reports/windows-dependency-preparation/baseline-Cargo.lock
+          python - <<'PY'
+          import hashlib, json, pathlib, urllib.request
+          targets = {'winreg': '0.56.0', 'windows-service': '0.8.1'}
+          metadata = {}
+          for name, version in targets.items():
+              request = urllib.request.Request(f'https://crates.io/api/v1/crates/{name}', headers={'User-Agent': 'Viper-dependency-migration'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  data = json.load(response)
+              assert data['crate']['max_stable_version'] == version, (name, data['crate']['max_stable_version'])
+              release = next(v for v in data['versions'] if v['num'] == version)
+              assert not release['yanked']
+              metadata[name] = {'version': version, 'checksum': release['checksum'], 'published_at': release['created_at'], 'repository': data['crate']['repository']}
+          pathlib.Path('tools/.reports/windows-dependency-preparation/published.json').write_text(json.dumps(metadata, indent=2) + '\n')
+          script = pathlib.Path('tools/.windows-dependency-prepare.py').read_bytes()
+          assert hashlib.sha256(script).hexdigest() == '28f2c761802cee96b06fb265c5fe1467e4738e7b96fbdd860cbdefcdd50c3597'
+          PY
+          python tools/.windows-dependency-prepare.py
+      - name: Install the isolated pinned Rust toolchain
+        run: python tools/ci_rust.py
+      - name: Resolve only the selected Windows packages
+        run: |
+          cargo update -p winreg@0.11.0 -p windows-service@0.6.0 > tools/.reports/windows-dependency-preparation/resolution.log 2>&1 || { cat tools/.reports/windows-dependency-preparation/resolution.log; exit 1; }
+          cargo metadata --locked --format-version 1 > /tmp/windows-dependency-metadata.json
+      - name: Verify unchanged forks and export data objects
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, pathlib, shutil, subprocess, tomllib
+          out = pathlib.Path('tools/.reports/windows-dependency-preparation')
+          before = tomllib.loads((out / 'baseline-Cargo.lock').read_text())['package']
+          after = tomllib.loads(pathlib.Path('Cargo.lock').read_text())['package']
+          identity = lambda p: (p['name'], p['version'], p.get('source', ''))
+          old = set(map(identity, before)); new = set(map(identity, after))
+          assert {i for i in old if i[2].startswith('git+')} == {i for i in new if i[2].startswith('git+')}
+          targets = {'winreg': '0.56.0', 'windows-service': '0.8.1'}
+          assert {i for i in new - old if i[0] not in targets} == set(), sorted(new - old)
+          published = json.loads((out / 'published.json').read_text())
+          for name, version in targets.items():
+              package = next(p for p in after if p['name'] == name and p['version'] == version)
+              assert package['checksum'] == published[name]['checksum']
+          expected = {'Cargo.toml': 'bf7ae1fb6f4834faf25748410533b331d079ecbd', 'src/platform/windows.rs': 'a13cb1344fbed371f2a0d5d9bf98bcd8ce6cd449', 'tools/windows_native.py': '9995905394e151866d776f8634d6da94fd37fc93'}
+          objects = []; payload = []
+          for index, name in enumerate(['Cargo.lock', *expected]):
+              data = pathlib.Path(name).read_bytes()
+              sha = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+              if name in expected:
+                  assert sha == expected[name], (name, sha)
+              filename = f'{index}.txt'
+              (out / filename).write_bytes(data)
+              objects.append({'path': name, 'file': filename, 'sha': sha})
+              payload.append({'path': name, 'sha': sha, 'content': base64.b64encode(data).decode()})
+          (out / 'objects.json').write_text(json.dumps(objects, indent=2) + '\n')
+          (out / 'payload.json').write_text(json.dumps(payload) + '\n')
+          (out / 'identity-diff.json').write_text(json.dumps({'added': sorted(new-old), 'removed': sorted(old-new)}, indent=2) + '\n')
+          (out / 'revision.txt').write_text(subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: windows-dependency-resolved
+          path: tools/.reports/windows-dependency-preparation/
+          retention-days: 3
+          if-no-files-found: error
+  store:
+    needs: resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: windows-dependency-resolved
+          path: input
+      - name: Store reviewed data only without executing source or moving refs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const allowed = new Set(['Cargo.lock', 'Cargo.toml', 'src/platform/windows.rs', 'tools/windows_native.py']);
+            const objects = JSON.parse(fs.readFileSync('input/payload.json', 'utf8'));
+            if (objects.length !== allowed.size) throw new Error('Unexpected object count');
+            for (const object of objects) {
+              if (!allowed.delete(object.path)) throw new Error('Unknown or duplicate path');
+              const bytes = Buffer.from(object.content, 'base64');
+              if (bytes.length > 1000000) throw new Error('Oversized object');
+              const sha = crypto.createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+              if (sha !== object.sha) throw new Error('Object hash mismatch');
+              const stored = await github.rest.git.createBlob({...context.repo, content: object.content, encoding: 'base64'});
+              if (stored.data.sha !== sha) throw new Error('Stored object mismatch');
+              core.info(`${object.path} ${sha}`);
+            }
