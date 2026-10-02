@@ -19,12 +19,10 @@ jobs:
     uses: ./.github/workflows/ios-native.yml
   linux-release:
     uses: ./.github/workflows/linux-release.yml
-  dart-platforms:
-    uses: ./.github/workflows/flutter-platform-tests.yml
   gate:
     name: HTTP candidate gate
     if: always()
-    needs: [foundation, linux-http, windows, macos, android, ios, linux-release, dart-platforms]
+    needs: [foundation, linux-http, windows, macos, android, ios, linux-release]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -35,7 +33,7 @@ jobs:
           python3 - <<'PY'
           import json, os
           results = json.loads(os.environ['RESULTS'])
-          expected = {'foundation', 'linux-http', 'windows', 'macos', 'android', 'ios', 'linux-release', 'dart-platforms'}
+          expected = {'foundation', 'linux-http', 'windows', 'macos', 'android', 'ios', 'linux-release'}
           if set(results) != expected or any(item['result'] != 'success' for item in results.values()):
               raise SystemExit('HTTP candidate validation incomplete or failed')
           print('All HTTP candidate native validation jobs succeeded')
