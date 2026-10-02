@@ -109,7 +109,7 @@ fn windows_dependency_recovery_preserves_intervening_changes() {
     let fixture = PrivateKey::new().unwrap();
     let recovery = recovery();
     for (bytes, kind) in [(&[7, 8, 9][..], REG_BINARY), (&[4, 5, 6][..], REG_NONE)] {
-        fixture.key().set_raw_value("Recent", &raw(bytes, kind)).unwrap();
+        fixture.key().set_raw_value("Recent", &raw(bytes, kind.clone())).unwrap();
         restore_reg_value(fixture.key(), &recovery, false).unwrap();
         assert_eq!(fixture.key().get_raw_value("Recent").unwrap(), raw(bytes, kind));
     }
