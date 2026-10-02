@@ -35,6 +35,25 @@ class WindowsDependencyTests(unittest.TestCase):
         self.assertFalse(any(p['name'] == 'windows' and p['version'] == '0.61.3' for p in packages))
         self.assertFalse(any(p['name'] == 'windows-service' and p['version'] == '0.6.0' for p in packages))
 
+    def test_portable_dependencies_and_opt_in_native_contract_are_locked(self):
+        manifest = tomllib.loads((ROOT / 'libs/portable/Cargo.toml').read_text())
+        packages = tomllib.loads((ROOT / 'Cargo.lock').read_text())['package']
+        expected = [
+            ('brotli', '9.0.0', 'f8b851b75c23ca7873623d612fe49bd1989aeb03d08fb9432187eb253d3d4c6b'),
+            ('dirs', '7.0.0', '8d57d423b3c82e89b9a24ca3091fee61f456a26edbd28d26c65906f4bc1dcd8f'),
+            ('md5', '0.8.1', '7ebb8d8732c6a6df3d8f032a82911cfc747e00efb95cc46e8d0acd5b5b88570c'),
+        ]
+        for name, version, checksum in expected:
+            self.assertEqual(manifest['dependencies'][name], version)
+            selected = [p for p in packages if p['name'] == name and p['version'] == version]
+            self.assertEqual(len(selected), 1)
+            self.assertEqual(selected[0]['checksum'], checksum)
+        self.assertEqual(manifest['test'], [{'name': 'dependency_contract',
+            'required-features': ['native-payload-tests']}])
+        source = (ROOT / 'libs/portable/tests/dependency_contract.rs').read_text()
+        self.assertEqual(source.count('#[test]'), 3)
+        self.assertNotIn('#[ignore]', source)
+
     def test_registry_data_ownership_and_serialized_recovery_stay_explicit(self):
         source = (ROOT / 'src/platform/windows.rs').read_text()
         self.assertNotIn('winreg::HKEY_CURRENT_USER', source)

@@ -13,9 +13,9 @@ build = "build.rs"
 native-payload-tests = []
 
 [dependencies]
-brotli = "3.4"
-dirs = "5.0"
-md5 = "0.7"
+brotli = "9.0.0"
+dirs = "7.0.0"
+md5 = "0.8.1"
 winapi = { version = "0.3", features = ["winbase", "libloaderapi"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
@@ -41,3 +41,7 @@ winres = "0.1"
 winapi = { version = "0.3", features = [ "winnt", "pdh", "synchapi" ] }
 
 
+
+[[test]]
+name = "dependency_contract"
+required-features = ["native-payload-tests"]
