@@ -1,11 +1,13 @@
 """Regression checks for the explicit Apple native ABI and FRB 2 linking."""
 from pathlib import Path
 import hashlib
+import json
 import struct
 import re
 import shutil
 import subprocess
 import unittest
+import tomllib
 
 import yaml
 
@@ -70,7 +72,10 @@ class AppleNativeTests(unittest.TestCase):
         project = self.text('flutter/macos/Runner.xcodeproj/project.pbxproj')
         workflow = yaml.safe_load(self.text('.github/workflows/apple-native.yml'))
         minimum = re.search(r"platform :osx, '([0-9.]+)'", podfile).group(1)
-        self.assertEqual(minimum, '12.3')
+        expected = json.loads(self.text('configs/toolchain.json'))['apple']['deployment_target']
+        self.assertEqual(minimum, expected)
+        bundle = tomllib.loads(self.text('Cargo.toml'))['package']['metadata']['bundle']
+        self.assertEqual(bundle['osx_minimum_system_version'], expected)
         self.assertEqual(re.findall(r'MACOSX_DEPLOYMENT_TARGET = ([0-9.]+);', project), [minimum] * 6)
         env = workflow['jobs']['macos']['env']
         self.assertEqual(env['MACOSX_DEPLOYMENT_TARGET'], minimum)

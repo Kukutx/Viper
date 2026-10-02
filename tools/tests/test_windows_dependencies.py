@@ -24,6 +24,12 @@ class WindowsDependencyTests(unittest.TestCase):
         self.assertNotIn('winreg 0.11.0', application['dependencies'])
         self.assertEqual(len([p for p in packages if p.get('source', '').startswith('git+')]), 59)
 
+    def test_service_state_contract_uses_public_representation(self):
+        source = (ROOT / 'src/platform/windows/reg_display_settings/dependency_tests.rs').read_text(encoding='utf-8')
+        for state, value in [('Running', 4), ('Stopped', 1)]:
+            self.assertNotIn(f'ServiceState::{state}.to_raw()', source)
+            self.assertIn(f'assert_eq!(ServiceState::{state} as u32, {value});', source)
+
     def test_real_native_regressions_are_unconditional_and_precede_packaging(self):
         module = ast.parse((ROOT / 'tools/windows_native.py').read_text(encoding='utf-8'))
         build = next(n for n in module.body if isinstance(n, ast.FunctionDef) and n.name == 'build')
