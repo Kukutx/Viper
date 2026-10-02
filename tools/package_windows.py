@@ -27,13 +27,15 @@ def archive_bundle(bundle: Path, destination: Path) -> None:
 def package(root: Path = ROOT) -> Path:
     arch = host()
     bundle = root / f'flutter/build/windows/{arch}/runner/Release'
-    check_bundle(bundle, root / 'target/release/librustdesk.dll', arch)
+    binaries = check_bundle(bundle, root / 'target/release/librustdesk.dll', arch)
     evidence = json.loads((root / 'tools/.reports/windows-native.json').read_text(encoding='utf-8'))
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
     if evidence['revision'] != revision or evidence['arch'] != arch:
         raise ValueError('Native validation evidence does not match this checkout')
     if evidence['rust_library_sha256'] != digest(bundle / 'librustdesk.dll'):
         raise ValueError('The Rust library changed after native validation')
+    if evidence.get('native_binaries') != binaries:
+        raise ValueError('Native binary inventory changed or is missing from validation evidence')
     if (root / 'dist').is_symlink():
         raise ValueError('The artifact directory cannot be a symlink')
     output = root / f'dist/windows-{arch}-unsigned'

@@ -15,7 +15,8 @@ jobs:
   windows:
     name: Windows ${{ matrix.arch }} native Release and FFI
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    # A cold arm64 build plus cache finalization exceeded the old 60m budget.
+    timeout-minutes: ${{ matrix.job-timeout }}
     concurrency:
       group: windows-native-${{ matrix.arch }}-${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -27,8 +28,12 @@ jobs:
         include:
           - os: windows-2025-vs2026
             arch: x64
+            job-timeout: 75
+            build-timeout: 55
           - os: windows-11-arm
             arch: arm64
+            job-timeout: 90
+            build-timeout: 65
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -56,14 +61,15 @@ jobs:
         id: native-cache
         with:
           path: .tools/vcpkg-cache
-          key: viper-windows-native-${{ matrix.arch }}-${{ hashFiles('configs/toolchain.json', 'res/vcpkg/**') }}
+          key: viper-windows-native-${{ matrix.arch }}-${{ hashFiles('configs/toolchain.json', 'tools/windows_native.py', 'res/vcpkg/**') }}
       - name: Build and verify the native Release bundle
+        timeout-minutes: ${{ matrix.build-timeout }}
         run: python tools/windows_native.py
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: always() && steps.native-cache.outputs.cache-hit != 'true'
         with:
           path: .tools/vcpkg-cache
-          key: viper-windows-native-${{ matrix.arch }}-${{ hashFiles('configs/toolchain.json', 'res/vcpkg/**') }}
+          key: viper-windows-native-${{ matrix.arch }}-${{ hashFiles('configs/toolchain.json', 'tools/windows_native.py', 'res/vcpkg/**') }}
       - name: Archive the validated unsigned bundle
         run: python tools/package_windows.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

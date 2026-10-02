@@ -40,8 +40,45 @@ def pe_machine(path: Path) -> int:
         return struct.unpack_from('<H', header, 4)[0]
 
 
-def check_bundle(bundle: Path, source: Path, arch: str) -> None:
+def verified_test_counts(text: str, minimum: int) -> dict[str, int]:
+    """Require one completed, nonempty libtest suite, not just Cargo exit zero."""
+    text = text.replace('\r\n', '\n')
+    summaries = re.findall(
+        r'^test result: (ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored; '
+        r'(\d+) measured; (\d+) filtered out; finished in [^\r\n]+$', text, re.M)
+    started = re.findall(r'^running (\d+) tests?$', text, re.M)
+    if type(minimum) is not int or minimum < 1 or len(summaries) != 1 or len(started) != 1:
+        raise ValueError('Expected one complete native test suite and a positive test floor')
+    status, *counts = summaries[0]
+    passed, failed, ignored, measured, filtered = map(int, counts)
+    if (status != 'ok' or passed < minimum or failed or ignored or measured
+            or int(started[0]) != passed):
+        raise ValueError('Native test suite is incomplete, reduced, failed or ignored')
+    return {'passed': passed, 'failed': failed, 'ignored': ignored, 'filtered_out': filtered}
+
+
+def check_bundle(bundle: Path, source: Path, arch: str) -> list[dict]:
     expected = MACHINES[arch]
+    if bundle.is_symlink() or bundle.is_junction() or not bundle.is_dir():
+        raise ValueError('The native bundle must be a real directory')
+    if source.is_symlink() or not source.is_file():
+        raise ValueError('The reference Rust library must be a real file')
+    binaries = []
+    pending = [bundle]
+    while pending:
+        for path in sorted(pending.pop().iterdir()):
+            if path.is_symlink() or path.is_junction():
+                raise ValueError(f'Linked bundle entry: {path}')
+            if path.is_dir():
+                pending.append(path)
+            elif not path.is_file():
+                raise ValueError(f'Unsupported bundle entry: {path}')
+            elif path.suffix.lower() in ('.exe', '.dll'):
+                machine = pe_machine(path)
+                if machine != expected:
+                    raise ValueError(f'Wrong native binary architecture: {path}')
+                binaries.append({'path': path.relative_to(bundle).as_posix(),
+                                 'machine': machine, 'sha256': digest(path)})
     for name in ('rustdesk.exe', 'librustdesk.dll', 'flutter_windows.dll'):
         path = bundle / name
         if path.is_symlink() or pe_machine(path) != expected:
@@ -54,6 +91,7 @@ def check_bundle(bundle: Path, source: Path, arch: str) -> None:
     assets = bundle / 'data/flutter_assets'
     if not assets.is_dir() or not any(p.is_file() for p in assets.rglob('*')):
         raise ValueError('Flutter assets are missing')
+    return sorted(binaries, key=lambda item: item['path'])
 
 
 def command(args: list[str], log: str, cwd: Path = ROOT) -> str:
@@ -180,12 +218,15 @@ def build() -> None:
     command(['cargo', 'build', '--locked', '--release', '--lib', '--features', 'flutter'], 'windows-cargo.log')
     command(['cargo', 'test', '--locked', '--release', '--lib', '--features', 'flutter', 'audio', '--', '--test-threads=1'], 'windows-audio-tests.log')
     command(['cargo', 'test', '--locked', '--release', '--lib', '--features', 'flutter', 'windows_dependency', '--', '--test-threads=1'], 'windows-dependency-tests.log')
+    reports = ROOT / 'tools/.reports'
+    audio_tests = verified_test_counts((reports / 'windows-audio-tests.log').read_text(encoding='utf-8'), 48)
+    dependency_tests = verified_test_counts((reports / 'windows-dependency-tests.log').read_text(encoding='utf-8'), 9)
     flutter = shutil.which('flutter')
     if flutter is None:
         raise ValueError('Flutter is missing')
     command([flutter, 'build', 'windows', '--release', '--no-pub'], 'windows-flutter.log', ROOT / 'flutter')
     bundle = ROOT / f'flutter/build/windows/{arch}/runner/Release'
-    check_bundle(bundle, ROOT / 'target/release/librustdesk.dll', arch)
+    binaries = check_bundle(bundle, ROOT / 'target/release/librustdesk.dll', arch)
     command(['dumpbin', '/dependents', str(bundle / 'rustdesk.exe')], 'windows-linked-libraries.log')
     os.environ['VIPER_NATIVE_LIBRARY'] = str(bundle / 'librustdesk.dll')
     command([flutter, 'test', '--no-pub', 'test_native/bridge_ffi_test.dart'], 'windows-ffi.log', ROOT / 'flutter')
@@ -193,7 +234,8 @@ def build() -> None:
     report = {'arch': arch, 'rust_target': target, 'llvm': windows['llvm'], 'visual_studio': studio,
               'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'rust_library_sha256': digest(bundle / 'librustdesk.dll'), 'profile': 'software-codec',
-              'signing': 'not-performed'}
+              'signing': 'not-performed', 'native_binaries': binaries,
+              'tests': {'audio': audio_tests, 'windows_dependency': dependency_tests}}
     (ROOT / 'tools/.reports/windows-native.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     print(f'Windows {arch} Release bundle and real FFI validated')
 

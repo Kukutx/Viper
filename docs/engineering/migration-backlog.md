@@ -2,20 +2,25 @@
 
 核对日期：2026-10-02。依据任务基线 `8a0c7be69e6af9147f9206e7d72157d8d2cdd7dd` 的源码、锁文件和已完成 CI，以及本轮 Windows 测试修复 `1b6f1ef760c6de787aeff5b6e76356d9e94407a6`。这是待办和退出条件，不是“全部最新”证明；后续提交的运行状态以 PR #1 和对应 Actions 为准。架构与命令仍以 [foundation.md](foundation.md)、[tools/README.md](../../tools/README.md) 为入口，不另建 agent 规则。
 
+## 后续复核：f91bf7e
+
+2026-10-02 对源码与完整 CI/产物重新复核。设计发现、本次 Windows 校验增强与待实施方案见 [架构与交付复核](architecture-review-2026-10-02.md)；下表更新到该次复核，未来提交仍须重新验收。
+
 ## 先处理的真实阻塞
 
 | 优先级 | 项目 | 当前事实 | 退出条件 |
 | --- | --- | --- | --- |
-| P0 | Windows 原生门禁 | 基线运行 `37047363178` 两架构在编译库测试时失败。新增服务测试误用了 windows-service 的私有 `ServiceState::to_raw()`；`1b6f1ef` 改为公开 `repr(u32)` 枚举转换，数值断言不变 | 同一最终提交的两架构 Release、48 项音频测试、9 项注册表/服务专项及包内 FFI 全通过；不能只看 Python 测试 |
-| P0 | Dependency review | 基线运行 `37047363184` 的日志要求启用 Dependency graph；不是扫描通过，也不能关闭检查 | 仓库管理员在 Settings 的安全分析设置中启用 Dependency graph，然后重跑原检查；若出现真实漏洞，再处理漏洞 |
+| P0 | Windows 原生门禁 | 私有 API 编译错误已修复。`37054791846` 的 x64 成功；arm64 编译、48 项音频、9 项依赖测试和打包均完成，但 Rust 缓存收尾耗尽 job 预算后被取消。本次调整预算并增强测试数量与全部 PE 的校验 | 本次修复提交的两架构完整 job 成功，不能把旧构建重检或仅完成业务步骤当成整条检查通过 |
+| 已解除设置阻塞 | Dependency review | `37054791735` 第二次 attempt、job `111045700344` 已成功；未降低 high 门槛。14 条依赖声明仍未识别许可证 | 后续每个提交继续执行原检查，并核实未知许可证；不把依赖差异检查当作全树安全证明 |
 | P0 | 发布门禁 | 现代平台验证与历史完整发行矩阵是不同范围；Draft 跳过的工作流不能算成功 | 计划交付的平台/格式均有同一提交的完整证据，且安全检查通过；否则保持 Draft |
 
-GitHub 连接器的授权不包含仓库管理设置写入。不能通过扩大 CI token 权限、跳过安全检查或另接开发网关来假装解除 Dependency graph 阻塞。生产签名和部署需要独立的凭据与环境审批。
+Dependency graph 的旧设置阻塞不再列为待管理员处理项。原安全检查继续保留，不扩大普通 PR 的 token 权限。生产签名和部署仍需要独立凭据与环境审批。
 
 ## 尚未迁移完的源码与依赖
 
 | 优先级 | 范围与位置 | 剩余工作 | 退出条件 |
 | --- | --- | --- | --- |
+| P1 | HTTP 安全策略：`src/hbbs_http/http_client.rs` | 继承的代理构造失败回退默认客户端，以及非严格证书探测回退，需要独立协同迁移 | 明确返回错误、禁止指定代理失败后直连，支持显式自建服务信任；同步/异步与账户/上传调用方负向回归通过 |
 | P1 | Rust 与原生平台：根目录及 `libs/*/Cargo.toml`、`vcpkg.json` | 继续审查其他 major/API；当前声明仍包括 zstd 0.13、cidr-utils 0.5、qrcode-generator 4.1、image 0.24，及 Windows/Apple/Linux/Android 平台依赖。它们是 manifest 约束示例，不是本日全部最新版本审计，也不是精确解析版本 | 逐项核验上游稳定发布、补丁与调用方；由包管理器生成锁文件；功能回归和目标平台完整编译通过 |
 | P1 | 受维护 fork 与传递依赖：`Cargo.lock`、各 Git 依赖 | machine-uid/wallpaper 的传递 winreg 0.11 和 portable-pty 的 winreg 0.10 仍保留；cpal、输入、剪贴板、PTY、WebRTC/TLS 等 fork 的行为补丁不能丢失 | 先迁移调用方补丁，再刷新锁文件；保留来源、许可和功能测试，不用强制依赖覆盖替代迁移 |
 | P1 | macOS 插件：`flutter/pubspec.lock`、`flutter/macos/Podfile.lock` | 六个定制 CocoaPods fallback：desktop_multi_window、flutter_custom_cursor、screen_retriever、texture_rgba_renderer、window_manager、window_size | 补齐各 fork 的 SwiftPM 支持并保持多窗口、光标、显示器、纹理和窗口能力；移除 Pods 后实际 Debug/Release 构建、包内 FFI 与工程无改写检查通过 |
@@ -35,7 +40,7 @@ GitHub 连接器的授权不包含仓库管理设置写入。不能通过扩大 
 | P2 | 诊断清理 | 保留已有 Rust warning 与 Dart INFO，并逐类处理；不得压低诊断等级或屏蔽检查来声称零诊断 |
 | P2 | 正式发布 | 确认产物/源码提交一致，完成签名、来源证明、SBOM、安全门禁、安装回归、回退和环境审批后，才执行发布；不得把构建镜像当作远程桌面服务部署 |
 
-## 本轮额外修正的旧声明
+## f91bf7e 已修正的旧声明（历史记录）
 
 根 `Cargo.toml` 的 `package.metadata.bundle.osx_minimum_system_version` 原为 10.14，与已经采用的 macOS 12.3 基线不一致。本轮改为 12.3；Foundation 的 Apple 配置测试改读中央 `apple.deployment_target`，同时核对 Cargo 元数据、Podfile、六处 Xcode 配置和 CI 环境值。没有再次提高实际部署下限，也没有修改应用身份、权限、业务代码、依赖选择或锁文件。
 
