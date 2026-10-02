@@ -1,0 +1,128 @@
+name: Prepare reviewed Windows API migration
+on:
+  push:
+    branches: [codex/viper-windows-api-validation]
+    paths: [.github/workflows/windows-api-prepare.yml]
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 655c019b63a96b7d2c0b7b19143cab601a3e79cf
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Verify published versions and prepare exact manifest changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tools/windows-api-inputs/files
+          git archive HEAD | gzip -n > .tools/windows-api-inputs/source.tar.gz
+          git ls-tree -r HEAD > .tools/windows-api-inputs/tree.txt
+          cp Cargo.lock .tools/windows-api-inputs/baseline-Cargo.lock
+          python - <<'PY'
+          import hashlib, json, pathlib, urllib.request
+          root = pathlib.Path('.tools/windows-api-inputs')
+          expected = {'winreg': '0.56.0', 'windows-service': '0.8.1', 'windows': '0.100.0'}
+          published = {}
+          for name, version in expected.items():
+              request = urllib.request.Request('https://crates.io/api/v1/crates/' + name, headers={'User-Agent': 'Viper-reviewed-dependency-migration'})
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  metadata = json.load(response)
+              assert metadata['crate']['max_stable_version'] == version, (name, metadata['crate']['max_stable_version'])
+              release = next(item for item in metadata['versions'] if item['num'] == version)
+              assert not release['yanked'], name
+              published[name] = release
+              with urllib.request.urlopen('https://static.crates.io/crates/' + name + '/' + name + '-' + version + '.crate', timeout=90) as response:
+                  data = response.read()
+              assert hashlib.sha256(data).hexdigest() == release['checksum'], name
+              (root / (name + '-' + version + '.crate')).write_bytes(data)
+          (root / 'published.json').write_text(json.dumps(published, indent=2) + '\n')
+          replacements = {
+              'Cargo.toml': [('windows = { version = "0.61"', 'windows = { version = "0.100.0"'), ('winreg = "0.11"', 'winreg = "0.56.0"'), ('windows-service = "0.6"', 'windows-service = "0.8.1"'), ('rust-version = "1.88"', 'rust-version = "1.95"')],
+              'libs/portable/Cargo.toml': [('windows = { version = "0.61"', 'windows = { version = "0.100.0"'), ('edition = "2021"', 'edition = "2021"\nrust-version = "1.95"')],
+              'src/platform/windows.rs': [('        winreg::HKEY_CURRENT_USER,\n', '')],
+          }
+          for name, edits in replacements.items():
+              path = pathlib.Path(name)
+              content = path.read_text()
+              for before, after in edits:
+                  assert content.count(before) == 1, (name, before)
+                  content = content.replace(before, after)
+              path.write_text(content)
+          PY
+      - name: Install isolated pinned Rust
+        run: python tools/ci_rust.py --label windows-api-resolver
+      - name: Resolve only the reviewed dependency families
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo update -p windows@0.61.3 -p winreg@0.11.0 -p windows-service@0.6.0 > .tools/windows-api-inputs/resolve.log 2>&1
+          cargo metadata --locked --format-version 1 --no-deps > .tools/windows-api-inputs/metadata.json
+          python - <<'PY'
+          import hashlib, json, pathlib, subprocess, tomllib
+          root = pathlib.Path('.tools/windows-api-inputs')
+          before = tomllib.loads((root / 'baseline-Cargo.lock').read_text())['package']
+          after = tomllib.loads(pathlib.Path('Cargo.lock').read_text())['package']
+          def git_identities(packages):
+              return sorted((p['name'], p['version'], p['source']) for p in packages if p.get('source', '').startswith('git+'))
+          assert git_identities(before) == git_identities(after), 'Git package identities changed'
+          allowed = {'Cargo.toml', 'Cargo.lock', 'libs/portable/Cargo.toml', 'src/platform/windows.rs'}
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+          assert changed == allowed, changed
+          objects = []
+          for index, name in enumerate(sorted(allowed)):
+              data = pathlib.Path(name).read_bytes()
+              filename = str(index) + '.txt'
+              (root / 'files' / filename).write_bytes(data)
+              objects.append({'path': name, 'file': filename, 'sha': hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest(), 'sha256': hashlib.sha256(data).hexdigest()})
+          (root / 'objects.json').write_text(json.dumps(objects, indent=2) + '\n')
+          (root / 'revision.txt').write_text(subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: windows-api-reviewed-inputs
+          path: .tools/windows-api-inputs/
+          retention-days: 3
+          if-no-files-found: error
+  store:
+    needs: resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: windows-api-reviewed-inputs
+          path: inputs
+      - name: Store data blobs only without running repository code or moving refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, urllib.request
+          root = pathlib.Path('inputs')
+          objects = json.loads((root / 'objects.json').read_text())
+          allowed = ['Cargo.lock', 'Cargo.toml', 'libs/portable/Cargo.toml', 'src/platform/windows.rs']
+          assert [o['path'] for o in objects] == allowed
+          for index, item in enumerate(objects):
+              assert item['file'] == str(index) + '.txt'
+              data = (root / 'files' / item['file']).read_bytes()
+              assert hashlib.sha256(data).hexdigest() == item['sha256']
+              expected = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+              assert expected == item['sha']
+              request = urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs', method='POST', data=json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode(), headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  result = json.load(response)
+              assert result['sha'] == expected
+              print(item['path'], expected)
+          PY
