@@ -27,7 +27,7 @@ jobs:
           python - <<'PY'
           import hashlib, json, pathlib, urllib.request
           root = pathlib.Path('.tools/portable-resolved')
-          expected = {'brotli': ('3.4', '9.0.0'), 'dirs': ('5.0', '7.0.0'), 'md5': ('0.7', '0.8.0')}
+          expected = {'brotli': ('3.4', '9.0.0'), 'dirs': ('5.0', '7.0.0'), 'md5': ('0.7', '0.8.1')}
           published = {}
           path = pathlib.Path('libs/portable/Cargo.toml'); content = path.read_text()
           for name, (old, version) in expected.items():
