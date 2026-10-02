@@ -2,7 +2,7 @@ use hbb_common::{
     async_recursion::async_recursion,
     bail,
     config::{Config, Socks5Server},
-    log::{self, info},
+    log,
     proxy::{Proxy, ProxyScheme},
     tls::{
         get_cached_tls_accept_invalid_cert, get_cached_tls_type, is_plain, upsert_tls_cache,
@@ -12,93 +12,77 @@ use hbb_common::{
 };
 use reqwest::{blocking::Client as SyncClient, Client as AsyncClient};
 
+#[derive(Debug)]
+pub enum HttpClientConfigError {
+    Proxy,
+    Tls,
+    Builder,
+}
+
+impl std::fmt::Display for HttpClientConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Proxy => "Invalid configured HTTP proxy",
+            Self::Tls => "Failed to initialize configured HTTP TLS backend",
+            Self::Builder => "Failed to build configured HTTP client",
+        })
+    }
+}
+
+impl std::error::Error for HttpClientConfigError {}
+
 macro_rules! configure_http_client {
-    ($builder:expr, $tls_type:expr, $danger_accept_invalid_cert:expr, $Client: ty) => {{
-        // https://github.com/rustdesk/rustdesk/issues/11569
-        // https://docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html#method.no_proxy
-        let mut builder = $builder.no_proxy();
-
-        match $tls_type {
-            TlsType::Plain => {}
-            TlsType::NativeTls => {
-                builder = builder.tls_backend_native();
-                if $danger_accept_invalid_cert {
-                    builder = builder.tls_danger_accept_invalid_certs(true);
-                }
-            }
-            TlsType::Rustls => {
-                // Keep the shared webpki/native roots and mobile verifier, rather than
-                // silently adopting reqwest's new platform-only trust policy.
-                match hbb_common::verifier::client_config($danger_accept_invalid_cert) {
-                    Ok(client_config) => {
-                        #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                        let client_config = {
-                            let mut config = client_config;
-                            config.alpn_protocols = vec![b"http/1.1".to_vec()];
-                            config
-                        };
-                        builder = builder.tls_backend_preconfigured(client_config);
-                    }
-                    Err(e) => {
-                        hbb_common::log::error!("Failed to get client config: {}", e);
+    ($builder:expr, $tls_type:expr, $danger_accept_invalid_cert:expr, $Client:ty) => {{
+        (|| -> ResultType<$Client> {
+            // Explicit proxy configuration must never fall back to ambient proxies or direct I/O.
+            let mut builder = $builder.no_proxy();
+            match $tls_type {
+                TlsType::Plain => {}
+                TlsType::NativeTls => {
+                    builder = builder.tls_backend_native();
+                    if $danger_accept_invalid_cert {
+                        builder = builder.tls_danger_accept_invalid_certs(true);
                     }
                 }
-            }
-        }
-
-        let client = if let Some(conf) = Config::get_socks() {
-            let proxy_result = Proxy::from_conf(&conf, None);
-
-            match proxy_result {
-                Ok(proxy) => {
-                    let proxy_setup = match &proxy.intercept {
-                        ProxyScheme::Http { host, .. } => {
-                            reqwest::Proxy::all(format!("http://{}", host))
-                        }
-                        ProxyScheme::Https { host, .. } => {
-                            reqwest::Proxy::all(format!("https://{}", host))
-                        }
-                        ProxyScheme::Socks5 { addr, .. } => {
-                            reqwest::Proxy::all(&format!("socks5://{}", addr))
-                        }
+                TlsType::Rustls => {
+                    let client_config = hbb_common::verifier::client_config($danger_accept_invalid_cert)
+                        .map_err(|_| HttpClientConfigError::Tls)?;
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    let client_config = {
+                        let mut config = client_config;
+                        config.alpn_protocols = vec![b"http/1.1".to_vec()];
+                        config
                     };
-
-                    match proxy_setup {
-                        Ok(mut p) => {
-                            if let Some(auth) = proxy.intercept.maybe_auth() {
-                                if !auth.username().is_empty() && !auth.password().is_empty() {
-                                    p = p.basic_auth(auth.username(), auth.password());
-                                }
-                            }
-                            builder = builder.proxy(p);
-                            builder.build().unwrap_or_else(|e| {
-                                info!("Failed to create a proxied client: {}", e);
-                                <$Client>::new()
-                            })
-                        }
-                        Err(e) => {
-                            info!("Failed to set up proxy: {}", e);
-                            <$Client>::new()
-                        }
-                    }
-                }
-                Err(e) => {
-                    info!("Failed to configure proxy: {}", e);
-                    <$Client>::new()
+                    builder = builder.tls_backend_preconfigured(client_config);
                 }
             }
-        } else {
-            builder.build().unwrap_or_else(|e| {
-                info!("Failed to create a client: {}", e);
-                <$Client>::new()
-            })
-        };
-
-        client
+            if let Some(conf) = Config::get_socks() {
+                // Parser errors can contain proxy userinfo. Do not expose it to logs or the UI.
+                let proxy = Proxy::from_conf(&conf, None)
+                    .map_err(|_| HttpClientConfigError::Proxy)?;
+                let proxy_setup = match &proxy.intercept {
+                    ProxyScheme::Http { host, .. } => reqwest::Proxy::all(format!("http://{}", host)),
+                    ProxyScheme::Https { host, .. } => reqwest::Proxy::all(format!("https://{}", host)),
+                    ProxyScheme::Socks5 { addr, .. } => reqwest::Proxy::all(format!("socks5://{}", addr)),
+                };
+                let mut configured = proxy_setup
+                    .map_err(|_| HttpClientConfigError::Proxy)?;
+                if let Some(auth) = proxy.intercept.maybe_auth() {
+                    if !auth.username().is_empty() && !auth.password().is_empty() {
+                        configured = configured.basic_auth(auth.username(), auth.password());
+                    }
+                }
+                builder = builder.proxy(configured);
+            }
+            Ok(builder.build().map_err(|_| HttpClientConfigError::Builder)?)
+        })()
     }};
 }
 
-pub fn create_http_client(tls_type: TlsType, danger_accept_invalid_cert: bool) -> SyncClient {
+pub fn create_http_client(
+    tls_type: TlsType,
+    danger_accept_invalid_cert: bool,
+) -> ResultType<SyncClient> {
     let builder = SyncClient::builder();
     configure_http_client!(builder, tls_type, danger_accept_invalid_cert, SyncClient)
 }
@@ -106,7 +90,7 @@ pub fn create_http_client(tls_type: TlsType, danger_accept_invalid_cert: bool) -
 pub fn create_http_client_async(
     tls_type: TlsType,
     danger_accept_invalid_cert: bool,
-) -> AsyncClient {
+) -> ResultType<AsyncClient> {
     let builder = AsyncClient::builder();
     configure_http_client!(builder, tls_type, danger_accept_invalid_cert, AsyncClient)
 }
@@ -122,7 +106,7 @@ pub fn get_url_for_tls<'a>(url: &'a str, proxy_conf: &'a Option<Socks5Server>) -
     url
 }
 
-pub fn create_http_client_with_url(url: &str) -> SyncClient {
+pub fn create_http_client_with_url(url: &str) -> ResultType<SyncClient> {
     let proxy_conf = Config::get_socks();
     let tls_url = get_url_for_tls(url, &proxy_conf);
     let tls_type = get_cached_tls_type(tls_url);
@@ -136,6 +120,7 @@ pub fn create_http_client_with_url(url: &str) -> SyncClient {
         is_tls_type_cached,
         tls_danger_accept_invalid_cert,
         tls_danger_accept_invalid_cert,
+        false,
     )
 }
 
@@ -149,20 +134,22 @@ pub fn create_http_client_with_url_strict(url: &str) -> ResultType<SyncClient> {
     let cached_tls_type = get_cached_tls_type(tls_url);
     let cached_danger_accept_invalid_cert = get_cached_tls_accept_invalid_cert(tls_url);
     let can_reuse_cached_probe =
-        cached_tls_type.is_some() && cached_danger_accept_invalid_cert == Some(false);
+        matches!(cached_tls_type, Some(TlsType::Rustls | TlsType::NativeTls))
+            && cached_danger_accept_invalid_cert == Some(false);
     let tls_type = if can_reuse_cached_probe {
         cached_tls_type.unwrap_or(TlsType::Rustls)
     } else {
         TlsType::Rustls
     };
-    Ok(create_http_client_with_url_(
+    create_http_client_with_url_(
         url,
         tls_url,
         tls_type,
         can_reuse_cached_probe,
         Some(false),
         Some(false),
-    ))
+        true,
+    )
 }
 
 fn create_http_client_with_url_(
@@ -172,10 +159,14 @@ fn create_http_client_with_url_(
     is_tls_type_cached: bool,
     danger_accept_invalid_cert: Option<bool>,
     original_danger_accept_invalid_cert: Option<bool>,
-) -> SyncClient {
-    let mut client = create_http_client(tls_type, danger_accept_invalid_cert.unwrap_or(false));
+    https_only: bool,
+) -> ResultType<SyncClient> {
+    let builder = SyncClient::builder().https_only(https_only);
+    let mut client = configure_http_client!(
+        builder, tls_type, danger_accept_invalid_cert.unwrap_or(false), SyncClient
+    )?;
     if is_tls_type_cached && original_danger_accept_invalid_cert.is_some() {
-        return client;
+        return Ok(client);
     }
     if let Err(e) = client.head(url).send() {
         if e.is_request() {
@@ -193,7 +184,8 @@ fn create_http_client_with_url_(
                         is_tls_type_cached,
                         Some(true),
                         original_danger_accept_invalid_cert,
-                    );
+                        https_only,
+                    )?;
                 }
                 (TlsType::Rustls, false, Some(_)) => {
                     log::warn!(
@@ -208,7 +200,8 @@ fn create_http_client_with_url_(
                         is_tls_type_cached,
                         original_danger_accept_invalid_cert,
                         original_danger_accept_invalid_cert,
-                    );
+                        https_only,
+                    )?;
                 }
                 (TlsType::NativeTls, _, None) => {
                     log::warn!(
@@ -223,7 +216,8 @@ fn create_http_client_with_url_(
                         is_tls_type_cached,
                         Some(true),
                         original_danger_accept_invalid_cert,
-                    );
+                        https_only,
+                    )?;
                 }
                 _ => {
                     log::error!(
@@ -254,10 +248,10 @@ fn create_http_client_with_url_(
             danger_accept_invalid_cert.unwrap_or(false),
         );
     }
-    client
+    Ok(client)
 }
 
-pub async fn create_http_client_async_with_url(url: &str) -> AsyncClient {
+pub async fn create_http_client_async_with_url(url: &str) -> ResultType<AsyncClient> {
     let proxy_conf = Config::get_socks();
     let tls_url = get_url_for_tls(url, &proxy_conf);
     let tls_type = get_cached_tls_type(tls_url);
@@ -271,6 +265,7 @@ pub async fn create_http_client_async_with_url(url: &str) -> AsyncClient {
         is_tls_type_cached,
         danger_accept_invalid_cert,
         danger_accept_invalid_cert,
+        false,
     )
     .await
 }
@@ -285,21 +280,23 @@ pub async fn create_http_client_async_with_url_strict(url: &str) -> ResultType<A
     let cached_tls_type = get_cached_tls_type(tls_url);
     let cached_danger_accept_invalid_cert = get_cached_tls_accept_invalid_cert(tls_url);
     let can_reuse_cached_probe =
-        cached_tls_type.is_some() && cached_danger_accept_invalid_cert == Some(false);
+        matches!(cached_tls_type, Some(TlsType::Rustls | TlsType::NativeTls))
+            && cached_danger_accept_invalid_cert == Some(false);
     let tls_type = if can_reuse_cached_probe {
         cached_tls_type.unwrap_or(TlsType::Rustls)
     } else {
         TlsType::Rustls
     };
-    Ok(create_http_client_async_with_url_(
+    create_http_client_async_with_url_(
         url,
         tls_url,
         tls_type,
         can_reuse_cached_probe,
         Some(false),
         Some(false),
+        true,
     )
-    .await)
+    .await
 }
 
 #[async_recursion]
@@ -310,11 +307,14 @@ async fn create_http_client_async_with_url_(
     is_tls_type_cached: bool,
     danger_accept_invalid_cert: Option<bool>,
     original_danger_accept_invalid_cert: Option<bool>,
-) -> AsyncClient {
-    let mut client =
-        create_http_client_async(tls_type, danger_accept_invalid_cert.unwrap_or(false));
+    https_only: bool,
+) -> ResultType<AsyncClient> {
+    let builder = AsyncClient::builder().https_only(https_only);
+    let mut client = configure_http_client!(
+        builder, tls_type, danger_accept_invalid_cert.unwrap_or(false), AsyncClient
+    )?;
     if is_tls_type_cached && original_danger_accept_invalid_cert.is_some() {
-        return client;
+        return Ok(client);
     }
     if let Err(e) = client.head(url).send().await {
         match (tls_type, is_tls_type_cached, danger_accept_invalid_cert) {
@@ -331,8 +331,9 @@ async fn create_http_client_async_with_url_(
                     is_tls_type_cached,
                     Some(true),
                     original_danger_accept_invalid_cert,
+                    https_only,
                 )
-                .await;
+                .await?;
             }
             (TlsType::Rustls, false, Some(_)) => {
                 log::warn!(
@@ -347,8 +348,9 @@ async fn create_http_client_async_with_url_(
                     is_tls_type_cached,
                     original_danger_accept_invalid_cert,
                     original_danger_accept_invalid_cert,
+                    https_only,
                 )
-                .await;
+                .await?;
             }
             (TlsType::NativeTls, _, None) => {
                 log::warn!(
@@ -363,8 +365,9 @@ async fn create_http_client_async_with_url_(
                     is_tls_type_cached,
                     Some(true),
                     original_danger_accept_invalid_cert,
+                    https_only,
                 )
-                .await;
+                .await?;
             }
             _ => {
                 log::error!(
@@ -387,5 +390,5 @@ async fn create_http_client_async_with_url_(
             danger_accept_invalid_cert.unwrap_or(false),
         );
     }
-    client
+    Ok(client)
 }

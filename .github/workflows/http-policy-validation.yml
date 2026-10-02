@@ -1,0 +1,42 @@
+name: HTTP policy native validation
+on:
+  push:
+    branches: [codex/viper-http-policy-validation]
+permissions:
+  contents: read
+jobs:
+  foundation:
+    uses: ./.github/workflows/foundation.yml
+  linux-http:
+    uses: ./.github/workflows/flutter-validate.yml
+  windows:
+    uses: ./.github/workflows/windows-native.yml
+  macos:
+    uses: ./.github/workflows/apple-native.yml
+  android:
+    uses: ./.github/workflows/android-native.yml
+  ios:
+    uses: ./.github/workflows/ios-native.yml
+  linux-release:
+    uses: ./.github/workflows/linux-release.yml
+  dart-platforms:
+    uses: ./.github/workflows/flutter-platform-tests.yml
+  gate:
+    name: HTTP candidate gate
+    if: always()
+    needs: [foundation, linux-http, windows, macos, android, ios, linux-release, dart-platforms]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Reject incomplete candidate validation
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          results = json.loads(os.environ['RESULTS'])
+          expected = {'foundation', 'linux-http', 'windows', 'macos', 'android', 'ios', 'linux-release', 'dart-platforms'}
+          if set(results) != expected or any(item['result'] != 'success' for item in results.values()):
+              raise SystemExit('HTTP candidate validation incomplete or failed')
+          print('All HTTP candidate native validation jobs succeeded')
+          PY

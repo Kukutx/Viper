@@ -108,3 +108,37 @@ Exact candidate and task-head validation runs are recorded in PR #1. A successfu
 resolver or tool test is not an application build; a historical candidate success
 does not certify a later task head. No signing, publication or production deployment
 is performed by this migration.
+
+## Fail-closed construction and strict HTTPS (2026-10-03)
+
+All synchronous/asynchronous HTTP factories now return `ResultType<Client>`.
+Proxy parsing/setup, shared TLS initialization and reqwest construction failures
+return a typed `HttpClientConfigError`, never an unconfigured default client.
+Errors deliberately omit proxy userinfo. Both generic API fallback dispatchers
+propagate configuration errors without retrying the rendezvous TCP transport;
+ordinary connection/5xx fallback and explicitly selected raw TCP mode retain
+existing semantics. Account initialization propagates failure and does not mark
+the API warmed. Recording upload initialization reports the error and stops its
+upload worker without deleting local recording files. Update discovery, POST
+and general requests propagate the same construction error.
+
+Strict factories enforce HTTPS on the constructed client, not only its initial
+URL: direct reuse for HTTP and HTTPS-to-HTTP redirects are rejected. Verified
+HTTPS redirects still work. A cached `Plain` backend is not usable as strict TLS
+evidence. Neither an insecure cached probe nor the insecure opt-in can lower
+strict factory verification.
+
+Scope correction to the earlier architectural review: the inherited
+`allow-insecure-tls-fallback` setting must explicitly be `Y` before the nonstrict
+factories may relax certificate verification. The shared configuration already
+defaults that option to disabled. This change preserves the explicit self-hosted
+opt-in and both existing trust stores; it does not claim that all TLS fallback
+has been removed or redesign the shared server/proxy/WebSocket policy.
+
+The original 17 native HTTP contracts remain; 10 additional private-loopback
+contracts cover malformed/refused proxies, sync/async URL factories with and
+without cached probes, sanitized typed errors, strict redirects/reuse and
+nonstrict rejection without opt-in. `tools/native/test-http.sh` executes them
+with a private HOME and temporary CA; configuration tests do not substitute for
+this execution. Current-commit CI results are recorded in PR #1. Dependencies,
+lockfiles, FRB signatures, protocol, app identity and permissions are unchanged.

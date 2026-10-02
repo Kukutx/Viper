@@ -196,7 +196,7 @@ fn set_proxy(server: &Server, scheme: &str) {
 fn synchronous_json_query_and_binary_upload_preserve_wire_bytes() {
     let _isolation = Isolation::new();
     let server = Server::new(None, false, ok_response());
-    let client = http_client::create_http_client(TlsType::Plain, false);
+    let client = http_client::create_http_client(TlsType::Plain, false).unwrap();
     let body = vec![0, 1, 127, 128, 255];
     let answer: serde_json::Value = client.post(server.url("http"))
         .query(&[("filename", "record +&/中文")]).body(body.clone()).timeout(TIMEOUT)
@@ -218,7 +218,7 @@ fn synchronous_json_query_and_binary_upload_preserve_wire_bytes() {
 async fn asynchronous_json_query_ignores_ambient_proxies() {
     let _isolation = Isolation::new();
     let server = Server::new(None, false, ok_response());
-    let client = http_client::create_http_client_async(TlsType::Plain, false);
+    let client = http_client::create_http_client_async(TlsType::Plain, false).unwrap();
     let answer: serde_json::Value = client.post(server.url("http"))
         .query(&[("name", "a +&")]).json(&serde_json::json!({"hello": "中文"})).timeout(TIMEOUT)
         .send().await.unwrap().json().await.unwrap();
@@ -237,7 +237,7 @@ fn synchronous_tls_checks_trust_and_hostname_for_both_backends() {
     for backend in [TlsType::NativeTls, TlsType::Rustls] {
         for name in ["trusted", "untrusted", "wrong-host"] {
             let server = Server::new(Some(name), false, ok_response());
-            let result = http_client::create_http_client(backend, false).get(server.url("https"))
+            let result = http_client::create_http_client(backend, false).unwrap().get(server.url("https"))
                 .timeout(TIMEOUT).send();
             if name == "trusted" { assert_eq!(result.unwrap().text().unwrap().as_bytes(), BODY); }
             else { assert!(result.is_err(), "{backend:?} accepted {name}"); }
@@ -251,7 +251,7 @@ async fn asynchronous_tls_checks_trust_and_hostname_for_both_backends() {
     for backend in [TlsType::NativeTls, TlsType::Rustls] {
         for name in ["trusted", "untrusted", "wrong-host"] {
             let server = Server::new(Some(name), false, ok_response());
-            let result = http_client::create_http_client_async(backend, false).get(server.url("https"))
+            let result = http_client::create_http_client_async(backend, false).unwrap().get(server.url("https"))
                 .timeout(TIMEOUT).send().await;
             if name == "trusted" { assert_eq!(result.unwrap().text().await.unwrap().as_bytes(), BODY); }
             else { assert!(result.is_err(), "{backend:?} accepted {name}"); }
@@ -264,8 +264,8 @@ fn explicit_insecure_opt_in_remains_explicit() {
     let _isolation = Isolation::new();
     let server = Server::new(Some("untrusted"), false, ok_response());
     for backend in [TlsType::NativeTls, TlsType::Rustls] {
-        assert!(http_client::create_http_client(backend, false).get(server.url("https")).timeout(TIMEOUT).send().is_err());
-        assert_eq!(http_client::create_http_client(backend, true).get(server.url("https")).timeout(TIMEOUT).send().unwrap().status(), 200);
+        assert!(http_client::create_http_client(backend, false).unwrap().get(server.url("https")).timeout(TIMEOUT).send().is_err());
+        assert_eq!(http_client::create_http_client(backend, true).unwrap().get(server.url("https")).timeout(TIMEOUT).send().unwrap().status(), 200);
     }
 }
 
@@ -303,7 +303,7 @@ fn synchronous_http_https_and_socks5_proxies_keep_authentication() {
     for scheme in ["http", "https", "socks5"] {
         let server = Server::new((scheme == "https").then_some("trusted"), scheme == "socks5", ok_response());
         set_proxy(&server, scheme);
-        let client = http_client::create_http_client(TlsType::Rustls, false);
+        let client = http_client::create_http_client(TlsType::Rustls, false).unwrap();
         assert_eq!(client.get("http://127.0.0.1:9/proxied").timeout(TIMEOUT).send().unwrap().status(), 200);
         let requests = server.requests();
         assert_eq!(requests.len(), 1);
@@ -320,7 +320,7 @@ async fn asynchronous_http_https_and_socks5_proxies_keep_authentication() {
     for scheme in ["http", "https", "socks5"] {
         let server = Server::new((scheme == "https").then_some("trusted"), scheme == "socks5", ok_response());
         set_proxy(&server, scheme);
-        let client = http_client::create_http_client_async(TlsType::Rustls, false);
+        let client = http_client::create_http_client_async(TlsType::Rustls, false).unwrap();
         assert_eq!(client.get("http://127.0.0.1:9/proxied").timeout(TIMEOUT).send().await.unwrap().status(), 200);
         let requests = server.requests();
         assert_eq!(requests.len(), 1);
@@ -344,7 +344,7 @@ fn synchronous_gzip_and_zstd_decode_without_stale_content_length() {
     let _isolation = Isolation::new();
     for encoding in ["gzip", "zstd"] {
         let server = Server::new(None, false, compressed_reply(encoding));
-        let response = http_client::create_http_client(TlsType::Plain, false).get(server.url("http"))
+        let response = http_client::create_http_client(TlsType::Plain, false).unwrap().get(server.url("http"))
             .timeout(TIMEOUT).send().unwrap();
         assert!(response.headers().get("content-length").is_none());
         assert_eq!(&response.bytes().unwrap()[..], BODY);
@@ -356,7 +356,7 @@ async fn asynchronous_gzip_and_zstd_decode_without_stale_content_length() {
     let _isolation = Isolation::new();
     for encoding in ["gzip", "zstd"] {
         let server = Server::new(None, false, compressed_reply(encoding));
-        let response = http_client::create_http_client_async(TlsType::Plain, false).get(server.url("http"))
+        let response = http_client::create_http_client_async(TlsType::Plain, false).unwrap().get(server.url("http"))
             .timeout(TIMEOUT).send().await.unwrap();
         assert!(response.headers().get("content-length").is_none());
         assert_eq!(&response.bytes().await.unwrap()[..], BODY);
@@ -369,7 +369,7 @@ fn redirects_strip_credentials_across_origins() {
     let _isolation = Isolation::new();
     let destination = Server::new(None, false, ok_response());
     let redirect = Server::new(None, false, response("302 Found", &format!("Location: {}\r\n", destination.url("http")), b""));
-    let response = http_client::create_http_client(TlsType::Plain, false).get(redirect.url("http"))
+    let response = http_client::create_http_client(TlsType::Plain, false).unwrap().get(redirect.url("http"))
         .bearer_auth("test-only-token").header("cookie", "test-only-cookie=1").timeout(TIMEOUT).send().unwrap();
     assert_eq!(response.status(), 200);
     assert_eq!(redirect.requests()[0].headers["authorization"], "Bearer test-only-token");
@@ -383,7 +383,7 @@ fn streaming_download_length_status_and_error_propagation_are_preserved() {
     let _isolation = Isolation::new();
     let bytes: Vec<u8> = (0..=255).cycle().take(32768).collect();
     let server = Server::new(None, false, response("200 OK", "", &bytes));
-    let client = http_client::create_http_client(TlsType::Plain, false);
+    let client = http_client::create_http_client(TlsType::Plain, false).unwrap();
     let mut answer = client.get(server.url("http")).timeout(TIMEOUT).send().unwrap();
     assert_eq!(answer.content_length(), Some(bytes.len() as u64));
     let mut downloaded = Vec::new();
@@ -415,7 +415,7 @@ fn tls_cache_uses_https_proxy_only_for_plain_destinations() {
 fn desktop_rustls_preserves_http11_alpn_for_synchronous_clients() {
     let _isolation = Isolation::new();
     let server = Server::new(Some("alpn"), false, ok_response());
-    let client = http_client::create_http_client(TlsType::Rustls, false);
+    let client = http_client::create_http_client(TlsType::Rustls, false).unwrap();
     assert_eq!(client.get(server.url("https")).timeout(TIMEOUT).send().unwrap().status(), 200);
     assert_eq!(server.requests().len(), 1);
 }
@@ -424,7 +424,181 @@ fn desktop_rustls_preserves_http11_alpn_for_synchronous_clients() {
 async fn desktop_rustls_preserves_http11_alpn_for_asynchronous_clients() {
     let _isolation = Isolation::new();
     let server = Server::new(Some("alpn"), false, ok_response());
-    let client = http_client::create_http_client_async(TlsType::Rustls, false);
+    let client = http_client::create_http_client_async(TlsType::Rustls, false).unwrap();
     assert_eq!(client.get(server.url("https")).timeout(TIMEOUT).send().await.unwrap().status(), 200);
     assert_eq!(server.requests().len(), 1);
+}
+
+fn invalid_proxy() {
+    Config::set_socks(Some(Socks5Server {
+        proxy: "ftp://private-user:private-password@127.0.0.1:9".into(),
+        username: "private-user".into(),
+        password: "private-password".into(),
+    }));
+}
+
+fn assert_configuration_error<T>(result: hbb_common::ResultType<T>) {
+    let error = match result {
+        Ok(_) => panic!("Invalid proxy configuration produced a usable client"),
+        Err(error) => {
+            assert!(error.is::<http_client::HttpClientConfigError>());
+            format!("{error:?}")
+        },
+    };
+    assert!(error.contains("configured HTTP proxy"));
+    assert!(!error.contains("private-user"));
+    assert!(!error.contains("private-password"));
+}
+
+#[test]
+fn synchronous_invalid_proxy_never_returns_a_default_client_or_warms_cache() {
+    let _isolation = Isolation::new();
+    let destination = Server::new(Some("trusted"), false, ok_response());
+    let url = destination.url("https");
+    invalid_proxy();
+    for backend in [TlsType::Plain, TlsType::NativeTls, TlsType::Rustls] {
+        assert_configuration_error(http_client::create_http_client(backend, false));
+    }
+    assert_configuration_error(http_client::create_http_client_with_url(&url));
+    assert_configuration_error(http_client::create_http_client_with_url_strict(&url));
+    assert!(tls::get_cached_tls_type(&url).is_none());
+    tls::upsert_tls_cache(&url, TlsType::Rustls, false);
+    assert_configuration_error(http_client::create_http_client_with_url(&url));
+    assert_configuration_error(http_client::create_http_client_with_url_strict(&url));
+    assert!(destination.requests().is_empty());
+    assert!(Config::get_socks().unwrap().proxy.starts_with("ftp://"));
+}
+
+#[tokio::test]
+async fn asynchronous_invalid_proxy_never_returns_a_default_client_or_warms_cache() {
+    let _isolation = Isolation::new();
+    let destination = Server::new(Some("trusted"), false, ok_response());
+    let url = destination.url("https");
+    invalid_proxy();
+    for backend in [TlsType::Plain, TlsType::NativeTls, TlsType::Rustls] {
+        assert_configuration_error(http_client::create_http_client_async(backend, false));
+    }
+    assert_configuration_error(http_client::create_http_client_async_with_url(&url).await);
+    assert_configuration_error(http_client::create_http_client_async_with_url_strict(&url).await);
+    assert!(tls::get_cached_tls_type(&url).is_none());
+    tls::upsert_tls_cache(&url, TlsType::Rustls, false);
+    assert_configuration_error(http_client::create_http_client_async_with_url(&url).await);
+    assert_configuration_error(http_client::create_http_client_async_with_url_strict(&url).await);
+    assert!(destination.requests().is_empty());
+}
+
+#[test]
+fn synchronous_unavailable_proxy_does_not_send_upload_directly() {
+    let _isolation = Isolation::new();
+    let destination = Server::new(None, false, ok_response());
+    for scheme in ["http", "https", "socks5"] {
+        Config::set_socks(Some(Socks5Server {
+            proxy: format!("{scheme}://127.0.0.1:0"), ..Default::default()
+        }));
+        let result = http_client::create_http_client(TlsType::Rustls, false).unwrap()
+            .post(destination.url("http")).bearer_auth("must-not-leak")
+            .body("private-recording").timeout(TIMEOUT).send();
+        assert!(result.is_err(), "Unavailable {scheme} proxy did not fail");
+    }
+    assert!(destination.requests().is_empty());
+}
+
+#[tokio::test]
+async fn asynchronous_unavailable_proxy_does_not_send_credentials_directly() {
+    let _isolation = Isolation::new();
+    let destination = Server::new(None, false, ok_response());
+    for scheme in ["http", "https", "socks5"] {
+        Config::set_socks(Some(Socks5Server {
+            proxy: format!("{scheme}://127.0.0.1:0"), ..Default::default()
+        }));
+        let result = http_client::create_http_client_async(TlsType::Rustls, false).unwrap()
+            .post(destination.url("http")).bearer_auth("must-not-leak")
+            .json(&serde_json::json!({"password": "test-only"})).timeout(TIMEOUT).send().await;
+        assert!(result.is_err(), "Unavailable {scheme} proxy did not fail");
+    }
+    assert!(destination.requests().is_empty());
+}
+
+#[test]
+fn strict_synchronous_clients_block_http_redirects_and_reuse_on_plain_urls() {
+    let _isolation = Isolation::new();
+    let destination = Server::new(None, false, ok_response());
+    for backend in [TlsType::Rustls, TlsType::NativeTls] {
+        let redirect = Server::new(Some("trusted"), false,
+            response("302 Found", &format!("Location: {}\r\n", destination.url("http")), b""));
+        let url = redirect.url("https");
+        tls::upsert_tls_cache(&url, backend, false);
+        let client = http_client::create_http_client_with_url_strict(&url).unwrap();
+        assert!(client.get(&url).timeout(TIMEOUT).send().is_err());
+        assert!(client.get(destination.url("http")).timeout(TIMEOUT).send().is_err());
+        assert_eq!(redirect.requests().len(), 1);
+    }
+    assert!(destination.requests().is_empty());
+}
+
+#[tokio::test]
+async fn strict_asynchronous_clients_block_http_redirects_and_reuse_on_plain_urls() {
+    let _isolation = Isolation::new();
+    let destination = Server::new(None, false, ok_response());
+    for backend in [TlsType::Rustls, TlsType::NativeTls] {
+        let redirect = Server::new(Some("trusted"), false,
+            response("302 Found", &format!("Location: {}\r\n", destination.url("http")), b""));
+        let url = redirect.url("https");
+        tls::upsert_tls_cache(&url, backend, false);
+        let client = http_client::create_http_client_async_with_url_strict(&url).await.unwrap();
+        assert!(client.get(&url).timeout(TIMEOUT).send().await.is_err());
+        assert!(client.get(destination.url("http")).timeout(TIMEOUT).send().await.is_err());
+        assert_eq!(redirect.requests().len(), 1);
+    }
+    assert!(destination.requests().is_empty());
+}
+
+#[test]
+fn strict_synchronous_factory_rejects_plain_cache_and_keeps_https_redirects() {
+    let _isolation = Isolation::new();
+    let destination = Server::new(Some("trusted"), false, ok_response());
+    let redirect = Server::new(Some("trusted"), false,
+        response("302 Found", &format!("Location: {}\r\n", destination.url("https")), b""));
+    let url = redirect.url("https");
+    tls::upsert_tls_cache(&url, TlsType::Plain, false);
+    let client = http_client::create_http_client_with_url_strict(&url).unwrap();
+    assert!(matches!(tls::get_cached_tls_type(&url), Some(TlsType::Rustls | TlsType::NativeTls)));
+    assert_eq!(client.get(&url).timeout(TIMEOUT).send().unwrap().text().unwrap().as_bytes(), BODY);
+}
+
+#[tokio::test]
+async fn strict_asynchronous_factory_rejects_plain_cache_and_keeps_https_redirects() {
+    let _isolation = Isolation::new();
+    let destination = Server::new(Some("trusted"), false, ok_response());
+    let redirect = Server::new(Some("trusted"), false,
+        response("302 Found", &format!("Location: {}\r\n", destination.url("https")), b""));
+    let url = redirect.url("https");
+    tls::upsert_tls_cache(&url, TlsType::Plain, false);
+    let client = http_client::create_http_client_async_with_url_strict(&url).await.unwrap();
+    assert!(matches!(tls::get_cached_tls_type(&url), Some(TlsType::Rustls | TlsType::NativeTls)));
+    assert_eq!(client.get(&url).timeout(TIMEOUT).send().await.unwrap().text().await.unwrap().as_bytes(), BODY);
+}
+
+#[test]
+fn nonstrict_sync_factory_does_not_accept_untrusted_tls_without_user_opt_in() {
+    let _isolation = Isolation::new();
+    let server = Server::new(Some("untrusted"), false, ok_response());
+    let url = server.url("https");
+    let client = http_client::create_http_client_with_url(&url).unwrap();
+    assert!(client.get(&url).timeout(TIMEOUT).send().is_err());
+    assert!(server.requests().is_empty());
+    assert!(tls::get_cached_tls_type(&url).is_none());
+    assert_eq!(tls::get_cached_tls_accept_invalid_cert(&url), Some(false));
+}
+
+#[tokio::test]
+async fn nonstrict_async_factory_does_not_accept_untrusted_tls_without_user_opt_in() {
+    let _isolation = Isolation::new();
+    let server = Server::new(Some("untrusted"), false, ok_response());
+    let url = server.url("https");
+    let client = http_client::create_http_client_async_with_url(&url).await.unwrap();
+    assert!(client.get(&url).timeout(TIMEOUT).send().await.is_err());
+    assert!(server.requests().is_empty());
+    assert!(tls::get_cached_tls_type(&url).is_none());
+    assert_eq!(tls::get_cached_tls_accept_invalid_cert(&url), Some(false));
 }
