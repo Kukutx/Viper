@@ -1,0 +1,113 @@
+name: Resolve reviewed portable dependencies
+on:
+  push:
+    branches: [codex/viper-windows-api-validation]
+    paths: [.github/workflows/portable-deps-prepare.yml]
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 4069ec338ffa983b86441d06a205be0addcca051
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version-file: .python-version
+      - name: Verify exact published portable crates and edit only their manifest entries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tools/portable-resolved/files
+          cp Cargo.lock .tools/portable-resolved/baseline-Cargo.lock
+          python - <<'PY'
+          import hashlib, json, pathlib, urllib.request
+          root = pathlib.Path('.tools/portable-resolved')
+          expected = {'brotli': ('3.4', '9.0.0'), 'dirs': ('5.0', '7.0.0'), 'md5': ('0.7', '0.8.0')}
+          published = {}
+          path = pathlib.Path('libs/portable/Cargo.toml'); content = path.read_text()
+          for name, (old, version) in expected.items():
+              request = urllib.request.Request('https://crates.io/api/v1/crates/' + name, headers={'User-Agent': 'Viper-reviewed-portable-migration'})
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  metadata = json.load(response)
+              assert metadata['crate']['max_stable_version'] == version, (name, metadata['crate']['max_stable_version'])
+              release = next(item for item in metadata['versions'] if item['num'] == version)
+              assert not release['yanked'], name
+              published[name] = release
+              with urllib.request.urlopen('https://static.crates.io/crates/' + name + '/' + name + '-' + version + '.crate', timeout=90) as response:
+                  data = response.read()
+              assert hashlib.sha256(data).hexdigest() == release['checksum'], name
+              (root / (name + '-' + version + '.crate')).write_bytes(data)
+              before = name + ' = "' + old + '"'
+              assert content.count(before) == 1
+              content = content.replace(before, name + ' = "' + version + '"')
+          path.write_text(content)
+          (root / 'published.json').write_text(json.dumps(published, indent=2) + '\n')
+          PY
+      - name: Install isolated pinned Rust
+        run: python tools/ci_rust.py
+      - name: Resolve the selected dependencies and preserve every Git fork
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo update -p brotli@3.5.0 -p dirs@5.0.1 -p md5@0.7.0 > .tools/portable-resolved/resolve.log 2>&1
+          cargo metadata --locked --no-deps --format-version 1 > .tools/portable-resolved/metadata.json
+          python - <<'PY'
+          import hashlib, json, pathlib, subprocess, tomllib
+          root = pathlib.Path('.tools/portable-resolved')
+          before = tomllib.loads((root / 'baseline-Cargo.lock').read_text())['package']
+          after = tomllib.loads(pathlib.Path('Cargo.lock').read_text())['package']
+          def ids(packages):
+              return sorted((p['name'], p['version'], p['source']) for p in packages if p.get('source', '').startswith('git+'))
+          assert ids(before) == ids(after), 'Git package identity drift'
+          allowed = ['Cargo.lock', 'libs/portable/Cargo.toml']
+          assert sorted(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()) == allowed
+          objects = []
+          for index, name in enumerate(allowed):
+              data = pathlib.Path(name).read_bytes(); filename = str(index) + '.txt'
+              (root / 'files' / filename).write_bytes(data)
+              objects.append({'path': name, 'file': filename, 'sha': hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest(), 'sha256': hashlib.sha256(data).hexdigest()})
+          (root / 'objects.json').write_text(json.dumps(objects, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: portable-resolved-inputs
+          path: .tools/portable-resolved/
+          retention-days: 3
+          if-no-files-found: error
+  store:
+    needs: resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: portable-resolved-inputs
+          path: inputs
+      - name: Store two reviewed data objects without executing source or moving refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, urllib.request
+          root = pathlib.Path('inputs'); objects = json.loads((root / 'objects.json').read_text())
+          assert [o['path'] for o in objects] == ['Cargo.lock', 'libs/portable/Cargo.toml']
+          for index, item in enumerate(objects):
+              assert item['file'] == str(index) + '.txt'
+              data = (root / 'files' / item['file']).read_bytes()
+              assert hashlib.sha256(data).hexdigest() == item['sha256']
+              assert hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest() == item['sha']
+              request = urllib.request.Request('https://api.github.com/repos/Kukutx/Viper/git/blobs', method='POST', data=json.dumps({'content': base64.b64encode(data).decode(), 'encoding': 'base64'}).encode(), headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  result = json.load(response)
+              assert result['sha'] == item['sha']
+              print(item['path'], item['sha'])
+          PY
