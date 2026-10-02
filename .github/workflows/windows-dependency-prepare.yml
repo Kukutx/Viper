@@ -43,6 +43,21 @@ jobs:
           assert hashlib.sha256(script).hexdigest() == '28f2c761802cee96b06fb265c5fe1467e4738e7b96fbdd860cbdefcdd50c3597'
           PY
           python tools/.windows-dependency-prepare.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/platform/windows.rs')
+          text = p.read_text()
+          for name in ('value1', 'value2'):
+              old = f'{name}.vtype as isize'
+              assert text.count(old) == 1
+              text = text.replace(old, f'{name}.vtype.clone() as isize')
+          p.write_text(text)
+          p = Path('src/platform/windows/reg_display_settings/dependency_tests.rs')
+          text = p.read_text()
+          old = 'raw(bytes, kind)).unwrap();'
+          assert text.count(old) == 1
+          p.write_text(text.replace(old, 'raw(bytes, kind.clone())).unwrap();'))
+          PY
       - name: Install the isolated pinned Rust toolchain
         run: python tools/ci_rust.py
       - name: Resolve only the selected Windows packages
@@ -52,7 +67,7 @@ jobs:
       - name: Verify unchanged forks and export data objects
         run: |
           python - <<'PY'
-          import base64, hashlib, json, pathlib, shutil, subprocess, tomllib
+          import base64, hashlib, json, pathlib, subprocess, tomllib
           out = pathlib.Path('tools/.reports/windows-dependency-preparation')
           before = tomllib.loads((out / 'baseline-Cargo.lock').read_text())['package']
           after = tomllib.loads(pathlib.Path('Cargo.lock').read_text())['package']
@@ -65,7 +80,7 @@ jobs:
           for name, version in targets.items():
               package = next(p for p in after if p['name'] == name and p['version'] == version)
               assert package['checksum'] == published[name]['checksum']
-          expected = {'Cargo.toml': 'bf7ae1fb6f4834faf25748410533b331d079ecbd', 'src/platform/windows.rs': 'a13cb1344fbed371f2a0d5d9bf98bcd8ce6cd449', 'tools/windows_native.py': '9995905394e151866d776f8634d6da94fd37fc93'}
+          expected = {'Cargo.toml': 'bf7ae1fb6f4834faf25748410533b331d079ecbd', 'src/platform/windows.rs': 'f644b108030696186e0f19955bfb01e79b5691d8', 'tools/windows_native.py': '9995905394e151866d776f8634d6da94fd37fc93', 'src/platform/windows/reg_display_settings/dependency_tests.rs': '9058c11d60e596332861dbae66b71f336b2c1c36'}
           objects = []; payload = []
           for index, name in enumerate(['Cargo.lock', *expected]):
               data = pathlib.Path(name).read_bytes()
@@ -105,7 +120,7 @@ jobs:
           script: |
             const fs = require('fs');
             const crypto = require('crypto');
-            const allowed = new Set(['Cargo.lock', 'Cargo.toml', 'src/platform/windows.rs', 'tools/windows_native.py']);
+            const allowed = new Set(['Cargo.lock', 'Cargo.toml', 'src/platform/windows.rs', 'tools/windows_native.py', 'src/platform/windows/reg_display_settings/dependency_tests.rs']);
             const objects = JSON.parse(fs.readFileSync('input/payload.json', 'utf8'));
             if (objects.length !== allowed.size) throw new Error('Unexpected object count');
             for (const object of objects) {
