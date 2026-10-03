@@ -67,6 +67,7 @@ class HttpDependencyTests(unittest.TestCase):
         self.assertIn('keys::OPTION_ALLOW_INSECURE_TLS_FALLBACK', source)
         common = (ROOT / 'src/common.rs').read_text()
         self.assertEqual(common.count('allow_insecure_tls_fallback()'), 2)
+        self.assertEqual(common.count('tls_type != Some(TlsType::NativeTls)'), 2)
         contract = (ROOT / 'tests/http_dependency_contract.rs').read_text()
         for name in [
             'automatic_sync_tls_probe_keeps_certificate_validation_strict_by_default',

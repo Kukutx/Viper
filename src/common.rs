@@ -1666,12 +1666,12 @@ async fn post_request_(
                             Some(false),
                         )
                         .await
-                    } else {
+                    } else if tls_type != Some(TlsType::NativeTls) {
                         api_log!(
                             warn,
                             url,
                             API_LOG_INTERVAL,
-                            "HTTP request failed: {:?}, try again with native-tls",
+                            "HTTP request failed: {:?}, try native-tls without weakening certificate validation",
                             e
                         );
                         post_request_(
@@ -1680,10 +1680,12 @@ async fn post_request_(
                             body,
                             header,
                             Some(TlsType::NativeTls),
-                            original_danger_accept_invalid_cert,
-                            original_danger_accept_invalid_cert,
+                            Some(false),
+                            Some(false),
                         )
                         .await
+                    } else {
+                        Err(anyhow!("{:?}", e))
                     }
                 } else {
                     Err(anyhow!("{:?}", e))
@@ -1796,8 +1798,11 @@ async fn get_http_response_async(
                             Some(false),
                         )
                         .await
-                    } else {
-                        log::warn!("HTTP request failed: {:?}, try again with native-tls", e);
+                    } else if tls_type != Some(TlsType::NativeTls) {
+                        log::warn!(
+                            "HTTP request failed: {:?}, try native-tls without weakening certificate validation",
+                            e
+                        );
                         get_http_response_async(
                             url,
                             tls_url,
@@ -1805,10 +1810,12 @@ async fn get_http_response_async(
                             body,
                             header,
                             Some(TlsType::NativeTls),
-                            original_danger_accept_invalid_cert,
-                            original_danger_accept_invalid_cert,
+                            Some(false),
+                            Some(false),
                         )
                         .await
+                    } else {
+                        Err(anyhow!("{:?}", e))
                     }
                 } else {
                     Err(anyhow!("{:?}", e))
