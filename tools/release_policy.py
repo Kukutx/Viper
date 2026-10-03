@@ -22,28 +22,54 @@ def allows_release(repository: str, event: str, ref: str, publish: bool) -> bool
 
 
 def check_workflow(workflow: dict) -> None:
+    if workflow.get('permissions') != {'contents': 'read'}:
+        raise ValueError('Release workflow must be read-only by default')
     shared = workflow.get('env', {})
     if shared.get('RELEASE_ALLOWED') != RELEASE_EXPRESSION:
         raise ValueError('Release trust-boundary expression drift')
     for name, value in shared.items():
         if 'secrets.' in str(value) and AVAILABILITY.get(name) != value:
             raise ValueError('A signing credential escaped into the shared environment')
-    for job in workflow.get('jobs', {}).values():
+    publication_steps = []
+    staged_steps = []
+    for job_name, job in workflow.get('jobs', {}).items():
         if 'secrets.' in str(job.get('env', {})):
             raise ValueError('A signing credential escaped into a build job environment')
         for step in job.get('steps', []):
             command = step.get('run', '')
             if 'secrets.' in command:
                 raise ValueError('Never interpolate a secret into shell source')
+            is_publication = step.get('uses', '').startswith('softprops/action-gh-release@')
+            is_staged_release = (step.get('uses', '').startswith('actions/upload-artifact@')
+                                 and str(step.get('with', {}).get('name', '')).startswith('release-'))
+            if is_publication:
+                publication_steps.append((job_name, step))
+            if is_staged_release:
+                staged_steps.append((job_name, step))
             protected = ('secrets.' in str(step.get('with', {}))
                          or 'secrets.' in str(step.get('env', {}))
-                         or step.get('uses', '').startswith('softprops/action-gh-release@'))
+                         or is_publication or is_staged_release)
             if protected and not re.fullmatch(
                     r"\$\{\{ env\.RELEASE_ALLOWED == 'true' && \(.+\) \}\}", step.get('if', '')):
                 raise ValueError('Signing/import/publication step lacks the release guard')
             if step.get('uses', '').startswith('actions/checkout@'):
                 if step.get('with', {}).get('persist-credentials') is not False:
                     raise ValueError('Build checkout must not persist its token')
+
+    if len(publication_steps) != 1 or publication_steps[0][0] != 'publish-release':
+        raise ValueError('Exactly one final publication step is allowed')
+    if len(staged_steps) != 15:
+        raise ValueError('Every historical publication path must stage an immutable artifact')
+    publish_job = workflow['jobs']['publish-release']
+    if publish_job.get('permissions') != {'contents': 'write'}:
+        raise ValueError('Only the final publisher may receive contents write permission')
+    required = set(workflow['jobs']) - {'publish-release'}
+    if set(publish_job.get('needs', [])) != required:
+        raise ValueError('Final publisher must wait for every build and evidence job')
+    condition = str(publish_job.get('if', ''))
+    for name in required:
+        if f"needs.{name}.result == 'success'" not in condition:
+            raise ValueError(f'Final publisher does not require success from {name}')
 
 
 def check(root: Path = ROOT) -> None:

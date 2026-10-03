@@ -61,6 +61,38 @@ class ReleasePolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'trust-boundary'):
             check_workflow(self.workflow)
 
+    def test_release_has_one_publication_gate_after_all_jobs(self):
+        workflow = self.workflow
+        publications = []
+        staged = []
+        for job_name, job in workflow['jobs'].items():
+            for step in job.get('steps', []):
+                if step.get('uses', '').startswith('softprops/action-gh-release@'):
+                    publications.append((job_name, step))
+                if (step.get('uses', '').startswith('actions/upload-artifact@')
+                        and str(step.get('with', {}).get('name', '')).startswith('release-')):
+                    staged.append((job_name, step))
+        self.assertEqual(len(publications), 1)
+        self.assertEqual(publications[0][0], 'publish-release')
+        self.assertEqual(len(staged), 15)
+        publisher = workflow['jobs']['publish-release']
+        self.assertEqual(workflow['permissions'], {'contents': 'read'})
+        self.assertEqual(publisher['permissions'], {'contents': 'write'})
+        self.assertEqual(set(publisher['needs']), set(workflow['jobs']) - {'publish-release'})
+        for dependency in publisher['needs']:
+            self.assertIn(f"needs.{dependency}.result == 'success'", publisher['if'])
+        self.assertIn('release-staging/**/*', publications[0][1]['with']['files'])
+        self.assertTrue(publications[0][1]['with']['fail_on_unmatched_files'])
+
+    def test_staged_release_assets_are_guarded_and_short_lived(self):
+        for job in self.workflow['jobs'].values():
+            for step in job.get('steps', []):
+                name = str(step.get('with', {}).get('name', ''))
+                if name.startswith('release-'):
+                    self.assertIn("env.RELEASE_ALLOWED == 'true'", step['if'])
+                    self.assertEqual(step['with']['retention-days'], 1)
+                    self.assertEqual(step['with']['if-no-files-found'], 'error')
+
     def test_notarization_key_is_temporary_and_cleaned_on_failure(self):
         job = self.workflow['jobs']['build-for-macOS']
         steps = {step.get('name'): step for step in job['steps'] if step.get('name')}
