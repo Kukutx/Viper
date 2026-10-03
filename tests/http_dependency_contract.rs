@@ -298,6 +298,37 @@ async fn strict_async_factory_never_inherits_an_insecure_cached_probe() {
 }
 
 #[test]
+fn automatic_sync_tls_probe_keeps_certificate_validation_strict_by_default() {
+    let _isolation = Isolation::new();
+    let server = Server::new(Some("untrusted"), false, ok_response());
+    let url = server.url("https");
+    let client = http_client::create_http_client_with_url(&url).unwrap();
+    assert!(client.get(&url).timeout(TIMEOUT).send().is_err());
+    assert_ne!(tls::get_cached_tls_accept_invalid_cert(&url), Some(true));
+}
+
+#[tokio::test]
+async fn automatic_async_tls_probe_keeps_certificate_validation_strict_by_default() {
+    let _isolation = Isolation::new();
+    let server = Server::new(Some("untrusted"), false, ok_response());
+    let url = server.url("https");
+    let client = http_client::create_http_client_async_with_url(&url).await.unwrap();
+    assert!(client.get(&url).timeout(TIMEOUT).send().await.is_err());
+    assert_ne!(tls::get_cached_tls_accept_invalid_cert(&url), Some(true));
+}
+
+#[test]
+fn insecure_tls_probe_requires_explicit_configuration() {
+    let _isolation = Isolation::new();
+    Config::set_option(config::keys::OPTION_ALLOW_INSECURE_TLS_FALLBACK.into(), "Y".into());
+    let server = Server::new(Some("untrusted"), false, ok_response());
+    let url = server.url("https");
+    let client = http_client::create_http_client_with_url(&url).unwrap();
+    assert_eq!(client.get(&url).timeout(TIMEOUT).send().unwrap().status(), 200);
+    assert_eq!(tls::get_cached_tls_accept_invalid_cert(&url), Some(true));
+}
+
+#[test]
 fn synchronous_http_https_and_socks5_proxies_keep_authentication() {
     let _isolation = Isolation::new();
     for scheme in ["http", "https", "socks5"] {

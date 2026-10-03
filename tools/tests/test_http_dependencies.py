@@ -61,6 +61,20 @@ class HttpDependencyTests(unittest.TestCase):
         self.assertIn('invalid_explicit_proxy_configuration_never_falls_back_to_direct_sync', contract)
         self.assertIn('invalid_explicit_proxy_configuration_never_falls_back_to_direct_async', contract)
 
+    def test_automatic_insecure_tls_fallback_requires_the_explicit_option(self):
+        source = (ROOT / 'src/hbbs_http/http_client.rs').read_text()
+        self.assertIn('pub(crate) fn allow_insecure_tls_fallback()', source)
+        self.assertIn('keys::OPTION_ALLOW_INSECURE_TLS_FALLBACK', source)
+        common = (ROOT / 'src/common.rs').read_text()
+        self.assertEqual(common.count('allow_insecure_tls_fallback()'), 2)
+        contract = (ROOT / 'tests/http_dependency_contract.rs').read_text()
+        for name in [
+            'automatic_sync_tls_probe_keeps_certificate_validation_strict_by_default',
+            'automatic_async_tls_probe_keeps_certificate_validation_strict_by_default',
+            'insecure_tls_probe_requires_explicit_configuration',
+        ]:
+            self.assertIn(name, contract)
+
     def test_strict_factories_preserve_https_and_safe_cache_checks(self):
         source = (ROOT / 'src/hbbs_http/http_client.rs').read_text()
         self.assertEqual(source.count('parsed_url.scheme() != "https"'), 2)

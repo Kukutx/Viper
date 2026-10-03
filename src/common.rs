@@ -36,7 +36,7 @@ use hbb_common::{
 };
 
 use crate::{
-    hbbs_http::{create_http_client_async, get_url_for_tls},
+    hbbs_http::{allow_insecure_tls_fallback, create_http_client_async, get_url_for_tls},
     ui_interface::{get_api_server as ui_get_api_server, get_option, is_installed, set_option},
 };
 
@@ -1630,12 +1630,12 @@ async fn post_request_(
             }
             Err(e) => {
                 if (tls_type.is_none() || danger_accept_invalid_cert.is_none()) && e.is_request() {
-                    if danger_accept_invalid_cert.is_none() {
+                    if danger_accept_invalid_cert.is_none() && allow_insecure_tls_fallback() {
                         api_log!(
                             warn,
                             url,
                             API_LOG_INTERVAL,
-                            "HTTP request failed: {:?}, try again, danger accept invalid cert",
+                            "HTTP request failed: {:?}, explicit insecure TLS fallback is enabled",
                             e
                         );
                         post_request_(
@@ -1646,6 +1646,24 @@ async fn post_request_(
                             tls_type,
                             Some(true),
                             original_danger_accept_invalid_cert,
+                        )
+                        .await
+                    } else if danger_accept_invalid_cert.is_none() && tls_type.is_none() {
+                        api_log!(
+                            warn,
+                            url,
+                            API_LOG_INTERVAL,
+                            "HTTP request failed: {:?}, try native-tls without weakening certificate validation",
+                            e
+                        );
+                        post_request_(
+                            url,
+                            tls_url,
+                            body,
+                            header,
+                            Some(TlsType::NativeTls),
+                            Some(false),
+                            Some(false),
                         )
                         .await
                     } else {
@@ -1746,9 +1764,9 @@ async fn get_http_response_async(
             }
             Err(e) => {
                 if (tls_type.is_none() || danger_accept_invalid_cert.is_none()) && e.is_request() {
-                    if danger_accept_invalid_cert.is_none() {
+                    if danger_accept_invalid_cert.is_none() && allow_insecure_tls_fallback() {
                         log::warn!(
-                            "HTTP request failed: {:?}, try again, danger accept invalid cert",
+                            "HTTP request failed: {:?}, explicit insecure TLS fallback is enabled",
                             e
                         );
                         get_http_response_async(
@@ -1760,6 +1778,22 @@ async fn get_http_response_async(
                             tls_type,
                             Some(true),
                             original_danger_accept_invalid_cert,
+                        )
+                        .await
+                    } else if danger_accept_invalid_cert.is_none() && tls_type.is_none() {
+                        log::warn!(
+                            "HTTP request failed: {:?}, try native-tls without weakening certificate validation",
+                            e
+                        );
+                        get_http_response_async(
+                            url,
+                            tls_url,
+                            method,
+                            body,
+                            header,
+                            Some(TlsType::NativeTls),
+                            Some(false),
+                            Some(false),
                         )
                         .await
                     } else {
