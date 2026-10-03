@@ -71,7 +71,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-1
+          name: release-sbom
           path: |
             rustdesk.sbom.json
           retention-days: 1
@@ -426,7 +426,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-2
+          name: release-windows-flutter-${{ matrix.job.arch }}
           path: |
             ./SignOutput/rustdesk-*.msi
             ./SignOutput/rustdesk-*.exe
@@ -594,7 +594,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-3
+          name: release-windows-sciter-${{ matrix.job.arch }}
           path: |
             ./SignOutput/rustdesk-*.exe
           retention-days: 1
@@ -829,7 +829,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-4
+          name: release-macos-${{ matrix.job.arch }}
           path: |
             rustdesk*-${{ matrix.job.arch }}.dmg
           retention-days: 1
@@ -892,7 +892,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-5
+          name: release-unsigned-desktop
           path: |
             rustdesk-${{ env.VERSION }}-unsigned.tar.gz
           retention-days: 1
@@ -1189,7 +1189,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (!startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && (env.HAS_ANDROID_SIGNING == 'true' && env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-6
+          name: release-android-${{ matrix.job.arch }}-signed
           path: |
             ${{steps.sign-rustdesk.outputs.signedReleaseFile}}
           retention-days: 1
@@ -1198,7 +1198,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (!startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && (env.HAS_ANDROID_SIGNING != 'true' && env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-7
+          name: release-android-${{ matrix.job.arch }}-unsigned
           path: |
             signed-apk/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.apk
           retention-days: 1
@@ -1392,7 +1392,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (!startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && (env.HAS_ANDROID_SIGNING == 'true' && env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-8
+          name: release-android-universal-signed
           path: |
             ${{steps.sign-rustdesk.outputs.signedReleaseFile}}
           retention-days: 1
@@ -1401,7 +1401,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (!startsWith(github.event_name, 'pull_request') && inputs.upload-artifact && (env.HAS_ANDROID_SIGNING != 'true' && env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-9
+          name: release-android-universal-unsigned
           path: |
             signed-apk/rustdesk-${{ env.VERSION }}-universal${{ env.suffix }}.apk
           retention-days: 1
@@ -1608,7 +1608,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-10
+          name: release-linux-${{ matrix.job.arch }}-packages
           path: |
             rustdesk-*.deb
             rustdesk-*.rpm
@@ -1644,7 +1644,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (matrix.job.arch == 'x86_64' && env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-11
+          name: release-linux-${{ matrix.job.arch }}-arch
           path: |
             res/rustdesk-${{ env.VERSION }}*.zst
           retention-days: 1
@@ -1892,7 +1892,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-12
+          name: release-linux-drm
           path: |
             ${{ env.DRM_DEB }}
           retention-days: 1
@@ -2135,7 +2135,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-13
+          name: release-linux-sciter-${{ matrix.job.arch }}
           path: |
             rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}-sciter.deb
           retention-days: 1
@@ -2194,7 +2194,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact && (env.UPLOAD_ARTIFACT == 'true')) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-14
+          name: release-appimage-${{ matrix.job.arch }}
           path: |
             ./appimage/rustdesk-${{ env.VERSION }}-*.AppImage
           retention-days: 1
@@ -2281,73 +2281,8 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact) }}
         with:
-          name: release-${{ github.job }}-${{ strategy.job-index || 0 }}-15
+          name: release-flatpak-${{ matrix.job.arch }}${{ matrix.job.suffix }}
           path: |
             flatpak/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}${{ matrix.job.suffix }}.flatpak
           retention-days: 1
           if-no-files-found: error
-
-  publish-release:
-    name: Publish complete release
-    needs:
-      - generate-sbom
-      - generate-bridge
-      - build-RustDeskTempTopMostWindow
-      - build-for-windows-flutter
-      - build-for-windows-sciter
-      - build-rustdesk-ios
-      - build-for-macOS
-      - publish_unsigned
-      - build-rustdesk-android
-      - build-rustdesk-android-universal
-      - build-rustdesk-linux
-      - build-rustdesk-linux-drm
-      - build-rustdesk-linux-sciter
-      - build-appimage
-      - build-flatpak
-    if: ${{ always() && inputs.upload-artifact && github.repository == 'Kukutx/Viper' && !startsWith(github.event_name, 'pull_request') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && needs.generate-sbom.result == 'success' && needs.generate-bridge.result == 'success' && needs.build-RustDeskTempTopMostWindow.result == 'success' && needs.build-for-windows-flutter.result == 'success' && needs.build-for-windows-sciter.result == 'success' && needs.build-rustdesk-ios.result == 'success' && needs.build-for-macOS.result == 'success' && needs.publish_unsigned.result == 'success' && needs.build-rustdesk-android.result == 'success' && needs.build-rustdesk-android-universal.result == 'success' && needs.build-rustdesk-linux.result == 'success' && needs.build-rustdesk-linux-drm.result == 'success' && needs.build-rustdesk-linux-sciter.result == 'success' && needs.build-appimage.result == 'success' && needs.build-flatpak.result == 'success' }}
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - name: Download validated release assets
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: release-*
-          path: release-staging
-      - name: Verify complete staged asset set
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import hashlib
-
-          root = Path("release-staging")
-          if not root.is_dir() or root.is_symlink():
-              raise SystemExit("release staging directory is missing or linked")
-          files = sorted(path for path in root.rglob("*") if path.is_file())
-          if not files:
-              raise SystemExit("release staging contains no files")
-          seen = set()
-          manifest = []
-          for path in files:
-              if path.is_symlink():
-                  raise SystemExit(f"release asset is a symlink: {path}")
-              if path.name in seen:
-                  raise SystemExit(f"duplicate release asset basename: {path.name}")
-              seen.add(path.name)
-              digest = hashlib.sha256(path.read_bytes()).hexdigest()
-              manifest.append(f"{digest}  {path.relative_to(root).as_posix()}")
-          Path("release-manifest.sha256").write_text("\n".join(manifest) + "\n", encoding="utf-8")
-          print(f"Verified {len(files)} staged release assets")
-          PY
-      - name: Publish complete release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        if: ${{ env.RELEASE_ALLOWED == 'true' && (inputs.upload-artifact) }}
-        with:
-          prerelease: true
-          tag_name: ${{ env.TAG_NAME }}
-          fail_on_unmatched_files: true
-          files: |
-            release-staging/**/*
-            release-manifest.sha256

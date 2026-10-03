@@ -1,4 +1,4 @@
-"""Fail closed for signing/import/publication and keep secret values out of shell text."""
+"""Fail closed for signing/staging and require one isolated release publisher."""
 from copy import deepcopy
 from pathlib import Path
 import sys
@@ -8,13 +8,14 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
-from release_policy import allows_release, check, check_workflow
+from release_policy import allows_release, check, check_caller, check_publisher, check_workflow
 from signing_identity import normalize_identity
 
 
 class ReleasePolicyTests(unittest.TestCase):
     def setUp(self):
         self.workflow = yaml.safe_load((ROOT / '.github/workflows/flutter-build.yml').read_text())
+        self.publisher = yaml.safe_load((ROOT / '.github/workflows/release-publish.yml').read_text())
 
     def test_committed_workflows(self):
         check(ROOT)
@@ -39,17 +40,38 @@ class ReleasePolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'job environment'):
             check_workflow(self.workflow)
 
-    def test_each_credential_and_publication_step_requires_a_guard(self):
+    def test_each_credential_and_staging_step_requires_guard(self):
         count = 0
         for key, job in self.workflow['jobs'].items():
             for i, step in enumerate(job.get('steps', [])):
-                if ('secrets.' in str(step) or step.get('uses', '').startswith('softprops/action-gh-release@')):
+                staged = (step.get('uses', '').startswith('actions/upload-artifact@')
+                          and str(step.get('with', {}).get('name', '')).startswith('release-'))
+                if 'secrets.' in str(step) or staged:
                     count += 1
                     changed = deepcopy(self.workflow)
                     changed['jobs'][key]['steps'][i].pop('if', None)
                     with self.subTest(job=key, step=i), self.assertRaisesRegex(ValueError, 'release guard'):
                         check_workflow(changed)
-        self.assertGreater(count, 10)
+        self.assertGreater(count, 20)
+
+    def test_build_workflow_has_no_direct_publisher(self):
+        self.assertNotIn('softprops/action-gh-release@', str(self.workflow))
+        staged = [step for job in self.workflow['jobs'].values() for step in job.get('steps', [])
+                  if str(step.get('with', {}).get('name', '')).startswith('release-')]
+        self.assertEqual(len(staged), 15)
+        self.assertEqual(len({step['with']['name'] for step in staged}), 15)
+
+    def test_publisher_is_one_write_scoped_job(self):
+        check_publisher(self.publisher)
+        self.assertEqual(self.publisher['permissions'], {'contents': 'write'})
+        self.assertEqual(set(self.publisher['jobs']), {'publish'})
+        self.assertNotIn('secrets.', str(self.publisher))
+
+    def test_release_callers_are_read_only_until_publish(self):
+        tag = yaml.safe_load((ROOT / '.github/workflows/flutter-tag.yml').read_text())
+        nightly = yaml.safe_load((ROOT / '.github/workflows/flutter-nightly.yml').read_text())
+        check_caller(tag, 'run-flutter-tag-build', '${{ github.ref_name }}')
+        check_caller(nightly, 'run-flutter-nightly-build', 'nightly')
 
     def test_shell_secret_interpolation_is_rejected(self):
         self.workflow['jobs']['generate-sbom']['steps'].append({'run': 'echo ${{ secrets.KEY }}'})
@@ -60,38 +82,6 @@ class ReleasePolicyTests(unittest.TestCase):
         self.workflow['env']['RELEASE_ALLOWED'] = '${{ inputs.upload-artifact }}'
         with self.assertRaisesRegex(ValueError, 'trust-boundary'):
             check_workflow(self.workflow)
-
-    def test_release_has_one_publication_gate_after_all_jobs(self):
-        workflow = self.workflow
-        publications = []
-        staged = []
-        for job_name, job in workflow['jobs'].items():
-            for step in job.get('steps', []):
-                if step.get('uses', '').startswith('softprops/action-gh-release@'):
-                    publications.append((job_name, step))
-                if (step.get('uses', '').startswith('actions/upload-artifact@')
-                        and str(step.get('with', {}).get('name', '')).startswith('release-')):
-                    staged.append((job_name, step))
-        self.assertEqual(len(publications), 1)
-        self.assertEqual(publications[0][0], 'publish-release')
-        self.assertEqual(len(staged), 15)
-        publisher = workflow['jobs']['publish-release']
-        self.assertEqual(workflow['permissions'], {'contents': 'read'})
-        self.assertEqual(publisher['permissions'], {'contents': 'write'})
-        self.assertEqual(set(publisher['needs']), set(workflow['jobs']) - {'publish-release'})
-        for dependency in publisher['needs']:
-            self.assertIn(f"needs.{dependency}.result == 'success'", publisher['if'])
-        self.assertIn('release-staging/**/*', publications[0][1]['with']['files'])
-        self.assertTrue(publications[0][1]['with']['fail_on_unmatched_files'])
-
-    def test_staged_release_assets_are_guarded_and_short_lived(self):
-        for job in self.workflow['jobs'].values():
-            for step in job.get('steps', []):
-                name = str(step.get('with', {}).get('name', ''))
-                if name.startswith('release-'):
-                    self.assertIn("env.RELEASE_ALLOWED == 'true'", step['if'])
-                    self.assertEqual(step['with']['retention-days'], 1)
-                    self.assertEqual(step['with']['if-no-files-found'], 'error')
 
     def test_notarization_key_is_temporary_and_cleaned_on_failure(self):
         job = self.workflow['jobs']['build-for-macOS']
@@ -124,3 +114,4 @@ class SigningIdentityTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

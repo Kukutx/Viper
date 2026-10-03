@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: flutter-nightly-${{ github.ref }}
@@ -19,4 +19,11 @@ jobs:
     secrets: inherit
     with:
       upload-artifact: true
+      upload-tag: "nightly"
+  publish-release:
+    needs: [run-flutter-nightly-build]
+    uses: ./.github/workflows/release-publish.yml
+    permissions:
+      contents: write
+    with:
       upload-tag: "nightly"

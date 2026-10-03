@@ -1,4 +1,4 @@
-"""Check release credentials remain outside PRs and shared build environments."""
+"""Check release credentials stay in guarded build steps and publication is centralized."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,57 +23,95 @@ def allows_release(repository: str, event: str, ref: str, publish: bool) -> bool
 
 def check_workflow(workflow: dict) -> None:
     if workflow.get('permissions') != {'contents': 'read'}:
-        raise ValueError('Release workflow must be read-only by default')
+        raise ValueError('Build workflow must be read-only')
     shared = workflow.get('env', {})
     if shared.get('RELEASE_ALLOWED') != RELEASE_EXPRESSION:
         raise ValueError('Release trust-boundary expression drift')
     for name, value in shared.items():
         if 'secrets.' in str(value) and AVAILABILITY.get(name) != value:
             raise ValueError('A signing credential escaped into the shared environment')
-    publication_steps = []
+
     staged_steps = []
-    for job_name, job in workflow.get('jobs', {}).items():
+    for job in workflow.get('jobs', {}).values():
         if 'secrets.' in str(job.get('env', {})):
             raise ValueError('A signing credential escaped into a build job environment')
         for step in job.get('steps', []):
             command = step.get('run', '')
             if 'secrets.' in command:
                 raise ValueError('Never interpolate a secret into shell source')
-            is_publication = step.get('uses', '').startswith('softprops/action-gh-release@')
+            if step.get('uses', '').startswith('softprops/action-gh-release@'):
+                raise ValueError('Build jobs may stage assets but may not publish releases')
             is_staged_release = (step.get('uses', '').startswith('actions/upload-artifact@')
                                  and str(step.get('with', {}).get('name', '')).startswith('release-'))
-            if is_publication:
-                publication_steps.append((job_name, step))
             if is_staged_release:
-                staged_steps.append((job_name, step))
+                staged_steps.append(step)
             protected = ('secrets.' in str(step.get('with', {}))
                          or 'secrets.' in str(step.get('env', {}))
-                         or is_publication or is_staged_release)
+                         or is_staged_release)
             if protected and not re.fullmatch(
                     r"\$\{\{ env\.RELEASE_ALLOWED == 'true' && \(.+\) \}\}", step.get('if', '')):
-                raise ValueError('Signing/import/publication step lacks the release guard')
+                raise ValueError('Signing/import/staging step lacks the release guard')
             if step.get('uses', '').startswith('actions/checkout@'):
                 if step.get('with', {}).get('persist-credentials') is not False:
                     raise ValueError('Build checkout must not persist its token')
-
-    if len(publication_steps) != 1 or publication_steps[0][0] != 'publish-release':
-        raise ValueError('Exactly one final publication step is allowed')
     if len(staged_steps) != 15:
         raise ValueError('Every historical publication path must stage an immutable artifact')
-    publish_job = workflow['jobs']['publish-release']
-    if publish_job.get('permissions') != {'contents': 'write'}:
-        raise ValueError('Only the final publisher may receive contents write permission')
-    required = set(workflow['jobs']) - {'publish-release'}
-    if set(publish_job.get('needs', [])) != required:
-        raise ValueError('Final publisher must wait for every build and evidence job')
-    condition = str(publish_job.get('if', ''))
-    for name in required:
-        if f"needs.{name}.result == 'success'" not in condition:
-            raise ValueError(f'Final publisher does not require success from {name}')
+    names = [str(step['with']['name']) for step in staged_steps]
+    if len(names) != len(set(names)):
+        raise ValueError('Release staging artifact names must be unique')
+
+
+def check_publisher(workflow: dict) -> None:
+    if workflow.get('permissions') != {'contents': 'write'}:
+        raise ValueError('Publisher must have explicit contents write permission')
+    jobs = workflow.get('jobs', {})
+    if set(jobs) != {'publish'}:
+        raise ValueError('Publisher workflow must contain exactly one job')
+    job = jobs['publish']
+    if 'pull_request' not in str(job.get('if', '')):
+        raise ValueError('Publisher trust boundary must explicitly reject pull requests')
+    publications = [step for step in job.get('steps', [])
+                    if step.get('uses', '').startswith('softprops/action-gh-release@')]
+    if len(publications) != 1:
+        raise ValueError('Publisher must have exactly one release publication step')
+    downloads = [step for step in job.get('steps', [])
+                 if step.get('uses', '').startswith('actions/download-artifact@')]
+    if len(downloads) != 1 or downloads[0].get('with', {}).get('pattern') != 'release-*':
+        raise ValueError('Publisher must consume only staged release artifacts')
+    release = publications[0]
+    if release.get('with', {}).get('fail_on_unmatched_files') is not True:
+        raise ValueError('Publisher must fail when staged assets are missing')
+    if 'release-staging/**/*' not in str(release.get('with', {}).get('files', '')):
+        raise ValueError('Publisher must publish the verified staging tree')
+
+
+def check_caller(workflow: dict, build_job: str, tag: str) -> None:
+    if workflow.get('permissions') != {'contents': 'read'}:
+        raise ValueError('Release callers must be read-only by default')
+    jobs = workflow.get('jobs', {})
+    build = jobs[build_job]
+    if build.get('uses') != './.github/workflows/flutter-build.yml':
+        raise ValueError('Release caller must use the canonical build workflow')
+    if build.get('with', {}).get('upload-artifact') is not True:
+        raise ValueError('Release build must stage artifacts')
+    publisher = jobs.get('publish-release', {})
+    if publisher.get('uses') != './.github/workflows/release-publish.yml':
+        raise ValueError('Release caller must use the canonical publisher')
+    if publisher.get('needs') != [build_job]:
+        raise ValueError('Publisher must wait for the complete reusable build')
+    if publisher.get('permissions') != {'contents': 'write'}:
+        raise ValueError('Only the publisher caller job may receive contents write')
+    if publisher.get('with', {}).get('upload-tag') != tag:
+        raise ValueError('Publisher tag input drift')
 
 
 def check(root: Path = ROOT) -> None:
     check_workflow(yaml.safe_load((root / '.github/workflows/flutter-build.yml').read_text(encoding='utf-8')))
+    check_publisher(yaml.safe_load((root / '.github/workflows/release-publish.yml').read_text(encoding='utf-8')))
+    check_caller(yaml.safe_load((root / '.github/workflows/flutter-tag.yml').read_text(encoding='utf-8')),
+                 'run-flutter-tag-build', '${{ github.ref_name }}')
+    check_caller(yaml.safe_load((root / '.github/workflows/flutter-nightly.yml').read_text(encoding='utf-8')),
+                 'run-flutter-nightly-build', 'nightly')
     ci = yaml.safe_load((root / '.github/workflows/flutter-ci.yml').read_text(encoding='utf-8'))
     if ci.get('permissions') != {'contents': 'read'}:
         raise ValueError('PR validation must retain read-only permissions')
@@ -84,4 +122,4 @@ def check(root: Path = ROOT) -> None:
 
 if __name__ == '__main__':
     check()
-    print('Release credential boundaries verified; no signing or publishing was executed.')
+    print('Release credential and single-publication boundaries verified.')
