@@ -135,7 +135,7 @@ winapi = { version = "0.3", features = [
     "ioapiset",
     "winspool",
 ] }
-windows = { version = "0.61", features = [
+windows = { version = "0.62.2", features = [
     "Win32",
     "Win32_Foundation",
     "Win32_Security",
