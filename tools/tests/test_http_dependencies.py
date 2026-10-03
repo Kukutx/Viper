@@ -40,9 +40,9 @@ class HttpDependencyTests(unittest.TestCase):
 
     def test_both_factories_use_the_same_shared_trust_configuration(self):
         source = (ROOT / 'src/hbbs_http/http_client.rs').read_text()
-        self.assertEqual(source.count('match hbb_common::verifier::client_config($danger_accept_invalid_cert)'), 1)
+        self.assertEqual(source.count('hbb_common::verifier::client_config($danger_accept_invalid_cert)?'), 1)
         self.assertIn('builder.tls_backend_preconfigured(client_config)', source)
-        self.assertIn('config.alpn_protocols = vec![b"http/1.1".to_vec()]', source)
+        self.assertIn('client_config.alpn_protocols = vec![b"http/1.1".to_vec()]', source)
         self.assertIn('builder.tls_backend_native()', source)
         self.assertIn('builder.tls_danger_accept_invalid_certs(true)', source)
         self.assertIn('$builder.no_proxy()', source)
