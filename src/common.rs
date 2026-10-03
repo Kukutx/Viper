@@ -1018,7 +1018,7 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
     let tls_type = get_cached_tls_type(tls_url);
     let is_tls_not_cached = tls_type.is_none();
     let tls_type = tls_type.unwrap_or(TlsType::Rustls);
-    let client = create_http_client_async(tls_type, false);
+    let client = create_http_client_async(tls_type, false)?;
     let latest_release_response = match client.post(&url).json(&request).send().await {
         Ok(resp) => {
             upsert_tls_cache(tls_url, tls_type, false);
@@ -1027,7 +1027,7 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
         Err(err) => {
             if is_tls_not_cached && err.is_request() {
                 let tls_type = TlsType::NativeTls;
-                let client = create_http_client_async(tls_type, false);
+                let client = create_http_client_async(tls_type, false)?;
                 let resp = client.post(&url).json(&request).send().await?;
                 upsert_tls_cache(tls_url, tls_type, false);
                 resp
@@ -1594,7 +1594,7 @@ async fn post_request_(
     let mut req = create_http_client_async(
         tls_type.unwrap_or(TlsType::Rustls),
         danger_accept_invalid_cert.unwrap_or(false),
-    )
+    )?
     .post(url);
     if !header.is_empty() {
         let tmp: Vec<&str> = header.split(": ").collect();
@@ -1694,7 +1694,7 @@ async fn get_http_response_async(
     let http_client = create_http_client_async(
         tls_type.unwrap_or(TlsType::Rustls),
         danger_accept_invalid_cert.unwrap_or(false),
-    );
+    )?;
     let normalized_method = method.to_ascii_lowercase();
     let mut http_client = match normalized_method.as_str() {
         "get" => http_client.get(url),

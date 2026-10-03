@@ -146,15 +146,16 @@ impl OidcSession {
         }
     }
 
-    fn ensure_client(api_server: &str) {
+    fn ensure_client(api_server: &str) -> ResultType<()> {
         let mut write_guard = OIDC_SESSION.write().unwrap();
         if write_guard.warmed_api_server.as_deref() == Some(api_server) {
-            return;
+            return Ok(());
         }
         // This URL is used to detect the appropriate TLS implementation for the server.
         let login_option_url = format!("{}/api/login-options", api_server);
-        let _ = create_http_client_with_url(&login_option_url);
+        create_http_client_with_url(&login_option_url)?;
         write_guard.warmed_api_server = Some(api_server.to_owned());
+        Ok(())
     }
 
     fn auth(
@@ -163,7 +164,7 @@ impl OidcSession {
         id: &str,
         uuid: &str,
     ) -> ResultType<HbbHttpResponse<OidcAuthUrl>> {
-        Self::ensure_client(api_server);
+        Self::ensure_client(api_server)?;
         let body = serde_json::json!({
             "op": op,
             "id": id,
@@ -186,7 +187,7 @@ impl OidcSession {
             &format!("{}/api/oidc/auth-query", api_server),
             &[("code", code), ("id", id), ("uuid", uuid)],
         )?;
-        Self::ensure_client(api_server);
+        Self::ensure_client(api_server)?;
         #[derive(Deserialize)]
         struct HttpResponseBody {
             body: String,

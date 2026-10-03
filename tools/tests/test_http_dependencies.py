@@ -50,6 +50,17 @@ class HttpDependencyTests(unittest.TestCase):
         for old in ['.use_rustls_tls(', '.use_native_tls(', '.use_preconfigured_tls(', '.danger_accept_invalid_certs(']:
             self.assertNotIn(old, source)
 
+    def test_client_construction_is_fallible_and_proxy_failure_cannot_go_direct(self):
+        source = (ROOT / 'src/hbbs_http/http_client.rs').read_text()
+        self.assertIn(') -> ResultType<SyncClient>', source)
+        self.assertIn(') -> ResultType<AsyncClient>', source)
+        self.assertNotIn('<$Client>::new()', source)
+        self.assertNotIn('Failed to set up proxy', source)
+        self.assertNotIn('Failed to configure proxy', source)
+        contract = (ROOT / 'tests/http_dependency_contract.rs').read_text()
+        self.assertIn('invalid_explicit_proxy_configuration_never_falls_back_to_direct_sync', contract)
+        self.assertIn('invalid_explicit_proxy_configuration_never_falls_back_to_direct_async', contract)
+
     def test_strict_factories_preserve_https_and_safe_cache_checks(self):
         source = (ROOT / 'src/hbbs_http/http_client.rs').read_text()
         self.assertEqual(source.count('parsed_url.scheme() != "https"'), 2)
