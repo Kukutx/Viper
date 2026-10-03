@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
@@ -14,15 +16,12 @@ import '../../common.dart';
 import '../../common/widgets/dialog.dart';
 import '../../common/widgets/toolbar.dart';
 import '../../models/model.dart';
-import '../../models/platform_model.dart';
 import '../../common/shared_state.dart';
 import '../../utils/image.dart';
 import '../widgets/remote_toolbar.dart';
 import '../widgets/kb_layout_type_chooser.dart';
 import '../widgets/tabbar_widget.dart';
 
-import 'package:flutter_hbb/native/custom_cursor.dart'
-    if (dart.library.html) 'package:flutter_hbb/web/custom_cursor.dart';
 
 final SimpleWrapper<bool> _firstEnterImage = SimpleWrapper(false);
 
@@ -611,17 +610,7 @@ class _ImagePaintState extends State<ImagePaint> {
     );
   }
 
-  MouseCursor _buildCustomCursor(BuildContext context, double scale) {
-    final cursor = Provider.of<CursorModel>(context);
-    final cache = cursor.cache ?? preDefaultCursor.cache;
-    return buildCursorOfCache(cursor, scale, cache);
-  }
 
-  MouseCursor _buildDisabledCursor(BuildContext context, double scale) {
-    final cursor = Provider.of<CursorModel>(context);
-    final cache = preForbiddenCursor.cache;
-    return buildCursorOfCache(cursor, scale, cache);
-  }
 
   Widget _buildCrossScrollbarFromLayout(
     BuildContext context,

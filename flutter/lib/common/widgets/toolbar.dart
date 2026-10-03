@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 
@@ -10,7 +12,6 @@ import 'package:flutter_hbb/common/widgets/login.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/remote_toolbar.dart';
 import 'package:flutter_hbb/models/model.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -648,8 +649,7 @@ Future<List<TRadioMenu<String>>> toolbarViewStyle(
       await bind.sessionGetViewStyle(sessionId: ffi.sessionId) ?? '';
   void onChanged(String? value) async {
     if (value == null) return;
-    bind
-        .sessionSetViewStyle(sessionId: ffi.sessionId, value: value)
+    bind.sessionSetViewStyle(sessionId: ffi.sessionId, value: value)
         .then((_) => ffi.canvasModel.updateViewStyle());
   }
 
@@ -1109,7 +1109,7 @@ List<TToggleMenu> toolbarPrivacyMode(
     return [
       getDefaultMenu((sid, opt) async {
         bind.sessionTogglePrivacyMode(
-            sessionId: sid, implKey: implKey, on: privacyModeState.isEmpty);
+            sessionId: sid, implKey: implKey, on_: privacyModeState.isEmpty);
         togglePrivacyModeTime = DateTime.now();
       }, implKey)
     ];
@@ -1137,7 +1137,7 @@ List<TToggleMenu> toolbarPrivacyMode(
                   }
                   togglePrivacyModeTime = DateTime.now();
                   bind.sessionTogglePrivacyMode(
-                      sessionId: sessionId, implKey: implKey, on: value);
+                      sessionId: sessionId, implKey: implKey, on_: value);
                 }
               : null);
     }).toList();
@@ -1268,7 +1268,7 @@ List<Widget> getVirtualDisplayMenuChildren(
                 : (bool? value) async {
                     if (value != null) {
                       bind.sessionToggleVirtualDisplay(
-                          sessionId: ffi.sessionId, index: i + 1, on: value);
+                          sessionId: ffi.sessionId, index: i + 1, on_: value);
                       clickCallBack?.call();
                     }
                   },
@@ -1284,7 +1284,7 @@ List<Widget> getVirtualDisplayMenuChildren(
                   bind.sessionToggleVirtualDisplay(
                       sessionId: ffi.sessionId,
                       index: kAllVirtualDisplay,
-                      on: false);
+                      on_: false);
                   clickCallBack?.call();
                 },
           ffi: ffi,
@@ -1302,7 +1302,7 @@ List<Widget> getVirtualDisplayMenuChildren(
                     ? null
                     : () {
                         bind.sessionToggleVirtualDisplay(
-                            sessionId: ffi.sessionId, index: 0, on: false);
+                            sessionId: ffi.sessionId, index: 0, on_: false);
                         clickCallBack?.call();
                       },
                 child: Icon(Icons.remove),
@@ -1313,7 +1313,7 @@ List<Widget> getVirtualDisplayMenuChildren(
                     ? null
                     : () {
                         bind.sessionToggleVirtualDisplay(
-                            sessionId: ffi.sessionId, index: 0, on: true);
+                            sessionId: ffi.sessionId, index: 0, on_: true);
                         clickCallBack?.call();
                       },
                 child: Icon(Icons.add),
@@ -1328,7 +1328,7 @@ List<Widget> getVirtualDisplayMenuChildren(
                     bind.sessionToggleVirtualDisplay(
                         sessionId: ffi.sessionId,
                         index: kAllVirtualDisplay,
-                        on: false);
+                        on_: false);
                     clickCallBack?.call();
                   },
             ffi: ffi,

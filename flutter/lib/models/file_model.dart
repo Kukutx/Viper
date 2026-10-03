@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 
@@ -12,7 +14,6 @@ import 'package:flutter_hbb/web/dummy.dart'
 
 import '../consts.dart';
 import 'model.dart';
-import 'platform_model.dart';
 
 enum SortBy {
   name,
@@ -1588,7 +1589,7 @@ class FileFetcher {
       } else {
         await bind.sessionReadRemoteEmptyDirsRecursiveSync(
             sessionId: sessionId, path: path, includeHidden: showHidden);
-        return registerReadEmptyDirsTask(isLocal, path);
+        return await registerReadEmptyDirsTask(isLocal, path);
       }
     } catch (e) {
       return Future.error(e);
@@ -1608,13 +1609,13 @@ class FileFetcher {
         final pendingTask = _remoteReadTasks[path];
         if (pendingTask != null) {
           if (pendingTask.includeHidden == showHidden) {
-            return pendingTask.completer.future;
+            return await pendingTask.completer.future;
           }
           await pendingTask.released.future;
           if (remoteSessionGeneration != _remoteSessionGeneration) {
             throw StateError(_kRemoteSessionChangedError);
           }
-          return fetchDirectory(path, isLocal, showHidden);
+          return await fetchDirectory(path, isLocal, showHidden);
         }
         final task = _registerRemoteReadTask(path, showHidden);
         unawaited(Future<void>.sync(
@@ -1623,7 +1624,7 @@ class FileFetcher {
           if (!_removeRemoteReadTask(path, task)) return;
           task.completer.completeError(error, stackTrace);
         }));
-        return task.completer.future;
+        return await task.completer.future;
       }
     } catch (e) {
       return Future.error(e);
@@ -1640,7 +1641,7 @@ class FileFetcher {
           path: path,
           isRemote: !isLocal,
           showHidden: showHidden);
-      return registerReadRecursiveTask(actID);
+      return await registerReadRecursiveTask(actID);
     } catch (e) {
       return Future.error(e);
     }

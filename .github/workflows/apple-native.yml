@@ -1,0 +1,133 @@
+name: Apple native validation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+concurrency:
+  group: apple-native-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  macos:
+    name: macOS native library and desktop bundle
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '12.3'
+      FLUTTER_XCODE_MACOSX_DEPLOYMENT_TARGET: '12.3'
+      FLUTTER_XCODE_ARCHS: arm64
+      FLUTTER_XCODE_ONLY_ACTIVE_ARCH: 'YES'
+      FLUTTER_XCODE_CODE_SIGNING_ALLOWED: 'NO'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Validate the committed native interface
+        run: |
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          python tools/bridge.py check
+          python tools/check_bridge_outputs.py
+          python -m unittest discover -s tools/tests -p test_apple_native.py -v
+          plutil -lint flutter/macos/Runner.xcodeproj/project.pbxproj
+          plutil -lint flutter/ios/Runner.xcodeproj/project.pbxproj
+          mkdir -p tools/.reports
+      - name: Select and verify the pinned Apple SDK
+        run: python tools/apple_sdk.py --github-env
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          architecture: arm64
+          cache: true
+      - name: Verify the actual SDK
+        run: python tools/flutter_sdk.py
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: apple-native-xcode27-v1
+          cache-on-failure: true
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: native-cache
+        with:
+          path: ~/.cache/viper-vcpkg-macos
+          key: viper-apple-xcode27-${{ runner.arch }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**', 'tools/native/setup-macos.sh') }}
+      - name: Set up pinned native dependencies
+        run: bash tools/native/setup-macos.sh
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/viper-vcpkg-macos
+          key: viper-apple-xcode27-${{ runner.arch }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('res/vcpkg/**', 'tools/native/setup-macos.sh') }}
+      - name: Build actual macOS Rust library
+        run: |
+          cargo build --locked --release --lib --features flutter > tools/.reports/macos-cargo.log 2>&1 || { tail -120 tools/.reports/macos-cargo.log; exit 1; }
+          test -s target/release/liblibrustdesk.dylib
+          file target/release/liblibrustdesk.dylib
+      - name: Verify native audio buffering and recovery
+        run: |
+          cargo test --locked --release --lib --features flutter audio -- --test-threads=1 > tools/.reports/macos-audio-tests.log 2>&1 || { tail -120 tools/.reports/macos-audio-tests.log; exit 1; }
+      - name: Validate the shared packaging entry
+        run: python tools/prepare_flutter.py
+      - name: Build the desktop bundle without signing
+        working-directory: flutter
+        run: |
+          flutter pub get --enforce-lockfile
+          flutter build macos --debug --no-pub > ../tools/.reports/macos-flutter.log 2>&1 || { tail -120 ../tools/.reports/macos-flutter.log; exit 1; }
+          git diff --exit-code -- pubspec.yaml pubspec.lock
+      - name: Verify the native dependency lock in deployment mode
+        working-directory: flutter/macos
+        run: |
+          pod install --deployment > ../../tools/.reports/macos-pods-deployment.log 2>&1 || { tail -100 ../../tools/.reports/macos-pods-deployment.log; exit 1; }
+          git diff --exit-code -- Podfile Podfile.lock
+      - name: Exercise the bundled native library
+        working-directory: flutter
+        env:
+          VIPER_NATIVE_LIBRARY: ${{ github.workspace }}/flutter/build/macos/Build/Products/Debug/RustDesk.app/Contents/Frameworks/liblibrustdesk.dylib
+        run: |
+          test -s "$VIPER_NATIVE_LIBRARY"
+          cmp ../target/release/liblibrustdesk.dylib "$VIPER_NATIVE_LIBRARY"
+          test "$(lipo -archs "$VIPER_NATIVE_LIBRARY")" = arm64
+          otool -L "$VIPER_NATIVE_LIBRARY" > ../tools/.reports/macos-linked-libraries.log
+          flutter test --no-pub test_native/bridge_ffi_test.dart > ../tools/.reports/macos-ffi.log 2>&1 || { tail -100 ../tools/.reports/macos-ffi.log; exit 1; }
+      - name: Build and verify the unsigned Release bundle
+        run: bash tools/native/build-macos-release.sh
+      - name: Require unchanged native project settings
+        run: git diff --exit-code -- flutter/macos/Runner.xcodeproj/project.pbxproj flutter/macos/Podfile flutter/macos/Podfile.lock flutter/macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme
+      - name: Capture native dependency and project evidence
+        if: always()
+        run: |
+          mkdir -p tools/.reports/native-project
+          git rev-parse HEAD > tools/.reports/native-project/revision.txt
+          git diff -- flutter/macos > tools/.reports/native-project/changes.patch
+          for path in flutter/macos/Podfile flutter/macos/Podfile.lock flutter/macos/Runner.xcodeproj/project.pbxproj flutter/macos/Flutter/GeneratedPluginRegistrant.swift flutter/macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme; do
+            if test -f "$path"; then
+              cp "$path" tools/.reports/native-project/
+            fi
+          done
+          xcodebuild -version > tools/.reports/native-project/xcode-version.txt
+          pod --version > tools/.reports/native-project/cocoapods-version.txt
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: macos-native-diagnostics-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-arm64-unsigned-${{ github.sha }}
+          path: dist/macos-arm64-unsigned/
+          retention-days: 3
+          if-no-files-found: error

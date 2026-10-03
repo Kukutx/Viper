@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "verified_at": "2026-09-29",
+  "rust": "1.98.1",
+  "flutter": "3.47.5",
+  "dart": "3.13.4",
+  "python": "3.14.7",
+  "uv": "0.12.20",
+  "cmake": "4.4.3",
+  "actionlint": "1.7.12",
+  "cargo_expand": "1.0.126",
+  "apple": {
+    "verified_at": "2026-09-30",
+    "xcode": "27.0",
+    "build": "27A266a",
+    "developer_dir": "/Applications/Xcode_27.app/Contents/Developer",
+    "macos_sdk": "27.0",
+    "cocoapods": "1.17.0",
+    "runner": "xcode-27",
+    "runner_preview": true,
+    "sources": [
+      "https://apps.apple.com/us/app/xcode/id497799835",
+      "https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md"
+    ],
+    "deployment_target": "12.3"
+  },
+  "flutter_rust_bridge": {
+    "version": "2.13.0",
+    "assets": {
+      "linux-x86_64": {
+        "target": "x86_64-unknown-linux-musl",
+        "sha256": "58de00e9a9cc60fce98a052917f68ac61889825f90ce25eb185cc9d32dc1ff48"
+      },
+      "linux-aarch64": {
+        "target": "aarch64-unknown-linux-musl",
+        "sha256": "8833f7c59baf5ad097852f12764a5f0fdb31a1b9b3687310c5e159d04ce1e68d"
+      },
+      "darwin-aarch64": {
+        "target": "aarch64-apple-darwin",
+        "sha256": "6971a50a83dccb035688c3938982707b58ca41cf243bea3df06101f3af42be96"
+      },
+      "darwin-x86_64": {
+        "target": "x86_64-apple-darwin",
+        "sha256": "fe0440000e0f0d94a28d20c1328e94635b9d2e3826ce761d0ab9e5cfa4939e16"
+      },
+      "windows-x86_64": {
+        "target": "x86_64-pc-windows-msvc",
+        "sha256": "58b949ac436440015fbae0372f35564e88c4b5eef119ee7b69fe80245f74d495"
+      }
+    }
+  },
+  "vcpkg": {
+    "version": "2026.07.29",
+    "revision": "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+  },
+  "hbb_common": {
+    "revision": "229b904508364c8997aad0fb5af57effac859f60",
+    "source": "https://github.com/rustdesk/rustdesk/tree/master/libs/hbb_common"
+  },
+  "migrations": {
+    "flutter_rust_bridge": "source-migrated-platform-validation-in-progress",
+    "flutter_platform_builds": "pending-unified-sdk-validation",
+    "android_gradle_kotlin": "pending-plugin-api-migration",
+    "sciter_and_legacy_platforms": "pending-feature-migration",
+    "native_dependency_majors": "pending-api-and-platform-validation"
+  },
+  "sources": {
+    "rust": "https://blog.rust-lang.org/releases/latest/",
+    "flutter": "https://github.com/flutter/flutter/tree/3.47.5",
+    "python": "https://www.python.org/downloads/release/python-3147/",
+    "uv": "https://github.com/astral-sh/uv/releases/tag/0.12.20",
+    "cmake": "https://github.com/Kitware/CMake/releases/tag/v4.4.3",
+    "actionlint": "https://github.com/rhysd/actionlint/releases/tag/v1.7.12",
+    "cargo_expand": "https://github.com/dtolnay/cargo-expand/releases/tag/1.0.126",
+    "vcpkg": "https://github.com/microsoft/vcpkg/releases/tag/2026.07.29",
+    "flutter_rust_bridge": "https://github.com/fzyzcjy/flutter_rust_bridge/releases/tag/v2.13.0"
+  },
+  "flutter_revision": "6a19cca56475dbfba1478ee68d7bd0c2ef891da1",
+  "windows": {
+    "verified_at": "2026-09-30",
+    "visual_studio_major": 18,
+    "llvm": "23.1.2",
+    "assets": {
+      "x64": {
+        "name": "clang+llvm-23.1.2-x86_64-pc-windows-msvc.tar.xz",
+        "sha256": "8fb91cdc44fcbbdcf6b3ffd0a1f9859abd14a3c3aae4423c2b6d4a4f90bf0095"
+      },
+      "arm64": {
+        "name": "clang+llvm-23.1.2-aarch64-pc-windows-msvc.tar.xz",
+        "sha256": "9703cceafb5a0efd6c8720c9b6d35a0d0858079cd2175229e7fa4b922f3d8822"
+      }
+    }
+  },
+  "android": {
+    "verified_at": "2026-09-30",
+    "agp": "9.4.0",
+    "gradle": "9.8.0",
+    "gradle_sha256": "bafd5ce9cfaea0fbccfdc8439a1ac42fbd4cd9c89dc9a988228d8a2639a58e6c",
+    "wrapper_sha256": "238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5",
+    "kotlin": "2.4.20",
+    "jdk": "25.0.4.1+1",
+    "jvm_target": 17,
+    "ndk": "30.0.16248370",
+    "ndk_release": "r30",
+    "cargo_ndk": "4.1.2",
+    "compile_sdk": 37,
+    "target_sdk": 37,
+    "min_sdk": 24,
+    "build_tools": "37.0.0",
+    "protobuf_plugin": "0.10.0",
+    "protobuf": "4.36.2",
+    "sources": {
+      "agp": "https://developer.android.com/build/releases/agp-9-4-0-release-notes",
+      "gradle": "https://gradle.org/release-checksums/",
+      "kotlin": "https://kotlinlang.org/docs/releases.html",
+      "ndk": "https://developer.android.com/ndk/downloads",
+      "jdk": "https://adoptium.net/support",
+      "protobuf": "https://github.com/protocolbuffers/protobuf/releases/tag/v36.2"
+    },
+    "compatibility_note": "Flutter 3.47.5 requires the AGP legacy DSL and external Kotlin plugin. The two explicit opt-outs must be removed together with the upstream Flutter Gradle plugin migration, not hidden in build-time patches."
+  },
+  "ios": {
+    "minimum": "15.0",
+    "sdk": "27.0",
+    "verified_at": "2026-09-30"
+  }
+}

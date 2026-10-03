@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
@@ -9,7 +11,6 @@ import 'package:xterm/xterm.dart';
 
 import 'input_modifier_utils.dart';
 import 'model.dart';
-import 'platform_model.dart';
 import 'rustdesk_terminal.dart';
 import 'terminal_copy_shortcut.dart';
 import 'terminal_mouse_handler.dart';
@@ -250,8 +251,7 @@ class TerminalModel with ChangeNotifier {
     debugPrint(
         '[TerminalModel] Opening terminal $terminalId, sessionId: ${parent.sessionId}, size: ${cols}x$rows');
     try {
-      await bind
-          .sessionOpenTerminal(
+      await bind.sessionOpenTerminal(
         sessionId: parent.sessionId,
         terminalId: terminalId,
         rows: rows,
@@ -293,8 +293,7 @@ class TerminalModel with ChangeNotifier {
   Future<void> closeTerminal() async {
     if (_terminalOpened) {
       try {
-        await bind
-            .sessionCloseTerminal(
+        await bind.sessionCloseTerminal(
           sessionId: parent.sessionId,
           terminalId: terminalId,
         )

@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:math';
 
 import 'package:bot_toast/bot_toast.dart';
@@ -11,7 +13,6 @@ import 'package:flutter_hbb/common/widgets/peers_view.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/models/ab_model.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
@@ -36,6 +37,26 @@ class AddressBook extends StatefulWidget {
 
 class _AddressBookState extends State<AddressBook> {
   var menuPos = RelativeRect.fill;
+  late final ValueNotifier<String?> _selectedAddressBook;
+  late final Worker _addressBookNameWorker;
+  final _addressBookSearch = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedAddressBook = ValueNotifier(gFFI.abModel.currentName.value);
+    _addressBookNameWorker = ever<String>(gFFI.abModel.currentName, (name) {
+      _selectedAddressBook.value = name;
+    });
+  }
+
+  @override
+  void dispose() {
+    _addressBookNameWorker.dispose();
+    _selectedAddressBook.dispose();
+    _addressBookSearch.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Obx(() {
@@ -220,20 +241,16 @@ class _AddressBookState extends State<AddressBook> {
     }
 
     final items = names
-        .map((e) => DropdownMenuItem(value: e, child: buildItem(e)))
+        .map((e) => DropdownItem<String>(value: e, height: 36, child: buildItem(e)))
         .toList();
-    var menuItemStyleData = MenuItemStyleData(height: 36);
     if (contains && items.length > 1) {
-      items.insert(1, DropdownMenuItem(enabled: false, child: Divider()));
-      List<double> customHeights = List.filled(items.length, 36);
-      customHeights[1] = 4;
-      menuItemStyleData = MenuItemStyleData(customHeights: customHeights);
+      items.insert(1, DropdownItem<String>(enabled: false, height: 4, child: Divider()));
     }
-    final TextEditingController textEditingController = TextEditingController();
+    final textEditingController = _addressBookSearch;
 
     final isOptFixed = isOptionFixed(kOptionCurrentAbName);
     return DropdownButton2<String>(
-      value: gFFI.abModel.currentName.value,
+      valueListenable: _selectedAddressBook,
       onChanged: isOptFixed
           ? null
           : (value) {
@@ -255,14 +272,13 @@ class _AddressBookState extends State<AddressBook> {
         height: 0.7,
         color: Theme.of(context).dividerColor.withOpacity(0.1),
       ),
-      menuItemStyleData: menuItemStyleData,
       items: items,
       isExpanded: true,
       isDense: true,
       dropdownSearchData: DropdownSearchData(
         searchController: textEditingController,
-        searchInnerWidgetHeight: 50,
-        searchInnerWidget: Container(
+        searchBarWidgetHeight: 50,
+        searchBarWidget: Container(
           height: 50,
           padding: const EdgeInsets.only(
             top: 8,

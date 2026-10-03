@@ -1,10 +1,11 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart';
@@ -265,7 +266,7 @@ class _InstallPageBodyState extends State<_InstallPageBody>
   }
 
   void selectInstallPath() async {
-    String? install_path = await FilePicker.platform
+    String? install_path = await FilePicker
         .getDirectoryPath(initialDirectory: controller.text);
     if (install_path != null) {
       controller.text = join(install_path, await bind.mainGetAppName());

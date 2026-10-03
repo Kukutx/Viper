@@ -1,8 +1,9 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:http/http.dart' as http;
-import '../models/platform_model.dart';
 import 'package:flutter_hbb/common.dart';
 export 'package:http/http.dart' show Response;
 
@@ -81,8 +82,6 @@ class HttpService {
               .delete(url, headers: headers, body: body)
               .timeout(_requestTimeout);
           break;
-        default:
-          throw Exception('Unsupported HTTP method');
       }
 
       return response;

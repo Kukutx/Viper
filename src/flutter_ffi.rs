@@ -11,12 +11,12 @@ use crate::{
     input::*,
     ui_interface::{self, *},
 };
-use flutter_rust_bridge::{StreamSink, SyncReturn};
+use crate::bridge_generated::StreamSink;
 use hbb_common::{
     config::{self, LocalConfig, PeerConfig, PeerInfoSerde},
     lazy_static, log,
     rendezvous_proto::ConnType,
-    ResultType,
+    anyhow,
 };
 use base::{
     config::keys,
@@ -85,7 +85,7 @@ fn initialize(app_dir: &str, custom_client_config: &str) {
 }
 
 #[inline]
-pub fn start_global_event_stream(s: StreamSink<String>, app_type: String) -> ResultType<()> {
+pub fn start_global_event_stream(s: StreamSink<String>, app_type: String) -> anyhow::Result<()> {
     super::flutter::start_global_event_stream(s, app_type)
 }
 
@@ -93,6 +93,7 @@ pub fn start_global_event_stream(s: StreamSink<String>, app_type: String) -> Res
 pub fn stop_global_event_stream(app_type: String) {
     super::flutter::stop_global_event_stream(app_type)
 }
+#[flutter_rust_bridge::frb(non_opaque)]
 pub enum EventToUI {
     Event(String),
     Rgba(usize),
@@ -105,7 +106,8 @@ pub fn host_stop_system_key_propagate(_stopped: bool) {
 }
 
 // This function is only used to count the number of control sessions.
-pub fn peer_get_sessions_count(id: String, conn_type: i32) -> SyncReturn<usize> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn peer_get_sessions_count(id: String, conn_type: i32) -> usize {
     let conn_type = if conn_type == ConnType::VIEW_CAMERA as i32 {
         ConnType::VIEW_CAMERA
     } else if conn_type == ConnType::FILE_TRANSFER as i32 {
@@ -119,22 +121,24 @@ pub fn peer_get_sessions_count(id: String, conn_type: i32) -> SyncReturn<usize> 
     } else {
         ConnType::DEFAULT_CONN
     };
-    SyncReturn(sessions::get_session_count(id, conn_type))
+    (sessions::get_session_count(id, conn_type))
 }
 
+#[flutter_rust_bridge::frb(sync)]
 pub fn session_add_existed_sync(
     id: String,
     session_id: SessionID,
     displays: Vec<i32>,
     is_view_camera: bool,
-) -> SyncReturn<String> {
+) -> String {
     if let Err(e) = session_add_existed(id.clone(), session_id, displays, is_view_camera) {
-        SyncReturn(format!("Failed to add session with id {}, {}", &id, e))
+        (format!("Failed to add session with id {}, {}", &id, e))
     } else {
-        SyncReturn("".to_owned())
+        ("".to_owned())
     }
 }
 
+#[flutter_rust_bridge::frb(sync)]
 pub fn session_add_sync(
     session_id: SessionID,
     id: String,
@@ -148,7 +152,7 @@ pub fn session_add_sync(
     password: String,
     is_shared_password: bool,
     conn_token: Option<String>,
-) -> SyncReturn<String> {
+) -> String {
     let add_res = session_add(
         &session_id,
         &id,
@@ -170,9 +174,9 @@ pub fn session_add_sync(
     }
 
     if let Err(e) = add_res {
-        SyncReturn(format!("Failed to add session with id {}, {}", &id, e))
+        (format!("Failed to add session with id {}, {}", &id, e))
     } else {
-        SyncReturn("".to_owned())
+        ("".to_owned())
     }
 }
 
@@ -180,7 +184,7 @@ pub fn session_start(
     events2ui: StreamSink<EventToUI>,
     session_id: SessionID,
     id: String,
-) -> ResultType<()> {
+) -> anyhow::Result<()> {
     session_start_(&session_id, &id, events2ui)
 }
 
@@ -189,7 +193,7 @@ pub fn session_start_with_displays(
     session_id: SessionID,
     id: String,
     displays: Vec<i32>,
-) -> ResultType<()> {
+) -> anyhow::Result<()> {
     session_start_(&session_id, &id, events2ui)?;
 
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
@@ -217,9 +221,10 @@ pub fn session_get_toggle_option(session_id: SessionID, arg: String) -> Option<b
     }
 }
 
-pub fn session_get_toggle_option_sync(session_id: SessionID, arg: String) -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_get_toggle_option_sync(session_id: SessionID, arg: String) -> bool {
     let res = session_get_toggle_option(session_id, arg) == Some(true);
-    SyncReturn(res)
+    (res)
 }
 
 pub fn session_get_option(session_id: SessionID, arg: String) -> Option<String> {
@@ -248,17 +253,19 @@ pub fn session_send2fa(session_id: SessionID, code: String, trust_this_device: b
     }
 }
 
-pub fn session_get_enable_trusted_devices(session_id: SessionID) -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_get_enable_trusted_devices(session_id: SessionID) -> bool {
     let v = if let Some(session) = sessions::get_session_by_session_id(&session_id) {
         session.get_enable_trusted_devices()
     } else {
         false
     };
-    SyncReturn(v)
+    (v)
 }
 
-pub fn will_session_close_close_session(session_id: SessionID) -> SyncReturn<bool> {
-    SyncReturn(sessions::would_remove_peer_by_session_id(&session_id))
+#[flutter_rust_bridge::frb(sync)]
+pub fn will_session_close_close_session(session_id: SessionID) -> bool {
+    (sessions::would_remove_peer_by_session_id(&session_id))
 }
 
 pub fn session_close(session_id: SessionID) {
@@ -291,11 +298,12 @@ pub fn session_handle_screenshot(
     crate::client::screenshot::handle_screenshot(action)
 }
 
-pub fn session_is_multi_ui_session(session_id: SessionID) -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_is_multi_ui_session(session_id: SessionID) -> bool {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
-        SyncReturn(session.is_multi_ui_session())
+        (session.is_multi_ui_session())
     } else {
-        SyncReturn(false)
+        (false)
     }
 }
 
@@ -305,11 +313,12 @@ pub fn session_record_screen(session_id: SessionID, start: bool) {
     }
 }
 
-pub fn session_get_is_recording(session_id: SessionID) -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_get_is_recording(session_id: SessionID) -> bool {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
-        SyncReturn(session.is_recording())
+        (session.is_recording())
     } else {
-        SyncReturn(false)
+        (false)
     }
 }
 
@@ -360,21 +369,24 @@ pub fn session_set_flutter_option(session_id: SessionID, k: String, v: String) {
     }
 }
 
-pub fn get_next_texture_key() -> SyncReturn<i32> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn get_next_texture_key() -> i32 {
     let k = TEXTURE_RENDER_KEY.fetch_add(1, Ordering::SeqCst) + 1;
-    SyncReturn(k)
+    (k)
 }
 
-pub fn get_local_flutter_option(k: String) -> SyncReturn<String> {
-    SyncReturn(ui_interface::get_local_flutter_option(k))
+#[flutter_rust_bridge::frb(sync)]
+pub fn get_local_flutter_option(k: String) -> String {
+    (ui_interface::get_local_flutter_option(k))
 }
 
 pub fn set_local_flutter_option(k: String, v: String) {
     ui_interface::set_local_flutter_option(k, v);
 }
 
-pub fn get_local_kb_layout_type() -> SyncReturn<String> {
-    SyncReturn(ui_interface::get_kb_layout_type())
+#[flutter_rust_bridge::frb(sync)]
+pub fn get_local_kb_layout_type() -> String {
+    (ui_interface::get_kb_layout_type())
 }
 
 pub fn set_local_kb_layout_type(kb_layout_type: String) {
@@ -458,13 +470,14 @@ pub fn session_set_keyboard_mode(session_id: SessionID, value: String) {
     }
 }
 
-pub fn session_get_reverse_mouse_wheel_sync(session_id: SessionID) -> SyncReturn<Option<String>> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_get_reverse_mouse_wheel_sync(session_id: SessionID) -> Option<String> {
     let res = if let Some(session) = sessions::get_session_by_session_id(&session_id) {
         Some(session.get_reverse_mouse_wheel())
     } else {
         None
     };
-    SyncReturn(res)
+    (res)
 }
 
 pub fn session_set_reverse_mouse_wheel(session_id: SessionID, value: String) {
@@ -473,13 +486,14 @@ pub fn session_set_reverse_mouse_wheel(session_id: SessionID, value: String) {
     }
 }
 
+#[flutter_rust_bridge::frb(sync)]
 pub fn session_get_displays_as_individual_windows(
     session_id: SessionID,
-) -> SyncReturn<Option<String>> {
+) -> Option<String> {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
-        SyncReturn(Some(session.get_displays_as_individual_windows()))
+        (Some(session.get_displays_as_individual_windows()))
     } else {
-        SyncReturn(None)
+        (None)
     }
 }
 
@@ -489,15 +503,16 @@ pub fn session_set_displays_as_individual_windows(session_id: SessionID, value: 
     }
 }
 
+#[flutter_rust_bridge::frb(sync)]
 pub fn session_get_use_all_my_displays_for_the_remote_session(
     session_id: SessionID,
-) -> SyncReturn<Option<String>> {
+) -> Option<String> {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
-        SyncReturn(Some(
+        (Some(
             session.get_use_all_my_displays_for_the_remote_session(),
         ))
     } else {
-        SyncReturn(None)
+        (None)
     }
 }
 
@@ -518,11 +533,12 @@ pub fn session_get_custom_image_quality(session_id: SessionID) -> Option<Vec<i32
     }
 }
 
-pub fn session_is_keyboard_mode_supported(session_id: SessionID, mode: String) -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_is_keyboard_mode_supported(session_id: SessionID, mode: String) -> bool {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
-        SyncReturn(session.is_keyboard_mode_supported(mode))
+        (session.is_keyboard_mode_supported(mode))
     } else {
-        SyncReturn(false)
+        (false)
     }
 }
 
@@ -612,7 +628,8 @@ pub fn session_handle_flutter_raw_key_event(
 // session_enter_or_leave() will be called then.
 // As Rust is multi-threaded, enter() can be called before leave().
 // The Rust-side grab ownership state filters stale transitions.
-pub fn session_enter_or_leave(_session_id: SessionID, _enter: bool) -> SyncReturn<()> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_enter_or_leave(_session_id: SessionID, _enter: bool) -> () {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     if let Some(session) = sessions::get_session_by_session_id(&_session_id) {
         let keyboard_mode = session.get_keyboard_mode();
@@ -634,7 +651,7 @@ pub fn session_enter_or_leave(_session_id: SessionID, _enter: bool) -> SyncRetur
             );
         }
     }
-    SyncReturn(())
+    (())
 }
 
 pub fn session_input_key(
@@ -938,8 +955,9 @@ pub fn main_get_sound_inputs() -> Vec<String> {
     vec![String::from("")]
 }
 
-pub fn main_get_login_device_info() -> SyncReturn<String> {
-    SyncReturn(get_login_device_info_json())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_login_device_info() -> String {
+    (get_login_device_info_json())
 }
 
 pub fn main_change_id(new_id: String) {
@@ -958,8 +976,9 @@ pub fn main_get_option(key: String) -> String {
     get_option(key)
 }
 
-pub fn main_get_option_sync(key: String) -> SyncReturn<String> {
-    SyncReturn(get_option(key))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_option_sync(key: String) -> String {
+    (get_option(key))
 }
 
 pub fn main_get_error() -> String {
@@ -1030,8 +1049,9 @@ pub fn main_get_options() -> String {
     get_options()
 }
 
-pub fn main_get_options_sync() -> SyncReturn<String> {
-    SyncReturn(get_options())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_options_sync() -> String {
+    (get_options())
 }
 
 pub fn main_set_options(json: String) {
@@ -1083,12 +1103,14 @@ pub fn main_get_app_name() -> String {
     get_app_name()
 }
 
-pub fn main_get_app_name_sync() -> SyncReturn<String> {
-    SyncReturn(get_app_name())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_app_name_sync() -> String {
+    (get_app_name())
 }
 
-pub fn main_uri_prefix_sync() -> SyncReturn<String> {
-    SyncReturn(crate::get_uri_prefix())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_uri_prefix_sync() -> String {
+    (crate::get_uri_prefix())
 }
 
 pub fn main_get_license() -> String {
@@ -1107,9 +1129,10 @@ pub fn main_store_fav(favs: Vec<String>) {
     store_fav(favs)
 }
 
-pub fn main_get_peer_sync(id: String) -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_peer_sync(id: String) -> String {
     let conf = get_peer(id);
-    SyncReturn(serde_json::to_string(&conf).unwrap_or("".to_string()))
+    (serde_json::to_string(&conf).unwrap_or("".to_string()))
 }
 
 pub fn main_get_lan_peers() -> String {
@@ -1164,24 +1187,28 @@ pub fn main_deploy_device(token: String, id: String) -> String {
     }
 }
 
-pub fn main_resolve_avatar_url(avatar: String) -> SyncReturn<String> {
-    SyncReturn(resolve_avatar_url(avatar))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_resolve_avatar_url(avatar: String) -> String {
+    (resolve_avatar_url(avatar))
 }
 
 pub fn main_http_request(url: String, method: String, body: Option<String>, header: String) {
     http_request(url, method, body, header)
 }
 
-pub fn main_get_local_option(key: String) -> SyncReturn<String> {
-    SyncReturn(get_local_option(key))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_local_option(key: String) -> String {
+    (get_local_option(key))
 }
 
-pub fn main_get_use_texture_render() -> SyncReturn<bool> {
-    SyncReturn(use_texture_render())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_use_texture_render() -> bool {
+    (use_texture_render())
 }
 
-pub fn main_get_env(key: String) -> SyncReturn<String> {
-    SyncReturn(std::env::var(key).unwrap_or_default())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_env(key: String) -> String {
+    (std::env::var(key).unwrap_or_default())
 }
 
 // Dart does not support changing environment variables.
@@ -1189,12 +1216,13 @@ pub fn main_get_env(key: String) -> SyncReturn<String> {
 // `Unsupported operation: Cannot modify unmodifiable map`.
 //
 // And we need to share the environment variables between rust and dart isolates sometimes.
-pub fn main_set_env(key: String, value: Option<String>) -> SyncReturn<()> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_set_env(key: String, value: Option<String>) -> () {
     let is_valid_key = !key.is_empty() && !key.contains('=') && !key.contains('\0');
     debug_assert!(is_valid_key, "Invalid environment variable key: {}", key);
     if !is_valid_key {
         log::error!("Invalid environment variable key: {}", key);
-        return SyncReturn(());
+        return (());
     }
 
     match value {
@@ -1203,14 +1231,14 @@ pub fn main_set_env(key: String, value: Option<String>) -> SyncReturn<()> {
             debug_assert!(is_valid_value, "Invalid environment variable value: {}", v);
             if !is_valid_value {
                 log::error!("Invalid environment variable value: {}", v);
-                return SyncReturn(());
+                return (());
             }
             std::env::set_var(key, v);
         }
         None => std::env::remove_var(key),
     }
 
-    SyncReturn(())
+    (())
 }
 
 pub fn main_set_local_option(key: String, value: String) {
@@ -1272,12 +1300,13 @@ pub fn main_handle_wayland_screencast_restore_token(_key: String, _value: String
     }
 }
 
-pub fn main_get_input_source() -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_input_source() -> String {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let input_source = get_cur_session_input_source();
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let input_source = "".to_owned();
-    SyncReturn(input_source)
+    (input_source)
 }
 
 pub fn main_set_input_source(session_id: SessionID, value: String) {
@@ -1299,15 +1328,16 @@ pub fn main_set_input_source(session_id: SessionID, value: String) {
 /// # Platform behavior
 /// - Windows/macOS/Linux: attempts to move the cursor to (x, y)
 /// - Android/iOS: no-op, always returns `false`
-pub fn main_set_cursor_position(x: i32, y: i32) -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_set_cursor_position(x: i32, y: i32) -> bool {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        SyncReturn(crate::set_cursor_pos(x, y))
+        (crate::set_cursor_pos(x, y))
     }
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         let _ = (x, y);
-        SyncReturn(false)
+        (false)
     }
 }
 
@@ -1327,13 +1357,14 @@ pub fn main_set_cursor_position(x: i32, y: i32) -> SyncReturn<bool> {
 ///   the rect coordinates are ignored (only Some/None matters)
 /// - Linux: no-op, always returns `true`; use pointer warping for similar effect
 /// - Android/iOS: no-op, always returns `false`
+#[flutter_rust_bridge::frb(sync)]
 pub fn main_clip_cursor(
     left: i32,
     top: i32,
     right: i32,
     bottom: i32,
     enable: bool,
-) -> SyncReturn<bool> {
+) -> bool {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         let rect = if enable {
@@ -1341,12 +1372,12 @@ pub fn main_clip_cursor(
         } else {
             None
         };
-        SyncReturn(crate::clip_cursor(rect))
+        (crate::clip_cursor(rect))
     }
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         let _ = (left, top, right, bottom, enable);
-        SyncReturn(false)
+        (false)
     }
 }
 
@@ -1362,28 +1393,32 @@ pub fn main_get_peer_option(id: String, key: String) -> String {
     get_peer_option(id, key)
 }
 
-pub fn main_get_peer_option_sync(id: String, key: String) -> SyncReturn<String> {
-    SyncReturn(get_peer_option(id, key))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_peer_option_sync(id: String, key: String) -> String {
+    (get_peer_option(id, key))
 }
 
 // Sometimes we need to get the flutter option of a peer by reading the file.
 // Because the session may not be established yet.
-pub fn main_get_peer_flutter_option_sync(id: String, k: String) -> SyncReturn<String> {
-    SyncReturn(get_peer_flutter_option(id, k))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_peer_flutter_option_sync(id: String, k: String) -> String {
+    (get_peer_flutter_option(id, k))
 }
 
-pub fn main_set_peer_flutter_option_sync(id: String, k: String, v: String) -> SyncReturn<()> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_set_peer_flutter_option_sync(id: String, k: String, v: String) -> () {
     set_peer_flutter_option(id, k, v);
-    SyncReturn(())
+    (())
 }
 
 pub fn main_set_peer_option(id: String, key: String, value: String) {
     set_peer_option(id, key, value)
 }
 
-pub fn main_set_peer_option_sync(id: String, key: String, value: String) -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_set_peer_option_sync(id: String, key: String, value: String) -> bool {
     set_peer_option(id, key, value);
-    SyncReturn(true)
+    (true)
 }
 
 pub fn main_set_peer_alias(id: String, alias: String) {
@@ -1582,27 +1617,31 @@ pub fn main_change_language(lang: String) {
     send_to_cm(&crate::ipc::Data::Language(lang));
 }
 
-pub fn main_video_save_directory(root: bool) -> SyncReturn<String> {
-    SyncReturn(video_save_directory(root))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_video_save_directory(root: bool) -> String {
+    (video_save_directory(root))
 }
 
 pub fn main_set_user_default_option(key: String, value: String) {
     set_user_default_option(key, value);
 }
 
-pub fn main_get_user_default_option(key: String) -> SyncReturn<String> {
-    SyncReturn(get_user_default_option(key))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_user_default_option(key: String) -> String {
+    (get_user_default_option(key))
 }
 
 pub fn main_handle_relay_id(id: String) -> String {
     handle_relay_id(&id).to_owned()
 }
 
-pub fn main_is_option_fixed(key: String) -> SyncReturn<bool> {
-    SyncReturn(is_option_fixed(&key))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_is_option_fixed(key: String) -> bool {
+    (is_option_fixed(&key))
 }
 
-pub fn main_get_main_display() -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_main_display() -> String {
     #[cfg(target_os = "ios")]
     let display_info = "".to_owned();
     #[cfg(not(target_os = "ios"))]
@@ -1642,12 +1681,13 @@ pub fn main_get_main_display() -> SyncReturn<String> {
             }
         }
     }
-    SyncReturn(display_info)
+    (display_info)
 }
 
 // No need to check if is on Wayland in this function.
 // The Flutter side gets display information on Wayland using a different method.
-pub fn main_get_displays() -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_displays() -> String {
     #[cfg(target_os = "ios")]
     let display_info = "".to_owned();
     #[cfg(not(target_os = "ios"))]
@@ -1667,7 +1707,7 @@ pub fn main_get_displays() -> SyncReturn<String> {
             .collect::<Vec<_>>();
         display_info = serde_json::to_string(&displays).unwrap_or_default();
     }
-    SyncReturn(display_info)
+    (display_info)
 }
 
 pub fn session_add_port_forward(
@@ -1705,11 +1745,12 @@ pub fn session_close_voice_call(session_id: SessionID) {
     }
 }
 
-pub fn session_get_conn_token(session_id: SessionID) -> SyncReturn<Option<String>> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_get_conn_token(session_id: SessionID) -> Option<String> {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
-        SyncReturn(session.get_conn_token())
+        (session.get_conn_token())
     } else {
-        SyncReturn(None)
+        (None)
     }
 }
 
@@ -1804,32 +1845,36 @@ pub fn main_remove_peer(id: String) {
     PeerConfig::remove(&id);
 }
 
-pub fn main_has_hwcodec() -> SyncReturn<bool> {
-    SyncReturn(has_hwcodec())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_has_hwcodec() -> bool {
+    (has_hwcodec())
 }
 
-pub fn main_has_vram() -> SyncReturn<bool> {
-    SyncReturn(has_vram())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_has_vram() -> bool {
+    (has_vram())
 }
 
-pub fn main_supported_hwdecodings() -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_supported_hwdecodings() -> String {
     let decoding = supported_hwdecodings();
     let msg = HashMap::from([("h264", decoding.0), ("h265", decoding.1)]);
 
-    SyncReturn(serde_json::ser::to_string(&msg).unwrap_or("".to_owned()))
+    (serde_json::ser::to_string(&msg).unwrap_or("".to_owned()))
 }
 
 pub fn main_is_root() -> bool {
     is_root()
 }
 
-pub fn get_double_click_time() -> SyncReturn<i32> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn get_double_click_time() -> i32 {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        return SyncReturn(crate::platform::get_double_click_time() as _);
+        return (crate::platform::get_double_click_time() as _);
     }
     #[cfg(any(target_os = "android", target_os = "ios"))]
-    SyncReturn(500i32)
+    (500i32)
 }
 
 pub fn main_start_dbus_server() {
@@ -2021,13 +2066,14 @@ pub fn session_restart_remote_device(session_id: SessionID) {
     }
 }
 
-pub fn session_get_audit_server_sync(session_id: SessionID, typ: String) -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_get_audit_server_sync(session_id: SessionID, typ: String) -> String {
     let res = if let Some(session) = sessions::get_session_by_session_id(&session_id) {
         session.get_audit_server(typ)
     } else {
         "".to_owned()
     };
-    SyncReturn(res)
+    (res)
 }
 
 pub fn session_send_note(session_id: SessionID, note: String) {
@@ -2036,11 +2082,12 @@ pub fn session_send_note(session_id: SessionID, note: String) {
     }
 }
 
-pub fn session_get_last_audit_note(session_id: SessionID) -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_get_last_audit_note(session_id: SessionID) -> String {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
-        SyncReturn(session.last_audit_note.lock().unwrap().clone())
+        (session.last_audit_note.lock().unwrap().clone())
     } else {
-        SyncReturn("".to_owned())
+        ("".to_owned())
     }
 }
 
@@ -2050,19 +2097,21 @@ pub fn session_set_audit_guid(session_id: SessionID, guid: String) {
     }
 }
 
-pub fn session_get_audit_guid(session_id: SessionID) -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_get_audit_guid(session_id: SessionID) -> String {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
-        SyncReturn(session.audit_guid.lock().unwrap().clone())
+        (session.audit_guid.lock().unwrap().clone())
     } else {
-        SyncReturn("".to_owned())
+        ("".to_owned())
     }
 }
 
-pub fn session_get_conn_session_id(session_id: SessionID) -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_get_conn_session_id(session_id: SessionID) -> String {
     if let Some(session) = sessions::get_session_by_session_id(&session_id) {
-        SyncReturn(session.lc.read().unwrap().session_id.to_string())
+        (session.lc.read().unwrap().session_id.to_string())
     } else {
-        SyncReturn("".to_owned())
+        ("".to_owned())
     }
 }
 
@@ -2112,7 +2161,8 @@ pub fn main_set_home_dir(_home: String) {
 }
 
 // This is a temporary method to get data dir for ios
-pub fn main_get_data_dir_ios(app_dir: String) -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_data_dir_ios(app_dir: String) -> String {
     *config::APP_DIR.write().unwrap() = app_dir;
     let data_dir = config::Config::path("data");
     if !data_dir.exists() {
@@ -2120,7 +2170,7 @@ pub fn main_get_data_dir_ios(app_dir: String) -> SyncReturn<String> {
             log::warn!("Failed to create data dir {}", e);
         }
     }
-    SyncReturn(data_dir.to_string_lossy().to_string())
+    (data_dir.to_string_lossy().to_string())
 }
 
 pub fn main_stop_service() {
@@ -2148,12 +2198,14 @@ pub fn main_check_super_user_permission() -> bool {
     check_super_user_permission()
 }
 
-pub fn main_get_unlock_pin() -> SyncReturn<String> {
-    SyncReturn(get_unlock_pin())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_unlock_pin() -> String {
+    (get_unlock_pin())
 }
 
-pub fn main_set_unlock_pin(pin: String) -> SyncReturn<String> {
-    SyncReturn(set_unlock_pin(pin))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_set_unlock_pin(pin: String) -> String {
+    (set_unlock_pin(pin))
 }
 
 pub fn main_check_mouse_time() {
@@ -2232,8 +2284,9 @@ pub fn cm_switch_permission(conn_id: i32, name: String, enabled: bool) {
     crate::ui_cm_interface::switch_permission(conn_id, name, enabled)
 }
 
-pub fn cm_can_elevate() -> SyncReturn<bool> {
-    SyncReturn(crate::ui_cm_interface::can_elevate())
+#[flutter_rust_bridge::frb(sync)]
+pub fn cm_can_elevate() -> bool {
+    (crate::ui_cm_interface::can_elevate())
 }
 
 pub fn cm_elevate_portable(conn_id: i32) {
@@ -2265,34 +2318,39 @@ pub fn main_get_build_date() -> String {
     crate::BUILD_DATE.to_string()
 }
 
-pub fn translate(name: String, locale: String) -> SyncReturn<String> {
-    SyncReturn(crate::client::translate_locale(name, &locale))
+#[flutter_rust_bridge::frb(sync)]
+pub fn translate(name: String, locale: String) -> String {
+    (crate::client::translate_locale(name, &locale))
 }
 
-pub fn session_get_rgba_size(session_id: SessionID, display: usize) -> SyncReturn<usize> {
-    SyncReturn(super::flutter::session_get_rgba_size(session_id, display))
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_get_rgba_size(session_id: SessionID, display: usize) -> usize {
+    (super::flutter::session_get_rgba_size(session_id, display))
 }
 
-pub fn session_next_rgba(session_id: SessionID, display: usize) -> SyncReturn<()> {
-    SyncReturn(super::flutter::session_next_rgba(session_id, display))
+#[flutter_rust_bridge::frb(sync)]
+pub fn session_next_rgba(session_id: SessionID, display: usize) -> () {
+    (super::flutter::session_next_rgba(session_id, display))
 }
 
+#[flutter_rust_bridge::frb(sync)]
 pub fn session_register_pixelbuffer_texture(
     session_id: SessionID,
     display: usize,
     ptr: usize,
-) -> SyncReturn<()> {
-    SyncReturn(super::flutter::session_register_pixelbuffer_texture(
+) -> () {
+    (super::flutter::session_register_pixelbuffer_texture(
         session_id, display, ptr,
     ))
 }
 
+#[flutter_rust_bridge::frb(sync)]
 pub fn session_register_gpu_texture(
     session_id: SessionID,
     display: usize,
     ptr: usize,
-) -> SyncReturn<()> {
-    SyncReturn(super::flutter::session_register_gpu_texture(
+) -> () {
+    (super::flutter::session_register_gpu_texture(
         session_id, display, ptr,
     ))
 }
@@ -2301,64 +2359,76 @@ pub fn query_onlines(ids: Vec<String>) {
     let _ = flutter::async_tasks::query_onlines(ids);
 }
 
-pub fn version_to_number(v: String) -> SyncReturn<i64> {
-    SyncReturn(hbb_common::get_version_number(&v))
+#[flutter_rust_bridge::frb(sync)]
+pub fn version_to_number(v: String) -> i64 {
+    (hbb_common::get_version_number(&v))
 }
 
 pub fn option_synced() -> bool {
     crate::ui_interface::option_synced()
 }
 
-pub fn main_is_installed() -> SyncReturn<bool> {
-    SyncReturn(is_installed())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_is_installed() -> bool {
+    (is_installed())
 }
 
-pub fn main_init_input_source() -> SyncReturn<()> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_init_input_source() -> () {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     crate::keyboard::input_source::init_input_source();
-    SyncReturn(())
+    (())
 }
 
-pub fn main_is_installed_lower_version() -> SyncReturn<bool> {
-    SyncReturn(is_installed_lower_version())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_is_installed_lower_version() -> bool {
+    (is_installed_lower_version())
 }
 
-pub fn main_is_installed_daemon(prompt: bool) -> SyncReturn<bool> {
-    SyncReturn(is_installed_daemon(prompt))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_is_installed_daemon(prompt: bool) -> bool {
+    (is_installed_daemon(prompt))
 }
 
-pub fn main_is_process_trusted(prompt: bool) -> SyncReturn<bool> {
-    SyncReturn(is_process_trusted(prompt))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_is_process_trusted(prompt: bool) -> bool {
+    (is_process_trusted(prompt))
 }
 
-pub fn main_is_can_screen_recording(prompt: bool) -> SyncReturn<bool> {
-    SyncReturn(is_can_screen_recording(prompt))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_is_can_screen_recording(prompt: bool) -> bool {
+    (is_can_screen_recording(prompt))
 }
 
-pub fn main_is_can_input_monitoring(prompt: bool) -> SyncReturn<bool> {
-    SyncReturn(is_can_input_monitoring(prompt))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_is_can_input_monitoring(prompt: bool) -> bool {
+    (is_can_input_monitoring(prompt))
 }
 
-pub fn main_is_share_rdp() -> SyncReturn<bool> {
-    SyncReturn(is_share_rdp())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_is_share_rdp() -> bool {
+    (is_share_rdp())
 }
 
 pub fn main_set_share_rdp(enable: bool) {
     set_share_rdp(enable)
 }
 
-pub fn main_goto_install() -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_goto_install() -> bool {
     goto_install();
-    SyncReturn(true)
+    (true)
 }
 
-pub fn main_get_new_version() -> SyncReturn<String> {
-    SyncReturn(get_new_version())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_new_version() -> String {
+    (get_new_version())
 }
 
-pub fn main_update_me() -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_update_me() -> bool {
     update_me("".to_owned());
-    SyncReturn(true)
+    (true)
 }
 
 pub fn set_cur_session_id(session_id: SessionID) {
@@ -2373,8 +2443,9 @@ fn set_cur_session_id_(session_id: SessionID, _keyboard_mode: &str) {
     crate::keyboard::update_grab_get_key_name(_keyboard_mode);
 }
 
-pub fn install_show_run_without_install() -> SyncReturn<bool> {
-    SyncReturn(show_run_without_install())
+#[flutter_rust_bridge::frb(sync)]
+pub fn install_show_run_without_install() -> bool {
+    (show_run_without_install())
 }
 
 pub fn install_run_without_install() {
@@ -2385,12 +2456,14 @@ pub fn install_install_me(options: String, path: String) {
     install_me(options, path, false, false);
 }
 
-pub fn install_install_path() -> SyncReturn<String> {
-    SyncReturn(install_path())
+#[flutter_rust_bridge::frb(sync)]
+pub fn install_install_path() -> String {
+    (install_path())
 }
 
-pub fn install_install_options() -> SyncReturn<String> {
-    SyncReturn(install_options())
+#[flutter_rust_bridge::frb(sync)]
+pub fn install_install_options() -> String {
+    (install_options())
 }
 
 pub fn main_account_auth(op: String, remember_me: bool) {
@@ -2413,27 +2486,32 @@ pub fn main_on_main_window_close() {
     crate::portable_service::client::drop_portable_service_shared_memory();
 }
 
-pub fn main_current_is_wayland() -> SyncReturn<bool> {
-    SyncReturn(current_is_wayland())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_current_is_wayland() -> bool {
+    (current_is_wayland())
 }
 
-pub fn main_is_login_wayland() -> SyncReturn<bool> {
-    SyncReturn(is_login_wayland())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_is_login_wayland() -> bool {
+    (is_login_wayland())
 }
 
-pub fn main_hide_dock() -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_hide_dock() -> bool {
     #[cfg(target_os = "macos")]
     crate::platform::macos::hide_dock();
-    SyncReturn(true)
+    (true)
 }
 
-pub fn main_has_file_clipboard() -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_has_file_clipboard() -> bool {
     let ret = cfg!(any(target_os = "windows", feature = "unix-file-copy-paste",));
-    SyncReturn(ret)
+    (ret)
 }
 
-pub fn main_has_gpu_texture_render() -> SyncReturn<bool> {
-    SyncReturn(cfg!(feature = "vram"))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_has_gpu_texture_render() -> bool {
+    (cfg!(feature = "vram"))
 }
 
 pub fn cm_init() {
@@ -2466,37 +2544,45 @@ pub fn main_support_remove_wallpaper() -> bool {
     support_remove_wallpaper()
 }
 
-pub fn is_incoming_only() -> SyncReturn<bool> {
-    SyncReturn(config::is_incoming_only())
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_incoming_only() -> bool {
+    (config::is_incoming_only())
 }
 
-pub fn is_outgoing_only() -> SyncReturn<bool> {
-    SyncReturn(config::is_outgoing_only())
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_outgoing_only() -> bool {
+    (config::is_outgoing_only())
 }
 
-pub fn is_custom_client() -> SyncReturn<bool> {
-    SyncReturn(crate::common::is_custom_client())
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_custom_client() -> bool {
+    (crate::common::is_custom_client())
 }
 
-pub fn is_disable_settings() -> SyncReturn<bool> {
-    SyncReturn(config::is_disable_settings())
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_disable_settings() -> bool {
+    (config::is_disable_settings())
 }
 
-pub fn is_disable_ab() -> SyncReturn<bool> {
-    SyncReturn(config::is_disable_ab())
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_disable_ab() -> bool {
+    (config::is_disable_ab())
 }
 
-pub fn is_disable_account() -> SyncReturn<bool> {
-    SyncReturn(config::is_disable_account())
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_disable_account() -> bool {
+    (config::is_disable_account())
 }
 
-pub fn is_disable_group_panel() -> SyncReturn<bool> {
-    SyncReturn(LocalConfig::get_option("disable-group-panel") == "Y")
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_disable_group_panel() -> bool {
+    (LocalConfig::get_option("disable-group-panel") == "Y")
 }
 
 // windows only
-pub fn is_disable_installation() -> SyncReturn<bool> {
-    SyncReturn(config::is_disable_installation())
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_disable_installation() -> bool {
+    (config::is_disable_installation())
 }
 
 pub fn is_preset_password() -> bool {
@@ -2511,8 +2597,9 @@ pub fn is_preset_password() -> bool {
 
 // Don't call this function for desktop version.
 // We need this function because we want a sync return for mobile version.
-pub fn is_preset_password_mobile_only() -> SyncReturn<bool> {
-    SyncReturn(is_preset_password())
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_preset_password_mobile_only() -> bool {
+    (is_preset_password())
 }
 
 /// Send a url scheme through the ipc.
@@ -2524,43 +2611,42 @@ pub fn send_url_scheme(_url: String) {
     std::thread::spawn(move || crate::handle_url_scheme(_url));
 }
 
-pub fn is_support_multi_ui_session(version: String) -> SyncReturn<bool> {
-    SyncReturn(crate::common::is_support_multi_ui_session(&version))
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_support_multi_ui_session(version: String) -> bool {
+    (crate::common::is_support_multi_ui_session(&version))
 }
 
-pub fn is_selinux_enforcing() -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_selinux_enforcing() -> bool {
     #[cfg(target_os = "linux")]
     {
-        SyncReturn(crate::platform::linux::is_selinux_enforcing())
+        (crate::platform::linux::is_selinux_enforcing())
     }
     #[cfg(not(target_os = "linux"))]
     {
-        SyncReturn(false)
+        (false)
     }
 }
 
-pub fn main_default_privacy_mode_impl() -> SyncReturn<String> {
-    SyncReturn(crate::privacy_mode::DEFAULT_PRIVACY_MODE_IMPL.to_owned())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_default_privacy_mode_impl() -> String {
+    (crate::privacy_mode::DEFAULT_PRIVACY_MODE_IMPL.to_owned())
 }
 
-pub fn main_supported_privacy_mode_impls() -> SyncReturn<String> {
-    SyncReturn(
-        serde_json::to_string(&crate::privacy_mode::get_supported_privacy_mode_impl())
-            .unwrap_or_default(),
-    )
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_supported_privacy_mode_impls() -> String {
+    serde_json::to_string(&crate::privacy_mode::get_supported_privacy_mode_impl()).unwrap_or_default()
 }
 
-pub fn main_supported_input_source() -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_supported_input_source() -> String {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
-        SyncReturn("".to_owned())
+        ("".to_owned())
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        SyncReturn(
-            serde_json::to_string(&crate::keyboard::input_source::get_supported_input_source())
-                .unwrap_or_default(),
-        )
+        serde_json::to_string(&crate::keyboard::input_source::get_supported_input_source()).unwrap_or_default()
     }
 }
 
@@ -2572,24 +2658,28 @@ pub fn main_verify2fa(code: String) -> bool {
     verify2fa(code)
 }
 
-pub fn main_has_valid_2fa_sync() -> SyncReturn<bool> {
-    SyncReturn(has_valid_2fa())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_has_valid_2fa_sync() -> bool {
+    (has_valid_2fa())
 }
 
 pub fn main_verify_bot(token: String) -> String {
     verify_bot(token)
 }
 
-pub fn main_has_valid_bot_sync() -> SyncReturn<bool> {
-    SyncReturn(has_valid_bot())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_has_valid_bot_sync() -> bool {
+    (has_valid_bot())
 }
 
-pub fn main_get_hard_option(key: String) -> SyncReturn<String> {
-    SyncReturn(get_hard_option(key))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_hard_option(key: String) -> String {
+    (get_hard_option(key))
 }
 
-pub fn main_get_buildin_option(key: String) -> SyncReturn<String> {
-    SyncReturn(get_builtin_option(&key))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_buildin_option(key: String) -> String {
+    (get_builtin_option(&key))
 }
 
 pub fn main_check_hwcodec() {
@@ -2608,8 +2698,9 @@ pub fn main_clear_trusted_devices() {
     clear_trusted_devices()
 }
 
-pub fn main_max_encrypt_len() -> SyncReturn<usize> {
-    SyncReturn(max_encrypt_len())
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_max_encrypt_len() -> usize {
+    (max_encrypt_len())
 }
 
 pub fn session_request_new_display_init_msgs(session_id: SessionID, display: usize) {
@@ -2618,24 +2709,24 @@ pub fn session_request_new_display_init_msgs(session_id: SessionID, display: usi
     }
 }
 
-pub fn main_audio_support_loopback() -> SyncReturn<bool> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_audio_support_loopback() -> bool {
     #[cfg(target_os = "windows")]
     let is_surpport = true;
     #[cfg(feature = "screencapturekit")]
     let is_surpport = crate::audio_service::is_screen_capture_kit_available();
     #[cfg(not(any(target_os = "windows", feature = "screencapturekit")))]
     let is_surpport = false;
-    SyncReturn(is_surpport)
+    (is_surpport)
 }
 
-pub fn main_get_printer_names() -> SyncReturn<String> {
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_printer_names() -> String {
     #[cfg(target_os = "windows")]
-    return SyncReturn(
-        serde_json::to_string(&crate::platform::windows::get_printer_names().unwrap_or_default())
-            .unwrap_or_default(),
-    );
+    return serde_json::to_string(&crate::platform::windows::get_printer_names().unwrap_or_default())
+        .unwrap_or_default();
     #[cfg(not(target_os = "windows"))]
-    return SyncReturn("".to_owned());
+    return ("".to_owned());
 }
 
 pub fn main_get_common(key: String) -> String {
@@ -2731,8 +2822,9 @@ pub fn main_get_common(key: String) -> String {
     }
 }
 
-pub fn main_get_common_sync(key: String) -> SyncReturn<String> {
-    SyncReturn(main_get_common(key))
+#[flutter_rust_bridge::frb(sync)]
+pub fn main_get_common_sync(key: String) -> String {
+    (main_get_common(key))
 }
 
 pub fn main_set_common(_key: String, _value: String) {
@@ -2874,12 +2966,13 @@ pub fn session_set_common(session_id: SessionID, key: String, value: String) {
     }
 }
 
+#[flutter_rust_bridge::frb(sync)]
 pub fn session_get_common_sync(
     session_id: SessionID,
     key: String,
     param: String,
-) -> SyncReturn<Option<String>> {
-    SyncReturn(session_get_common(session_id, key, param))
+) -> Option<String> {
+    (session_get_common(session_id, key, param))
 }
 
 pub fn session_get_common(

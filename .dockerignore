@@ -1,0 +1,16 @@
+.git
+.tools
+.venv
+**/target
+**/build
+**/.dart_tool
+**/node_modules
+tools/.reports
+.env
+.env.*
+secrets
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/*private*.pem

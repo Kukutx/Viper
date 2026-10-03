@@ -3,22 +3,23 @@ name: Full Flutter CI
 on:
   workflow_dispatch:
   pull_request:
-    paths-ignore:
-    - "docs/**"
-    - "README.md"
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths-ignore: ['docs/**', 'README.md']
   push:
-    branches:
-      - master
-    paths-ignore:
-      - ".github/**"
-      - "docs/**"
-      - "README.md"
-      - "res/**"
-      - "appimage/**"
-      - "flatpak/**"
+    branches: [main]
+    paths-ignore: ['docs/**', 'README.md']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   run-ci:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     uses: ./.github/workflows/flutter-build.yml
     with:
       upload-artifact: false

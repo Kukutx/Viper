@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 
@@ -10,7 +12,6 @@ import 'package:get/get.dart';
 import '../common.dart';
 import '../utils/http_service.dart' as http;
 import 'model.dart';
-import 'platform_model.dart';
 
 bool refreshingUser = false;
 

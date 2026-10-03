@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:ui' as ui;
 
@@ -18,7 +20,6 @@ import '../../common/widgets/dialog.dart';
 import '../../common/widgets/remote_input.dart';
 import '../../models/input_model.dart';
 import '../../models/model.dart';
-import '../../models/platform_model.dart';
 import '../../utils/image.dart';
 
 final initText = '1' * 1024;

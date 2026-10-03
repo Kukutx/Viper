@@ -1,0 +1,96 @@
+name: Android native validation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+concurrency:
+  group: android-native-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  android:
+    name: Android Release (${{ matrix.abi }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Validate the committed Android toolchain
+        run: |
+          python -m pip install -r tools/requirements-dev.txt
+          python tools/viper.py env >> "$GITHUB_ENV"
+          python tools/android_toolchain.py --env >> "$GITHUB_ENV"
+          python tools/bridge.py check
+          python tools/check_bridge_outputs.py
+          mkdir -p tools/.reports
+      - name: Install and verify isolated Rust before native prerequisites
+        run: python tools/ci_rust.py
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.ANDROID_JDK_FEATURE }}
+          check-latest: true
+      - name: Require the pinned JDK runtime and build
+        run: python tools/android_toolchain.py --java-only
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - name: Install native prerequisites and the exact SDK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libclang-dev nasm ninja-build pkg-config autoconf automake libtool
+          python -m pip install "cmake==$CMAKE_VERSION"
+          bash tools/native/install-android-sdk.sh
+          python tools/android_toolchain.py --runtime
+          python tools/flutter_sdk.py
+      - name: Verify Gradle evaluation order
+        run: python tools/check_android_gradle_layout.py
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          prefix-key: android-${{ matrix.abi }}-${{ env.ANDROID_NDK_VERSION }}
+          cache-on-failure: true
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .tools/android-vcpkg-cache
+          key: android-vcpkg-${{ matrix.abi }}-${{ env.ANDROID_NDK_VERSION }}-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/*android.cmake') }}
+      - name: Build the real native library and unsigned APK
+        env:
+          ANDROID_ABI: ${{ matrix.abi }}
+        run: bash tools/native/build-android.sh "$ANDROID_ABI"
+      - name: Record the tested source revision
+        if: always()
+        run: |
+          mkdir -p tools/.reports
+          git rev-parse HEAD > tools/.reports/android-revision.txt
+          git diff -- flutter/android > tools/.reports/android-project.patch
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: android-diagnostics-${{ matrix.abi }}-${{ github.sha }}
+          path: tools/.reports/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-unsigned-${{ matrix.abi }}-${{ github.sha }}
+          path: dist/android-${{ matrix.abi }}-unsigned/
+          retention-days: 3
+          if-no-files-found: error

@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 
 import 'package:auto_size_text_field/auto_size_text_field.dart';
@@ -15,7 +17,6 @@ import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../consts.dart';
 import '../../models/model.dart';
-import '../../models/platform_model.dart';
 import 'home_page.dart';
 
 /// Connection page for connecting to a remote peer.

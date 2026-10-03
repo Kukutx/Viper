@@ -58,10 +58,14 @@ Uint8List _padCursor(Uint8List data, int size) {
   if (bitmap == null) {
     throw const FormatException('Invalid native cursor PNG');
   }
-  final padded = img.copyExpandCanvas(bitmap,
-      newWidth: size,
-      newHeight: size,
-      position: img.ExpandCanvasPosition.topLeft,
-      toImage: img.Image(width: size, height: size, numChannels: 4));
+  if (size < bitmap.width || size < bitmap.height) {
+    throw ArgumentError.value(size, 'size', 'Canvas cannot crop the cursor');
+  }
+  final padded = img.Image(width: size, height: size, numChannels: 4);
+  // Padding is a lossless copy, not alpha compositing: blending introduces
+  // rounding in translucent pixels even over a transparent destination.
+  for (final pixel in bitmap) {
+    padded.setPixel(pixel.x, pixel.y, pixel);
+  }
   return Uint8List.fromList(img.encodePng(padded));
 }

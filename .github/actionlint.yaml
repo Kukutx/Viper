@@ -1,0 +1,5 @@
+# GitHub-hosted preview label not yet built into actionlint 1.7.12.
+# Exact Xcode version/build are independently verified by tools/apple_sdk.py.
+self-hosted-runner:
+  labels:
+    - xcode-27

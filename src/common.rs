@@ -36,7 +36,7 @@ use hbb_common::{
 };
 
 use crate::{
-    hbbs_http::{create_http_client_async, get_url_for_tls},
+    hbbs_http::{allow_insecure_tls_fallback, create_http_client_async, get_url_for_tls},
     ui_interface::{get_api_server as ui_get_api_server, get_option, is_installed, set_option},
 };
 
@@ -359,53 +359,51 @@ pub fn resample_channels(
     channels: u16,
 ) -> Vec<f32> {
     use rubato::{
-        InterpolationParameters, InterpolationType, Resampler, SincFixedIn, WindowFunction,
+        audioadapter_buffers::direct::InterleavedSlice, Async, FixedAsync, Resampler,
+        SincInterpolationParameters, SincInterpolationType, WindowFunction,
     };
-    let params = InterpolationParameters {
-        sinc_len: 256,
-        f_cutoff: 0.95,
-        interpolation: InterpolationType::Nearest,
-        oversampling_factor: 160,
-        window: WindowFunction::BlackmanHarris2,
-    };
-    let mut resampler = SincFixedIn::<f64>::new(
-        sample_rate as f64 / sample_rate0 as f64,
-        params,
-        data.len() / (channels as usize),
-        channels as _,
-    );
-    let mut waves_in = Vec::new();
-    if channels == 2 {
-        waves_in.push(
-            data.iter()
-                .step_by(2)
-                .map(|x| *x as f64)
-                .collect::<Vec<_>>(),
-        );
-        waves_in.push(
-            data.iter()
-                .skip(1)
-                .step_by(2)
-                .map(|x| *x as f64)
-                .collect::<Vec<_>>(),
-        );
-    } else {
-        waves_in.push(data.iter().map(|x| *x as f64).collect::<Vec<_>>());
+    if data.is_empty() {
+        return Vec::new();
     }
-    if let Ok(x) = resampler.process(&waves_in) {
-        if x.is_empty() {
-            Vec::new()
-        } else if x.len() == 2 {
-            x[0].chunks(1)
-                .zip(x[1].chunks(1))
-                .flat_map(|(a, b)| a.into_iter().chain(b))
-                .map(|x| *x as f32)
-                .collect()
-        } else {
-            x[0].iter().map(|x| *x as f32).collect()
+    let process = || -> ResultType<Vec<f32>> {
+        if sample_rate0 == 0 || sample_rate == 0 || !matches!(channels, 1 | 2) {
+            bail!("invalid Rubato rates or channel count");
         }
-    } else {
-        Vec::new()
+        let channels = usize::from(channels);
+        if !data.len().is_multiple_of(channels) {
+            bail!("incomplete interleaved Rubato input frame");
+        }
+        let params = SincInterpolationParameters {
+            sinc_len: 256,
+            f_cutoff: Some(0.95),
+            interpolation: SincInterpolationType::Nearest,
+            oversampling_factor: 160,
+            window: WindowFunction::BlackmanHarris2,
+        };
+        let frames = data.len() / channels;
+        let mut resampler = Async::<f64>::new_sinc(
+            f64::from(sample_rate) / f64::from(sample_rate0),
+            1.0,
+            &params,
+            frames,
+            channels,
+            FixedAsync::Input,
+        )?;
+        let input: Vec<f64> = data.iter().map(|sample| f64::from(*sample)).collect();
+        let input = InterleavedSlice::new(&input, channels, frames)?;
+        Ok(resampler
+            .process(&input, None)?
+            .take_data()
+            .into_iter()
+            .map(|sample| sample as f32)
+            .collect())
+    };
+    match process() {
+        Ok(output) => output,
+        Err(error) => {
+            log::error!("Failed to resample audio with Rubato: {error}");
+            Vec::new()
+        }
     }
 }
 
@@ -1020,7 +1018,7 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
     let tls_type = get_cached_tls_type(tls_url);
     let is_tls_not_cached = tls_type.is_none();
     let tls_type = tls_type.unwrap_or(TlsType::Rustls);
-    let client = create_http_client_async(tls_type, false);
+    let client = create_http_client_async(tls_type, false)?;
     let latest_release_response = match client.post(&url).json(&request).send().await {
         Ok(resp) => {
             upsert_tls_cache(tls_url, tls_type, false);
@@ -1029,7 +1027,7 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
         Err(err) => {
             if is_tls_not_cached && err.is_request() {
                 let tls_type = TlsType::NativeTls;
-                let client = create_http_client_async(tls_type, false);
+                let client = create_http_client_async(tls_type, false)?;
                 let resp = client.post(&url).json(&request).send().await?;
                 upsert_tls_cache(tls_url, tls_type, false);
                 resp
@@ -1596,7 +1594,7 @@ async fn post_request_(
     let mut req = create_http_client_async(
         tls_type.unwrap_or(TlsType::Rustls),
         danger_accept_invalid_cert.unwrap_or(false),
-    )
+    )?
     .post(url);
     if !header.is_empty() {
         let tmp: Vec<&str> = header.split(": ").collect();
@@ -1632,12 +1630,12 @@ async fn post_request_(
             }
             Err(e) => {
                 if (tls_type.is_none() || danger_accept_invalid_cert.is_none()) && e.is_request() {
-                    if danger_accept_invalid_cert.is_none() {
+                    if danger_accept_invalid_cert.is_none() && allow_insecure_tls_fallback() {
                         api_log!(
                             warn,
                             url,
                             API_LOG_INTERVAL,
-                            "HTTP request failed: {:?}, try again, danger accept invalid cert",
+                            "HTTP request failed: {:?}, explicit insecure TLS fallback is enabled",
                             e
                         );
                         post_request_(
@@ -1650,12 +1648,12 @@ async fn post_request_(
                             original_danger_accept_invalid_cert,
                         )
                         .await
-                    } else {
+                    } else if danger_accept_invalid_cert.is_none() && tls_type.is_none() {
                         api_log!(
                             warn,
                             url,
                             API_LOG_INTERVAL,
-                            "HTTP request failed: {:?}, try again with native-tls",
+                            "HTTP request failed: {:?}, try native-tls without weakening certificate validation",
                             e
                         );
                         post_request_(
@@ -1664,10 +1662,30 @@ async fn post_request_(
                             body,
                             header,
                             Some(TlsType::NativeTls),
-                            original_danger_accept_invalid_cert,
-                            original_danger_accept_invalid_cert,
+                            Some(false),
+                            Some(false),
                         )
                         .await
+                    } else if tls_type != Some(TlsType::NativeTls) {
+                        api_log!(
+                            warn,
+                            url,
+                            API_LOG_INTERVAL,
+                            "HTTP request failed: {:?}, try native-tls without weakening certificate validation",
+                            e
+                        );
+                        post_request_(
+                            url,
+                            tls_url,
+                            body,
+                            header,
+                            Some(TlsType::NativeTls),
+                            Some(false),
+                            Some(false),
+                        )
+                        .await
+                    } else {
+                        Err(anyhow!("{:?}", e))
                     }
                 } else {
                     Err(anyhow!("{:?}", e))
@@ -1696,7 +1714,7 @@ async fn get_http_response_async(
     let http_client = create_http_client_async(
         tls_type.unwrap_or(TlsType::Rustls),
         danger_accept_invalid_cert.unwrap_or(false),
-    );
+    )?;
     let normalized_method = method.to_ascii_lowercase();
     let mut http_client = match normalized_method.as_str() {
         "get" => http_client.get(url),
@@ -1748,9 +1766,9 @@ async fn get_http_response_async(
             }
             Err(e) => {
                 if (tls_type.is_none() || danger_accept_invalid_cert.is_none()) && e.is_request() {
-                    if danger_accept_invalid_cert.is_none() {
+                    if danger_accept_invalid_cert.is_none() && allow_insecure_tls_fallback() {
                         log::warn!(
-                            "HTTP request failed: {:?}, try again, danger accept invalid cert",
+                            "HTTP request failed: {:?}, explicit insecure TLS fallback is enabled",
                             e
                         );
                         get_http_response_async(
@@ -1764,8 +1782,11 @@ async fn get_http_response_async(
                             original_danger_accept_invalid_cert,
                         )
                         .await
-                    } else {
-                        log::warn!("HTTP request failed: {:?}, try again with native-tls", e);
+                    } else if danger_accept_invalid_cert.is_none() && tls_type.is_none() {
+                        log::warn!(
+                            "HTTP request failed: {:?}, try native-tls without weakening certificate validation",
+                            e
+                        );
                         get_http_response_async(
                             url,
                             tls_url,
@@ -1773,10 +1794,28 @@ async fn get_http_response_async(
                             body,
                             header,
                             Some(TlsType::NativeTls),
-                            original_danger_accept_invalid_cert,
-                            original_danger_accept_invalid_cert,
+                            Some(false),
+                            Some(false),
                         )
                         .await
+                    } else if tls_type != Some(TlsType::NativeTls) {
+                        log::warn!(
+                            "HTTP request failed: {:?}, try native-tls without weakening certificate validation",
+                            e
+                        );
+                        get_http_response_async(
+                            url,
+                            tls_url,
+                            method,
+                            body,
+                            header,
+                            Some(TlsType::NativeTls),
+                            Some(false),
+                            Some(false),
+                        )
+                        .await
+                    } else {
+                        Err(anyhow!("{:?}", e))
                     }
                 } else {
                     Err(anyhow!("{:?}", e))

@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 // These floating mouse widgets are used to simulate a physical mouse
 // when "mobile" -> "desktop" in mouse mode.
 // This file does not contain whole mouse widgets, it only contains
@@ -13,7 +15,6 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/remote_input.dart';
 import 'package:flutter_hbb/models/input_model.dart';
 import 'package:flutter_hbb/models/model.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 
 // Used for the wheel button and wheel scroll widgets
 const double _kSpaceToHorizontalEdge = 25;

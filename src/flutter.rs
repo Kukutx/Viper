@@ -3,7 +3,7 @@ use crate::{
     flutter_ffi::{EventToUI, SessionID},
     ui_session_interface::{io_loop, InvokeUiSession, Session},
 };
-use flutter_rust_bridge::StreamSink;
+use crate::bridge_generated::StreamSink;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use hbb_common::dlopen::{
     symbor::{Library, Symbol},
@@ -595,7 +595,9 @@ impl FlutterHandler {
             }
             if push {
                 if let Some(stream) = &session.event_stream {
-                    stream.add(EventToUI::Event(out.clone()));
+                    if let Err(error) = stream.add(EventToUI::Event(out.clone())) {
+                        hbb_common::log::debug!("Flutter event receiver closed: {error}");
+                    }
                 }
             }
         }
@@ -873,7 +875,9 @@ impl InvokeUiSession for FlutterHandler {
         for (_, session) in self.session_handlers.read().unwrap().iter() {
             if session.renderer.on_texture(display, texture) {
                 if let Some(stream) = &session.event_stream {
-                    stream.add(EventToUI::Texture(display, true));
+                    if let Err(error) = stream.add(EventToUI::Texture(display, true)) {
+                        hbb_common::log::debug!("Flutter event receiver closed: {error}");
+                    }
                 }
             }
         }
@@ -1210,7 +1214,9 @@ impl FlutterHandler {
                 }
             }
             if let Some(stream) = &h.event_stream {
-                stream.add(EventToUI::Rgba(display));
+                if let Err(error) = stream.add(EventToUI::Rgba(display)) {
+                    hbb_common::log::debug!("Flutter event receiver closed: {error}");
+                }
                 is_sent = true;
             }
         }
@@ -1240,7 +1246,9 @@ impl FlutterHandler {
             if use_texture_render || session.displays.len() > 1 {
                 if session.renderer.on_rgba(display, rgba) {
                     if let Some(stream) = &session.event_stream {
-                        stream.add(EventToUI::Texture(display, false));
+                        if let Err(error) = stream.add(EventToUI::Texture(display, false)) {
+                            hbb_common::log::debug!("Flutter event receiver closed: {error}");
+                        }
                     }
                 }
             }
@@ -1409,7 +1417,9 @@ pub fn session_start_(
 #[inline]
 fn try_send_close_event(event_stream: &Option<StreamSink<EventToUI>>) {
     if let Some(stream) = &event_stream {
-        stream.add(EventToUI::Event("close".to_owned()));
+        if let Err(error) = stream.add(EventToUI::Event("close".to_owned())) {
+            hbb_common::log::debug!("Flutter event receiver closed: {error}");
+        }
     }
 }
 
@@ -1568,7 +1578,9 @@ pub mod connection_manager {
             h.insert("name", json!(name));
 
             if let Some(s) = GLOBAL_EVENT_STREAM.read().unwrap().get(super::APP_TYPE_CM) {
-                s.add(serde_json::ser::to_string(&h).unwrap_or("".to_owned()));
+                if let Err(error) = s.add(serde_json::ser::to_string(&h).unwrap_or("".to_owned())) {
+                    hbb_common::log::debug!("Flutter event receiver closed: {error}");
+                }
             } else {
                 println!(
                     "Push event {} failed. No {} event stream found.",
@@ -1816,7 +1828,7 @@ pub fn push_session_event(session_id: &SessionID, name: &str, event: Vec<(&str, 
 
 #[inline]
 pub fn push_global_event(channel: &str, event: String) -> Option<bool> {
-    Some(GLOBAL_EVENT_STREAM.read().unwrap().get(channel)?.add(event))
+    Some(GLOBAL_EVENT_STREAM.read().unwrap().get(channel)?.add(event).is_ok())
 }
 
 #[inline]

@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:convert';
 import 'dart:async';
 
@@ -18,7 +20,6 @@ import 'package:window_size/window_size.dart' as window_size;
 
 import '../../common.dart';
 import '../../models/model.dart';
-import '../../models/platform_model.dart';
 import '../../common/shared_state.dart';
 import './popup_menu.dart';
 import './kb_layout_type_chooser.dart';
@@ -1862,8 +1863,7 @@ class _DisplayMenuState extends State<_DisplayMenu> {
           viewStyle == kRemoteViewStyleCustom;
       final scrollStyle =
           await bind.sessionGetScrollStyle(sessionId: ffi.sessionId) ?? '';
-      final edgeScrollEdgeThickness = await bind
-          .sessionGetEdgeScrollEdgeThickness(sessionId: ffi.sessionId);
+      final edgeScrollEdgeThickness = await bind.sessionGetEdgeScrollEdgeThickness(sessionId: ffi.sessionId);
       return {
         'visible': visible,
         'scrollStyle': scrollStyle,

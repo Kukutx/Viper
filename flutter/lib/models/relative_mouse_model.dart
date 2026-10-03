@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -12,7 +14,6 @@ import 'package:get/get.dart';
 
 import '../common.dart';
 import '../consts.dart';
-import 'platform_model.dart';
 
 class RelativeMouseModel {
   final SessionID sessionId;

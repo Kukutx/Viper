@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -833,7 +835,7 @@ class _GeneralState extends State<_General> {
                                 initialDirectory = user_dir;
                               }
                               String? selectedDirectory =
-                                  await FilePicker.platform.getDirectoryPath(
+                                  await FilePicker.getDirectoryPath(
                                       initialDirectory: initialDirectory);
                               if (selectedDirectory != null) {
                                 await bind.mainSetLocalOption(
@@ -2353,7 +2355,7 @@ class _CheckboxState extends State<_Checkbox> {
 }
 
 class _Printer extends StatefulWidget {
-  const _Printer({super.key});
+  const _Printer();
 
   @override
   State<_Printer> createState() => __PrinterState();
@@ -3003,50 +3005,6 @@ Widget _lock(
       ));
 }
 
-_LabeledTextField(
-    BuildContext context,
-    String label,
-    TextEditingController controller,
-    String errorText,
-    bool enabled,
-    bool secure) {
-  return Table(
-    columnWidths: const {
-      0: FixedColumnWidth(150),
-      1: FlexColumnWidth(),
-    },
-    defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-    children: [
-      TableRow(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: Text(
-              '${translate(label)}:',
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 16,
-                color: disabledTextColor(context, enabled),
-              ),
-            ),
-          ),
-          TextField(
-            controller: controller,
-            enabled: enabled,
-            obscureText: secure,
-            autocorrect: false,
-            decoration: InputDecoration(
-              errorText: errorText.isNotEmpty ? errorText : null,
-            ),
-            style: TextStyle(
-              color: disabledTextColor(context, enabled),
-            ),
-          ).workaroundFreezeLinuxMint(),
-        ],
-      ),
-    ],
-  ).marginOnly(bottom: 8);
-}
 
 class _CountDownButton extends StatefulWidget {
   _CountDownButton({

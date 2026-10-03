@@ -1,8 +1,9 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_hbb/models/platform_model.dart';
 
 import '../../common.dart';
 

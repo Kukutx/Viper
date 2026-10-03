@@ -1,5 +1,9 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
+import 'package:file_selector/file_selector.dart' as file_selector;
+import '../utils/screenshot_save.dart';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -34,7 +38,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:vector_math/vector_math.dart' show Vector2;
 
 import '../common.dart';
@@ -44,8 +47,9 @@ import 'input_model.dart';
 import 'platform_model.dart';
 import 'package:flutter_hbb/utils/scale.dart';
 
-import 'package:flutter_hbb/generated_bridge.dart'
-    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart';
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart'
+    show EventToUI, EventToUI_Event, EventToUI_Rgba, EventToUI_Texture;
 import 'package:flutter_hbb/native/custom_cursor.dart'
     if (dart.library.html) 'package:flutter_hbb/web/custom_cursor.dart';
 
@@ -506,21 +510,29 @@ class FfiModel with ChangeNotifier {
         close();
         Future.delayed(Duration.zero, () async {
           final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          String? outputFile = await FilePicker.platform.saveFile(
-            dialogTitle: '${translate('Save as')}...',
-            fileName: 'screenshot_$ts.png',
-            allowedExtensions: ['png'],
-            type: FileType.custom,
-          );
-          if (outputFile == null) {
-            bind.sessionHandleScreenshot(sessionId: sessionId, action: '2');
-          } else {
-            final res = await bind.sessionHandleScreenshot(
-                sessionId: sessionId, action: '0:$outputFile');
+          try {
+            final res = await saveScreenshotToSelectedPath(
+              selectPath: () async => (await file_selector.getSaveLocation(
+                suggestedName: 'screenshot_$ts.png',
+                confirmButtonText: translate('Save as'),
+                acceptedTypeGroups: const [
+                  file_selector.XTypeGroup(
+                    label: 'PNG', extensions: ['png'],
+                    uniformTypeIdentifiers: ['public.png'],
+                  ),
+                ],
+              ))?.path,
+              handleAction: (action) => bind.sessionHandleScreenshot(
+                sessionId: sessionId, action: action,
+              ),
+            );
             if (res.isNotEmpty) {
               msgBox(sessionId, 'custom-nook-nocancel-hasclose-error',
                   'Take screenshot', res, '', dialogManager);
             }
+          } catch (error) {
+            msgBox(sessionId, 'custom-nook-nocancel-hasclose-error',
+                'Take screenshot', error.toString(), '', dialogManager);
           }
         });
       }
@@ -1259,8 +1271,7 @@ class FfiModel with ChangeNotifier {
       if (bind.isDisableAccount()) {
         return;
       }
-      if (bind
-          .sessionGetAuditServerSync(sessionId: sessionId, typ: "conn/active")
+      if (bind.sessionGetAuditServerSync(sessionId: sessionId, typ: "conn/active")
           .isEmpty) {
         return;
       }

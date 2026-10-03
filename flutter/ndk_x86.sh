@@ -7,4 +7,4 @@
 export CFLAGS="-DBROKEN_CLANG_ATOMICS"
 export CXXFLAGS="-DBROKEN_CLANG_ATOMICS"
 
-cargo ndk --platform 21 --target i686-linux-android build --locked --release --features flutter
+python3 tools/android_cargo.py i686-linux-android build --locked --release --features flutter

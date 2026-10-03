@@ -6,7 +6,7 @@ edition = "2021"
 build= "build.rs"
 description = "RustDesk Remote Desktop"
 default-run = "rustdesk"
-rust-version = "1.75"
+rust-version = "1.88"
 
 [lib]
 name = "librustdesk"
@@ -20,7 +20,17 @@ path = "src/naming.rs"
 name = "service"
 path = "src/service.rs"
 
+[[test]]
+name = "http_dependency_contract"
+required-features = ["http-contract-tests"]
+
+[[test]]
+name = "rubato_dependency_contract"
+required-features = ["use_rubato"]
+
 [features]
+# Ephemeral certificates and a private HOME are prepared by tools/native/test-http.sh.
+http-contract-tests = []
 inline = []
 use_samplerate = ["samplerate", "libsamplerate-sys"]
 use_rubato = ["rubato"]
@@ -60,21 +70,21 @@ serde_json = "1.0"
 serde_repr = "0.1"
 cfg-if = "1.0"
 lazy_static = "1.4"
-sha2 = "0.10"
+sha2 = "0.11.0"
 repng = "0.2"
 zstd = "0.13"
 parity-tokio-ipc = { git = "https://github.com/rustdesk-org/parity-tokio-ipc" }
 magnum-opus = { git = "https://github.com/rustdesk-org/magnum-opus" }
 dasp = { version = "0.11", features = ["signal", "interpolate-linear", "interpolate"], optional = true }
-rubato = { version = "0.12", optional = true }
+rubato = { version = "5.0.1", optional = true }
 samplerate = { version = "0.2", optional = true }
 libsamplerate-sys = { version = "0.1.12", optional = true }
 uuid = { version = "1.3", features = ["v4"] }
 num_cpus = "1.15"
 bytes = { version = "1.4", features = ["serde"] }
-default-net = "0.14"
+netdev = { version = "=0.46.3", default-features = false }
 wol-rs = "1.0"
-flutter_rust_bridge = { version = "=1.80", features = ["uuid"], optional = true}
+flutter_rust_bridge = { version = "=2.13.0", features = ["uuid"], optional = true}
 errno = "0.3"
 rdev = { git = "https://github.com/rustdesk-org/rdev" }
 url = { version = "2.3", features = ["serde"] }
@@ -84,15 +94,15 @@ chrono = "0.4"
 cidr-utils = "0.5"
 fon = "0.6"
 shutdown_hooks = "0.1"
-totp-rs = { version = "5.4", default-features = false, features = ["gen_secret", "otpauth"] }
+totp-rs = { version = "6.0.0", default-features = false, features = ["std", "gen_secret", "otpauth"] }
 stunclient = "0.4"
 kcp-sys= { git = "https://github.com/rustdesk-org/kcp-sys", branch = "rustdesk-patches" }
-reqwest = { version = "0.12", features = ["blocking", "socks", "json", "native-tls", "rustls-tls", "rustls-tls-native-roots", "gzip", "zstd"], default-features=false }
+reqwest = { version = "0.13.5", features = ["blocking", "socks", "json", "query", "native-tls-no-alpn", "rustls-no-provider", "gzip", "zstd"], default-features=false }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 # https://github.com/rustdesk/rustdesk/discussions/10197, not use cpal on linux
 cpal = { git = "https://github.com/rustdesk-org/cpal", branch = "osx-screencapturekit" }
-ringbuf = "0.3"
+ringbuf = "0.5.2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 mac_address = "1.1"
@@ -125,7 +135,7 @@ winapi = { version = "0.3", features = [
     "ioapiset",
     "winspool",
 ] }
-windows = { version = "0.61", features = [
+windows = { version = "0.62.2", features = [
     "Win32",
     "Win32_Foundation",
     "Win32_Security",
@@ -145,8 +155,8 @@ windows = { version = "0.61", features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
-winreg = "0.11"
-windows-service = "0.6"
+winreg = "0.56.0"
+windows-service = "0.8.1"
 virtual_display = { path = "libs/virtual_display" }
 remote_printer = { path = "libs/remote_printer" }
 impersonate_system = { git = "https://github.com/rustdesk-org/impersonate-system" }
@@ -187,7 +197,7 @@ ttf-parser = "0.25"
 libxdo-sys = "0.11"
 psimple = { package = "libpulse-simple-binding", version = "2.27" }
 pulse = { package = "libpulse-binding", version = "2.27" }
-rust-pulsectl = { git = "https://github.com/rustdesk-org/pulsectl" }
+rust-pulsectl = { path = "libs/pulsectl" }
 async-process = "1.7"
 evdev = { git="https://github.com/rustdesk-org/evdev" }
 dbus = "0.9"
@@ -276,7 +286,7 @@ tokio = { version = "1.44", features = ["test-util"] }
 name = "RustDesk"
 identifier = "com.carriez.rustdesk"
 icon = ["res/32x32.png", "res/128x128.png", "res/128x128@2x.png"]
-osx_minimum_system_version = "10.14"
+osx_minimum_system_version = "12.3"
 
 #https://github.com/johnthagen/min-sized-rust
 [profile.release]
@@ -289,3 +299,6 @@ rpath = true
 
 [profile.dev]
 debug = 1
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(frb_expand)"] }

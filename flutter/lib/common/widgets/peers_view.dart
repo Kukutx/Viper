@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:collection';
 
@@ -15,7 +17,6 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../common.dart';
 import '../../models/peer_model.dart';
-import '../../models/platform_model.dart';
 import 'peer_card.dart';
 
 typedef PeerFilter = bool Function(Peer peer);

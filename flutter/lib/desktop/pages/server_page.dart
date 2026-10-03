@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 // original cm window in Sciter version.
 
 import 'dart:async';
@@ -19,7 +21,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../common.dart';
 import '../../common/widgets/chat_page.dart';
 import '../../models/file_model.dart';
-import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
 
 /// Set only by this window's own close control, and only once the user has confirmed. Any other

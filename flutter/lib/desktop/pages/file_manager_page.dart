@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -24,7 +26,6 @@ import '../../consts.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 import '../../common.dart';
 import '../../models/model.dart';
-import '../../models/platform_model.dart';
 import '../widgets/popup_menu.dart';
 
 /// status of location bar

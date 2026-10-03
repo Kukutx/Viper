@@ -6,10 +6,24 @@ on:
     - cron: "0 0 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-nightly-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   run-flutter-nightly-build:
     uses: ./.github/workflows/flutter-build.yml
     secrets: inherit
     with:
       upload-artifact: true
+      upload-tag: "nightly"
+  publish-release:
+    needs: [run-flutter-nightly-build]
+    uses: ./.github/workflows/release-publish.yml
+    permissions:
+      contents: write
+    with:
       upload-tag: "nightly"

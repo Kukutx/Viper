@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/hbbs/hbbs.dart';

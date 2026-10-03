@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 
@@ -15,7 +17,6 @@ import 'package:flutter_hbb/models/terminal_copy_shortcut.dart';
 import 'package:flutter_hbb/models/terminal_model.dart';
 import 'package:get/get.dart';
 
-import '../../models/platform_model.dart';
 import 'terminal_page.dart';
 import 'terminal_connection_manager.dart';
 import '../widgets/material_mod_popup_menu.dart' as mod_menu;

@@ -1,3 +1,5 @@
+import 'package:flutter_hbb/generated/flutter_ffi.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart' as bind;
 import 'dart:async';
 import 'dart:convert';
 
@@ -17,7 +19,6 @@ import 'package:flutter_hbb/utils/http_service.dart' as http;
 
 import '../../common.dart';
 import '../../models/model.dart';
-import '../../models/platform_model.dart';
 import 'address_book.dart';
 
 void clientClose(SessionID sessionId, FFI ffi) async {
@@ -1592,8 +1593,7 @@ bool allowAskForNoteAtEndOfConnection(FFI? ffi, bool closedByControlling) {
     return false;
   }
   return mainGetLocalBoolOptionSync(kOptionAllowAskForNoteAtEndOfConnection) &&
-      bind
-          .sessionGetAuditServerSync(sessionId: ffi.sessionId, typ: "conn")
+      bind.sessionGetAuditServerSync(sessionId: ffi.sessionId, typ: "conn")
           .isNotEmpty &&
       bind.sessionGetAuditGuid(sessionId: ffi.sessionId).isNotEmpty &&
       bind.sessionGetLastAuditNote(sessionId: ffi.sessionId).isEmpty &&
